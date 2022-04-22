@@ -39,6 +39,14 @@ class TestGeomValidTDES(unittest.TestCase):
                 self.tdes[pair].append(np.random.choice(invlid_tdes,1))
 
     def test_tristar_case(self):
+        self.check_tdes_are_valid()
+
+    def test_empty_tde_case(self):
+        '''When there is no tdoa in one of the channel pairs  '''
+        self.tdes[(0,1)] = []
+        self.check_tdes_are_valid()
+    
+    def check_tdes_are_valid(self):
         tdes_geomvalid = tde.geometrically_valid(self.tdes,
                                 array_geom=self.tristar,
                                 v_sound=self.vsound)
@@ -49,6 +57,7 @@ class TestGeomValidTDES(unittest.TestCase):
             all_leq = np.all(abs(np.array(tdes))<=maxdelay)
             leq_maxdelay.append(all_leq)
         self.assertTrue(np.all(leq_maxdelay))
+        
 
 if __name__ == '__main__':
     unittest.main()

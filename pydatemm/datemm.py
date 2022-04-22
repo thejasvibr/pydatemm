@@ -38,15 +38,15 @@ def datemm_per_chunk(audio, **kwargs):
     ----------
     array_geom
     v_sound
-    
     '''
     # pair-wise cross-corelations (cc) and TDOA detection
     multich_cc = tde.generate_multich_crosscorr(audio, **kwargs)
     multich_tdoas = tde.get_multich_tdoas(multich_cc, **kwargs)
-    # remove impossible TDOAs based on array geometry
+    # remove impossible pairwise TDOAs based on array geometry
     valid_tdoas = tde.geometrically_valid(multich_tdoas, **kwargs)
     # channel wise auto-correlations (aa) and peak detection
     multich_aa = tde.generate_multich_autocorr(audio)
+    # CONTINUE FROM HERE!
     aa_tdes = tde.get_multich_aa_tdes(multich_aa)
     # Raster matching - which of the pair-wise TDEs come from indirect paths?
     tdoas_rastermatched = rasmat.raster_matcher(valid_tdoas, aa_tdes, **kwargs)

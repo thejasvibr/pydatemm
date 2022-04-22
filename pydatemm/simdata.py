@@ -14,7 +14,7 @@ import scipy.signal as signal
 
 
 
-def simulate_1source_and_reflector(**kwargs):
+def simulate_1source_and_1reflector(**kwargs):
     '''
     Parameters
     ----------
