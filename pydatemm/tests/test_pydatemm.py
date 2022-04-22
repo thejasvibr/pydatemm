@@ -5,7 +5,6 @@
 
 import unittest
 
-from pydatemm import pydatemm
 
 
 class TestPydatemm(unittest.TestCase):
