@@ -31,7 +31,7 @@ import pydatemm
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode',
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.viewcode',
               'sphinx.ext.viewcode','recommonmark','sphinx.ext.mathjax',
 				'sphinx_gallery.gen_gallery']
 

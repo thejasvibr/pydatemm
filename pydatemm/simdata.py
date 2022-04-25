@@ -51,8 +51,8 @@ def simulate_1source_and_1reflector(**kwargs):
     
     
     vsound = 340.0
-    audio = np.zeros((int(fs*0.03),4))
     toa_sounds = dist_mat/vsound
+    audio = np.zeros((int(fs*np.max(toa_sounds+0.01)),4))
     toa_samples = np.int64(toa_sounds*fs)
     for channel in range(4):
         random_atten = np.random.choice(np.linspace(0.2,0.9,20),2)
@@ -81,3 +81,74 @@ def make_tristar(**kwargs):
     tristar[:,1] += [1e-3, 0.5e-3, 0.25e-3, 0.15e-3] # many algorithms don't
     # like it if your position is 0,0,0
     return tristar
+
+
+
+def simulate_1source_and_2reflector(**kwargs):
+    '''
+    Runs simulate_1source_and_1reflector twice.
+    Second time round runs with a diff source and reflector
+    Only first source and first reflector can be specified. 
+    Second source and reflector are hard coded.
+
+    Parameters
+    ----------
+    **kwargs : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+    audio , dist_mat, tristar, (sound_pos, reflection_source) = simulate_1source_and_1reflector(**kwargs)
+    audio2, _, _, (sound_pos, reflection_source2) = simulate_1source_and_1reflector(**{'sound_pos':sound_pos,
+                                                     'reflection_source':np.array([4,4,-2])})
+    both_audio = [audio, audio2]
+    samples_order = np.argsort([audio.shape[0] for each in both_audio])
+    ordered_audio = [both_audio[each] for each in samples_order] 
+    
+    final_audio = np.zeros(ordered_audio[1].shape)
+    final_audio[:ordered_audio[0].shape[0],:] += ordered_audio[0]
+    final_audio += ordered_audio[1]
+    
+    final_audio /= np.max(np.abs(final_audio))
+    final_audio *= 0.8
+    return final_audio, dist_mat, tristar, (sound_pos, [reflection_source, reflection_source2])
+
+
+def simulate_1source_and_3reflector(**kwargs):
+    '''
+    Runs simulate_1source_and_1reflector twice.
+    Second time round runs with a diff source and reflector
+    Only first source and first reflector can be specified. 
+    Second source and reflector are hard coded.
+
+    Parameters
+    ----------
+    **kwargs : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+    audio , dist_mat, tristar, (sound_pos, reflection_source) = simulate_1source_and_2reflector(**kwargs)
+    audio2, _, _, (sound_pos, reflection_source2) = simulate_1source_and_1reflector(**{'sound_pos':sound_pos,
+                                                     'reflection_source':np.array([4,5,-2])})
+    both_audio = [audio, audio2]
+    samples_order = np.argsort([audio.shape[0] for each in both_audio])
+    ordered_audio = [both_audio[each] for each in samples_order] 
+    
+    final_audio = np.zeros(ordered_audio[1].shape)
+    final_audio[:ordered_audio[0].shape[0],:] += ordered_audio[0]
+    final_audio += ordered_audio[1]
+    
+    final_audio /= np.max(np.abs(final_audio))
+    final_audio *= 0.8
+    return final_audio, dist_mat, tristar, (sound_pos, [reflection_source, reflection_source2])
+
+if __name__=='__main__':
+    a,_,_,_ = simulate_1source_and_3reflector()
+

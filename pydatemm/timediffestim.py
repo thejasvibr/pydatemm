@@ -7,8 +7,14 @@ peak detection.
 
 TODO
 ----
-Make unique keyword arguments to identify peak detection thresholds separately
+* Make unique keyword arguments to identify peak detection thresholds separately
 for cross-correlation and auto-correlation signals.
+
+References
+----------
+* Scheuing, J., & Yang, B. (2008). Disambiguation of TDOA estimation for multiple
+sources in reverberant environments. IEEE transactions on audio, speech, and
+language processing, 16(8), 1479-1489.
 """
 
 
@@ -83,37 +89,55 @@ def generate_multich_autocorr(input_audio):
 
     Returns 
     -------
-    multichannel_autocor : np.array
-        M samples x Nchannels
+    multichannel_autocor : dict
+        Keys are (channel,channel) and entry is an np.array of the 
+        autocorrelation
     '''
-    return np.apply_along_axis(lambda X: signal.correlate(X,X,'same'),0, input_audio)
-
+    multich_aa_array = np.apply_along_axis(lambda X: signal.correlate(X,X,'same'),0, input_audio)
+    channels = input_audio.shape[1]
+    multichannel_autocor = {}
+    for i in range(channels):
+        multichannel_autocor[(i,i)] = multich_aa_array[:,i]
+    return multichannel_autocor
 
 def get_multich_aa_tdes(multich_aa, **kwargs):
     '''
-    
 
     Parameters
     ----------
-    multich_aa : (samples, Mmics) np.array
+    multich_aa : dict
+    
     fs : int
 
+    
     Returns
     -------
     multich_aapeaks : dict
-        Keys with channel number (1,1) and entries with peaks in seconds. 
-    
+        Keys are channel-ID (e.g. (1,1) - autocorr of channel 1).
+        Entry is a list with tuples. Each tuple is a peak detection with 
+        three peak properties:
+        (peak position in samples, centred peak position in seconds, peak value)
+
     See Also
     --------
-    timediffestim.get_peaks
+    timediffestim.get_multich_tdoas
+    
+    Notes
+    -----
+    The output of :code:`multich_aapeaks` mirrors that of :code:`get_multich_tdoas`.
+    Ref the Notes there.
     '''
     multich_aapeaks = {}
-    nchannels = multich_aa.shape[1]
-    for channel in range(nchannels):
-        peaks = get_peaks(multich_aa[:,channel], **kwargs)
-        centred_peaks = np.array(peaks-int(multich_aa[:,channel].size/2.0), dtype=np.float64)
-        centred_peaks_sec = centred_peaks/kwargs['fs']
-        multich_aapeaks[(channel,channel)] = centred_peaks_sec
+    for channel, aa in multich_aa.items():
+        peaks_raw = get_peaks(aa, **kwargs)
+        peaks_sec = np.array(peaks_raw-int(aa.size/2.0), dtype=np.float64)
+        peaks_sec /= np.float64(kwargs['fs'])
+        peak_values = aa[peaks_raw]
+        multich_aapeaks[channel] = []
+       
+        for peak_raw, peak_sec, peak_val in zip(peaks_raw, peaks_sec, peak_values):
+            peak_tuple = (peak_raw, peak_sec, peak_val)
+            multich_aapeaks[channel].append(peak_tuple)
     return multich_aapeaks
 
 def get_multich_tdoas(multich_cc, **kwargs):
@@ -133,15 +157,41 @@ def get_multich_tdoas(multich_cc, **kwargs):
 
     Returns
     -------
-    None.
+    multich_tdoas: dict
+        Keys are channel pair (e.g. (1,0) ref to cross-corr bet 1 and 0 with 0 
+        as the reference channel.). List with tuples. Each tuple is a peak
+        detection with three peak properties:
+        (peak position in samples, centred peak position in seconds, peak value)
 
+    Notes
+    -----
+    The output from :code:`multich_tdoas` corresponds to :math:`P_{kl}`
+    in Scheuing & Yang 2008
+
+    For example the output of :code:`multich_tdoas` for 2 channels may look like
+
+    .. code-block:: python
+        
+        {(1,0): [(203565, 5.23, 1044), (2345, -0.001, 2345)],
+         (2,0): [(102,, 23e-5,  202)]} 
+
+    Here we see the (1,0) pair has two cross-cor peaks. The sample peak 
+    position is >=0. The centred peak position calculates the relative time
+    difference in seconds, and the third entry provides the value
+    :math:`r_{kl}(\eta_{\mu})` of the  peak :math:`\eta_{\mu}`.
     '''
     multich_tdoas = {}
     for ch_pair, crosscor in multich_cc.items():
-        multich_tdoas[ch_pair] = np.array( np.array(get_peaks(crosscor, **kwargs)) - int(crosscor.size/2.0),
+        peaks_raw = np.array(get_peaks(crosscor, **kwargs))
+        cc_delay_sec = np.array( peaks_raw - int(crosscor.size/2.0),
                                                               dtype=np.float64)
-        multich_tdoas[ch_pair] /= np.float64(kwargs['fs'])
-        multich_tdoas[ch_pair] = multich_tdoas[ch_pair].tolist()
+        cc_delay_sec /= np.float64(kwargs['fs']) # divide sample delay by sampling rate
+        peak_values = crosscor[peaks_raw]
+        
+        multich_tdoas[ch_pair] = []
+        for peak_raw, peak_sec, peakval in zip(peaks_raw, cc_delay_sec, peak_values):
+            peak_tuple = (peak_raw, peak_sec, peakval)
+            multich_tdoas[ch_pair].append(peak_tuple)
     return multich_tdoas
 
 def get_peaks(X,  **kwargs):
@@ -179,8 +229,9 @@ def geometrically_valid(multich_tdoas:dict, **kwargs):
     Parameters
     ----------
     multich_tdoas : dict
-        Dictionary with channel pair keys (tuples) and pairwise TDOAs in seconds
-        (np.array) entries.
+        Dictionary with channel pair keys (e.g.(1,0)) and entry is a list
+        with tuples. Each tuple is a peak detection with 
+        peak sample position, peak time position, peak value.
     array_geom: (Mmics,3) np.array
         XYZ coordinates of M microphones
     v_sound: float, optional 
@@ -189,8 +240,12 @@ def geometrically_valid(multich_tdoas:dict, **kwargs):
     Returns
     -------
     geom_valid_tdoas : dict
-        Keys are channel pair number e.g. (0,2) and entries are time difference
-        of arrivals in seconds as a list. 
+        Keys are channel pair number e.g. (0,2) and entries are lists with
+        tuples for each peak detection. 
+    
+    See Also
+    --------
+    get_multich_tdoas
     '''
     v_sound = kwargs.get('v_sound', 340)
     distmat = spatial.distance_matrix(kwargs['array_geom'], kwargs['array_geom'])
@@ -205,32 +260,37 @@ def geometrically_valid(multich_tdoas:dict, **kwargs):
         if len(pair_tdoas)==0:
             continue 
         # if not empty
-        for tdoa in pair_tdoas:
-            if abs(tdoa)<=mic2mic_delay:
-                geom_valid_tdoas[ch_pair].append(tdoa)
+        for peak_details in pair_tdoas:
+            peak_delay = peak_details[1]
+            if abs(peak_delay)<=mic2mic_delay:
+                geom_valid_tdoas[ch_pair].append(peak_details)
     return geom_valid_tdoas
-                
+
+
+def get_positive_aa_peaks(multich_aa):
+    pos_multich_aa = {}
+    for channel, aa_peaks in multich_aa.items():
+        pos_multich_aa[channel] = []
+        for each in aa_peaks:
+            _, delay, _ = each
+            if delay>0.0:
+                pos_multich_aa[channel].append(each)
+    return pos_multich_aa
 
 if __name__ == '__main__':
     from simdata import simulate_1source_and_1reflector
     audio, _, _, _ = simulate_1source_and_1reflector()
     multich_cc = generate_multich_crosscorr(audio, use_gcc=True)
     multich_ac = generate_multich_autocorr(audio)
-
+    
+    cc_peaks = get_multich_tdoas(multich_cc, min_height=2, fs=192000)
     #%%
-    rnaudio = np.random.normal(0,1,1000)
-    mch_audio = np.column_stack((rnaudio,
-                                 np.roll(rnaudio,10),
-                                 np.roll(rnaudio,-10),
-                                 np.roll(rnaudio,-30)))
-    
-    
-    mcs_cc = generate_multich_crosscorr(mch_audio)
-    mch_peaks = get_multich_tdoas(mcs_cc, min_height=200, fs=192000.0)
+    multiaa = get_multich_aa_tdes(multich_ac, fs=192000, min_height=2)
     #%%
-    mch_audio[:,0] += np.roll(mch_audio[:,0], 30)*0.2
-    multiaa = get_multich_aa_tdes(mch_audio, fs=192000)
-    
+    # plot all the cross-cor peaks
+    uu = {}
+    for k, pks in cc_peaks.items():
+        uu[k] = [each[1]*10**3 for each in pks]
     
     
 

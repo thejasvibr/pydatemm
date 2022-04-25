@@ -46,7 +46,6 @@ def datemm_per_chunk(audio, **kwargs):
     valid_tdoas = tde.geometrically_valid(multich_tdoas, **kwargs)
     # channel wise auto-correlations (aa) and peak detection
     multich_aa = tde.generate_multich_autocorr(audio)
-    # CONTINUE FROM HERE!
     aa_tdes = tde.get_multich_aa_tdes(multich_aa)
     # Raster matching - which of the pair-wise TDEs come from indirect paths?
     tdoas_rastermatched = rasmat.raster_matcher(valid_tdoas, aa_tdes, **kwargs)
