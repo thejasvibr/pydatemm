@@ -102,6 +102,7 @@ def generate_multich_autocorr(input_audio):
 
 def get_multich_aa_tdes(multich_aa, **kwargs):
     '''
+    Calculates the positive autocorrelation peaks across multiple channels.
 
     Parameters
     ----------
@@ -112,7 +113,7 @@ def get_multich_aa_tdes(multich_aa, **kwargs):
     
     Returns
     -------
-    multich_aapeaks : dict
+    positive_multich_aapeaks : dict
         Keys are channel-ID (e.g. (1,1) - autocorr of channel 1).
         Entry is a list with tuples. Each tuple is a peak detection with 
         three peak properties:
@@ -138,7 +139,10 @@ def get_multich_aa_tdes(multich_aa, **kwargs):
         for peak_raw, peak_sec, peak_val in zip(peaks_raw, peaks_sec, peak_values):
             peak_tuple = (peak_raw, peak_sec, peak_val)
             multich_aapeaks[channel].append(peak_tuple)
-    return multich_aapeaks
+    
+    positive_multich_aapeaks = get_positive_aa_peaks(multich_aapeaks)
+    
+    return positive_multich_aapeaks
 
 def get_multich_tdoas(multich_cc, **kwargs):
     '''
