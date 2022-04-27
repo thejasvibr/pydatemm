@@ -277,14 +277,12 @@ def make_Pprime_kl(Pkl, peak_qualities):
     '''
     rkl_values = [rkl for (_,_,rkl) in Pkl]
     t_kl = np.min(rkl_values)
-    print(f'tkl:{t_kl}')
    
     # keep only those peaks with quality of at least tkl
     Pprime_kl = []
     for peak in peak_qualities:
         quality_score = peak[-1]
         if quality_score>=t_kl:
-            print(quality_score, t_kl)
             Pprime_kl.append(peak)
     return Pprime_kl
 
