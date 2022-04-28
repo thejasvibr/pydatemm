@@ -12,6 +12,58 @@ import numpy as np
 import scipy.spatial as spatial 
 import scipy.signal as signal 
 
+def  simulate_1source_and1reflector_general(**kwargs):
+    '''
+    if nmics>4 , then nmics with an x-y-z 
+    distribution of N(0,2) are created.
+
+    Parameters
+    ----------
+    sound_pos: (1,3) np.array, optional
+    reflection_source: (1,3) np.array, optional
+    nmics : int, optional
+
+    Returns
+    -------
+    None.
+
+    '''
+    nmics = kwargs.get('nmics', 4)
+    if nmics == 4:
+        array_geom = make_3dtristar(**kwargs)
+    else:
+        array_geom = np.random.normal(0,2,nmics*3).reshape(-1,3)
+    
+    sound_pos = kwargs.get('sound_pos',np.array([3,2,1]))
+    reflection_source = kwargs.get('reflection_source',np.array([1,4,1]))
+    direct_indirect_sources = np.row_stack((sound_pos, reflection_source))
+    # direct path propagation:
+    
+    dist_mat = spatial.distance_matrix(direct_indirect_sources, array_geom)
+    #add the distance of propagation from source to reflection point
+    source_to_reflectionpoint = spatial.distance.euclidean(sound_pos, reflection_source)
+    dist_mat[1,:] += source_to_reflectionpoint
+    
+    # make the direct
+    
+    chirp_durn = 0.003
+    fs = 192000
+    t = np.linspace(0,chirp_durn,int(fs*chirp_durn))
+    chirp = signal.chirp(t,80000,t[-1],25000)
+    chirp *= signal.hann(chirp.size)*0.5
+    
+    
+    vsound = 340.0
+    toa_sounds = dist_mat/vsound
+    audio = np.zeros((int(fs*np.max(toa_sounds+0.01)),nmics))
+    toa_samples = np.int64(toa_sounds*fs)
+    for channel in range(nmics):
+        random_atten = np.random.choice(np.linspace(0.2,0.9,20),2)
+        start_direct, start_indirect = toa_samples[0,channel], toa_samples[1,channel]
+        audio[start_direct:start_direct+chirp.size,channel] += chirp*random_atten[0]
+        audio[start_indirect:start_indirect+chirp.size,channel] += chirp*random_atten[1]
+    audio += np.random.normal(0,1e-5,audio.size).reshape(audio.shape)
+    return audio , dist_mat, array_geom, (sound_pos, reflection_source)
 
 
 def simulate_1source_and_1reflector(**kwargs):

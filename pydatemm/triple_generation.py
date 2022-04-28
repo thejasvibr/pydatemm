@@ -10,8 +10,37 @@ References
 '''
 import numpy as np 
 from itertools import combinations
+from dataclasses import dataclass
 
-def generate_consistent_triples(nchannels, Pprime_kl, **kwargs):
+@dataclass
+class triple():
+    '''
+    Parameters
+    ----------
+    nodes : tuple
+        Tuple with a,b,c nodes (channel #'s) e.g. (0,1,2)
+    tde_ab, tde_bc, tde_ca: tuple
+        Tuple which represents the time-difference estimate
+        of each channel pair in that order, along with the 
+        quality of that time-difference. e.g. for tde_ab
+        the tuple may be (-5.5e-3, 29.3)
+
+    TODO
+    ----
+    implement an equals __eq__ for the triple dataclass - to check that
+    two triples have the same data
+    '''
+    nodes : tuple
+    tde_ab: tuple
+    tde_bc: tuple
+    tde_ca: tuple
+    
+    def __post_init__(self):
+        '''generate the triple ID'''
+        self.triple_id = str(self.nodes)+'_'+str(self.tde_ab)+'_'+str(self.tde_bc)+'_'+str(self.tde_ca)
+        self.quality = np.nan
+
+def generate_consistent_triples(Pprime_kl, **kwargs):
     '''
     Generates all possible consistent triples from the detected TDOAs.
     First calculates all possible triple cases (e.g. for 4 channel recording
@@ -22,9 +51,9 @@ def generate_consistent_triples(nchannels, Pprime_kl, **kwargs):
    
     Parameters
     ----------
+    Pprime_kl : dict
     nchannels : int
         Number of channels
-    Pprime_kl : dict
     twtm : float
     
     Returns
@@ -32,10 +61,12 @@ def generate_consistent_triples(nchannels, Pprime_kl, **kwargs):
     consistent_triples : list
         List with multiple consistent triples.
     '''
-    all_triplet_cases = list(combinations(range(nchannels), 3))
-    consistent_triples = []
+    all_triplet_cases = list(combinations(range(kwargs['nchannels']), 3))
+    consistent_triples_raw = []
     for triple_case in all_triplet_cases:
-        consistent_triples = consistent_triples + choose_consistent_triples(triple_case, Pprime_kl, **kwargs)
+        consistent_triples_raw = consistent_triples_raw + choose_consistent_triples(triple_case, Pprime_kl, **kwargs)
+    # reformat the contents
+    consistent_triples = [ triple(each[0], each[1], each[2], each[3]) for each in consistent_triples_raw]
     return consistent_triples
 
 def choose_consistent_triples(triple_name, Pkl, **kwargs):
@@ -75,8 +106,6 @@ def make_channel_pairs_from_triple(triple_name):
     a,b,c = triple_name
     return (a,b), (b,c), (c,a)
 
-
-
 def mirror_Pprime_kl(P_primekl):
     ''' The raw Pprime_kl has unique channel pairs, with pairs in 
     descending channel order (smaller channel is reference). 
@@ -112,11 +141,12 @@ if __name__ == '__main__':
     from itertools import permutations
     audio, distmat, arraygeom, _ = simulate_1source_and_3reflector()
     fs = 192000
+    kwargs = {'nchannels':audio.shape[1], 'twtm':1e-4}
     multich_cc = generate_multich_crosscorr(audio, use_gcc=True)
     multich_ac = generate_multich_autocorr(audio)
     cc_peaks = get_multich_tdoas(multich_cc, min_height=2, fs=192000)
     multiaa = get_multich_aa_tdes(multich_ac, fs=192000, min_height=2) 
-   
+
     tdoas_rm = multichannel_raster_matcher(cc_peaks, multiaa, twrm=10/fs, array_geom=arraygeom)
     tdoas_mirrored = mirror_Pprime_kl(tdoas_rm)
     true_tdoas = {}
@@ -127,4 +157,5 @@ if __name__ == '__main__':
         true_tdoas[chpair] = tdoa
     #%%
     # Now get all approx consistent triples
-    consistent_triples = generate_consistent_triples(audio.shape[1], tdoas_mirrored, twtm=1e-5)
+    consistent_triples = generate_consistent_triples(tdoas_mirrored, **kwargs)
+    

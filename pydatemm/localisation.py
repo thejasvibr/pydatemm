@@ -9,34 +9,12 @@ built from graph synthesis.
 import numpy as np 
 import scipy.spatial as spatial
 matmul = np.matmul
-def spherical_interpolation_huang(d, **kwargs):
-    '''
-    
-
-    Parameters
-    ----------
-    d : TYPE
-        DESCRIPTION.
-    S : (Mmics, 3) np.array
-        Sensory geometry with xyz coordinates
-    **kwargs : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-    
-    References
-    ----------
-    * Huang et al. 2001, Real-time passive source localization: a practical
-    linear-correction least-squares approach, ICASSP
-    '''
-    
-
-
 
 def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     '''
+    Spiesberger & Wahlberg solution. Provides *two* potential solutions, the
+    correct one needs to be chosen based on validity.
+
     Parameters
     ----------
     array_geometry: (Nmics,3) np.array
@@ -47,6 +25,9 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
         All range_differences (:math:`d_{0..N}`), are calculated by
         taking :math:`D_{i}-D_{0}`, where :math:`D` is the direct
         range from a mic to the source.
+    c: float, optional
+        Speed of sound in m/s. Defaults to 340 m/s.
+
     Returns
     -------
     s : list
@@ -61,8 +42,13 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     relative subtraction and addition. 
     
     Code taken from the batracker package.
+    
+    Reference
+    ---------
+    1. Spiesberger & Wahlberg 2002, Probability density functions for hyperbolic and isodiachronic locations, 
+       JASA, 112, 3046 (2002); doi: 10.1121/1.1513648
     '''
-    c = kwargs.get('c', 338.0) # m/s
+    c = kwargs.get('c', 340.0) # m/s
     # check that the 1st mic is origin - else set it to 0,0,0
     if not np.array_equal(array_geometry[0,:], np.array([0,0,0])):
         mic1_notorigin = True
@@ -119,7 +105,7 @@ if __name__ == '__main__':
     from simdata import simulate_1source_and_1reflector, simulate_1source_and_1reflector_3dtristar
     audio, distmat, array_geom, (source,ref)= simulate_1source_and_1reflector()
     d = np.array([each-distmat[0,0] for each in distmat[0,1:]])
-    spiesberger_wahlberg_solution(array_geom,d, c=340)
+    loc1, loc2 = spiesberger_wahlberg_solution(array_geom,d, c=340)
 
     
     
