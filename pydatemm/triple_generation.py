@@ -24,7 +24,20 @@ class triple():
         of each channel pair in that order, along with the 
         quality of that time-difference. e.g. for tde_ab
         the tuple may be (-5.5e-3, 29.3)
+    
+    Attributes
+    ----------
+    triple_id : str
+        A concatenation of the nodes and time differences
+    quality : float
+        The triple quality score. The closer the sum of differences
+        is to zero, the higher the score. See eqn. 23 Scheuing & Yang 2008
 
+    See Also
+    --------
+    generate_consistent_triples
+    
+    
     TODO
     ----
     implement an equals __eq__ for the triple dataclass - to check that
@@ -39,6 +52,13 @@ class triple():
         '''generate the triple ID'''
         self.triple_id = str(self.nodes)+'_'+str(self.tde_ab)+'_'+str(self.tde_bc)+'_'+str(self.tde_ca)
         self.quality = np.nan
+    
+    def __eq__(self, other):
+        if other.__class__ is not self.__class__:
+            raise NotImplementedError(f'{other.__class__} and a triple cannot be compared')
+        values = [self.nodes, self.tde_ab, self.tde_bc, self.tde_ca, self, self.quality]
+        input_values = [other.nodes, other.tde_ab, other.tde_bc, other.tde_ca, other, other.quality]
+        return values==input_values
 
 def generate_consistent_triples(Pprime_kl, **kwargs):
     '''
@@ -59,7 +79,11 @@ def generate_consistent_triples(Pprime_kl, **kwargs):
     Returns
     -------
     consistent_triples : list
-        List with multiple consistent triples.
+        List with multiple triple objects. 
+    
+    See Also
+    --------
+    triple
     '''
     all_triplet_cases = list(combinations(range(kwargs['nchannels']), 3))
     consistent_triples_raw = []
