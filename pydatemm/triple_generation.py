@@ -10,55 +10,7 @@ References
 '''
 import numpy as np 
 from itertools import combinations
-from dataclasses import dataclass
-
-@dataclass
-class triple():
-    '''
-    Parameters
-    ----------
-    nodes : tuple
-        Tuple with a,b,c nodes (channel #'s) e.g. (0,1,2)
-    tde_ab, tde_bc, tde_ca: tuple
-        Tuple which represents the time-difference estimate
-        of each channel pair in that order, along with the 
-        quality of that time-difference. e.g. for tde_ab
-        the tuple may be (-5.5e-3, 29.3)
-    
-    Attributes
-    ----------
-    triple_id : str
-        A concatenation of the nodes and time differences
-    quality : float
-        The triple quality score. The closer the sum of differences
-        is to zero, the higher the score. See eqn. 23 Scheuing & Yang 2008
-
-    See Also
-    --------
-    generate_consistent_triples
-    
-    
-    TODO
-    ----
-    implement an equals __eq__ for the triple dataclass - to check that
-    two triples have the same data
-    '''
-    nodes : tuple
-    tde_ab: tuple
-    tde_bc: tuple
-    tde_ca: tuple
-    
-    def __post_init__(self):
-        '''generate the triple ID'''
-        self.triple_id = str(self.nodes)+'_'+str(self.tde_ab)+'_'+str(self.tde_bc)+'_'+str(self.tde_ca)
-        self.quality = np.nan
-    
-    def __eq__(self, other):
-        if other.__class__ is not self.__class__:
-            raise NotImplementedError(f'{other.__class__} and a triple cannot be compared')
-        values = [self.nodes, self.tde_ab, self.tde_bc, self.tde_ca, self, self.quality]
-        input_values = [other.nodes, other.tde_ab, other.tde_bc, other.tde_ca, other, other.quality]
-        return values==input_values
+from pydatemm.tdoa_objects import triple
 
 def generate_consistent_triples(Pprime_kl, **kwargs):
     '''
@@ -80,7 +32,7 @@ def generate_consistent_triples(Pprime_kl, **kwargs):
     -------
     consistent_triples : list
         List with multiple triple objects. 
-    
+
     See Also
     --------
     triple
