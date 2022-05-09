@@ -37,12 +37,16 @@ class TestMergeGraphs(unittest.TestCase):
     
     def test_bad_merge(self):
         self.prep_good_merge()
-        self.a[1,0] = 2
-        print(self.a, '\n', self.b)
-        output_graph = merge_graphs([self.a, self.b])
-        #with self.assertRaises(ValueError, msg='Unmergeable graphs. Some entries are incompatible'):
-            
-        
+        self.a[2,0] = 2; self.a[0,2] = -2
+        with self.assertRaises(ValueError, msg='Unmergeable graphs. Some entries are incompatible'):
+            output_graph = merge_graphs([self.a, self.b])    
+    
+    def test_asymm_merge(self):
+        self.prep_good_merge()
+        self.a[2,0] = 5;
+        with self.assertRaises(ValueError, msg='The 0th graph in input list is not symmetric. Cannot proceed.'):
+            output_graph = merge_graphs([self.a, self.b])    
+
 if __name__ == '__main__':
     unittest.main()
         

@@ -10,6 +10,11 @@ missing entries, as well as
 Reference
 ---------
 * Scheuing & Yang 2008, ICASSP
+
+
+TODO
+----
+* Make the code robust to starter seed :| ...
 '''
 import numpy as np
 from pydatemm.common_funcs import nona, find_unique_Ntuplets, merge_graphs
@@ -19,13 +24,13 @@ from itertools import combinations, product
 from copy  import deepcopy
 #%%
 
-def fill_up_triple_hole_in_star(star, triple_pool):
+def fill_up_triple_hole_in_star(star_in, triple_pool):
     '''
     Tries to fill a missing triple in a star's graph.
 
     Parameters
     ----------
-    star : dataclass
+    star_in : dataclass
         tdoa_objects.star instance
     triple_pool : list
         List with consistent triples sorted by quality
@@ -37,25 +42,37 @@ def fill_up_triple_hole_in_star(star, triple_pool):
     filled_star : dataclass
         A copy of the input :code:`star` object. If fillled, then 
         with a different graph structure, else an identical copy.
+    
+    TODO
+    ----
+    * Right now implementation only works if there's only one triplet missing.
+    Implement when there are multiple triplet holes.
     '''
-    filled_star = deepcopy(star)
-    filled = False
-    if not star.is_complete_graph():
-        num_missing_entries = np.sum(np.isnan(star.graph))-star.graph.shape[0]
+    filled_star = deepcopy(star_in)
+    if not star_in.is_complete_graph():
+        num_missing_entries = np.sum(np.isnan(star_in.graph))-star_in.graph.shape[0]
         num_missing_entries *= 0.5 # consider only one of the lower/upper triangles
-        if num_missing_entries==3:
-            target_triple_nodes = missing_triplet_id(star.graph)
-            potential_triples = list(filter(lambda X: X.nodes==target_triple_nodes,
-                                                                triple_pool))
-            if len(potential_triples)>0:
-                filler_triple = potential_triples[0]
-                triple_graph = make_triplet_graph(filler_triple, **kwargs)
-                filled_star.graph = merge_graphs([filled_star.graph, triple_graph])
-                filled_star.component_triples.append(filler_triple)
-                filled = True
-        else:
-            filled = False
+    else: 
+        raise ValueError('Complete graph input - cannot fill up triple holes')  
+    target_triple_nodes = missing_triplets(star_in.graph)
 
+    for each in target_triple_nodes:
+        potential_triples = list(filter(lambda X: X.nodes==each,
+                                                            triple_pool))
+        for filler_triple in potential_triples:
+            triple_graph = make_triplet_graph(filler_triple, **kwargs)
+            try:
+                one_triple_filled = merge_graphs([filled_star.graph, triple_graph])
+                # if matching triple found - then move onto searching for the next
+                # unique triple nodeset
+                filled_star.graph = one_triple_filled
+                filled_star.component_triples.append(filler_triple)
+                break
+            except:
+                # what if the merge can't happen with this candidate triple??
+                # then move onto next potential triple
+                pass
+    filled =  filled_star.is_complete_graph()
     return filled, filled_star
 
 def get_component_triples(tdoa_object):
@@ -125,18 +142,27 @@ def merge_quads_to_star(quads):
     startuplet.component_quads = quads
     return startuplet
 
-def missing_triplet_id(graph):
-    '''finds missing weights, and the appropriate triplets'''
+def missing_triplets(graph):
+    '''
+    Finds missing weights, and the appropriate triplets
+    
+    Parameters
+    ----------
+    graph : np.array
+    
+    Returns
+    -------
+    target_triples : list 
+        List with tuples with missing tuple nodes.
+    '''
     # search all possible triples in sorted consistent triples list
     missing_entries = np.argwhere(np.isnan(graph))
     # remove diagonal elements
     offdiagonal_inds = [each for each in missing_entries if not each[0]==each[1]]
     target_triple_nodes = tuple(set(np.array(offdiagonal_inds).flatten()))
-    if len(target_triple_nodes)==3:
-        return target_triple_nodes
-    else:
-        # make all possible triplet combinations
-        raise NotImplementedError('>1 triplet missing not implemented')
+    target_triples = list(combinations(target_triple_nodes, 3))
+    return target_triples
+    
 
 def validate_multi_quad_merge(quads):
     '''
@@ -315,9 +341,8 @@ def sort_triples_by_quality(triples, **kwargs):
         quality = triplet_quality(each, **kwargs)
         each.quality = quality
         triples_quality.append(quality)
-    # thanks to https://www.adamsmith.haus/python/answers/how-to-sort-a-list-based-on-another-list-in-python
-    zipped_sorted_lists = sorted(zip(triples_quality, triples), reverse=True)
-    sorted_triples = [element for _, element in zipped_sorted_lists]
+    argsorted = np.argsort(triples_quality)[::-1]# descending order
+    sorted_triples = [triples[index] for index in argsorted]
     return sorted_triples
 
 def triplet_quality(triplet, **kwargs):
@@ -369,7 +394,7 @@ def generate_quads_from_seed_triple(seed_triple, sorted_triples):
     possible_pairs = list(combinations(range(len(valid_triple_pool)), 2))
     valid_quads = []
     for (triple2, triple3) in possible_pairs:
-        out = triplet_to_quadruplet(best_triple,
+        out = triplet_to_quadruplet(seed_triple,
                                     valid_triple_pool[triple2],
                                     valid_triple_pool[triple3], **kwargs)
         # if all values are np.nan
@@ -387,9 +412,9 @@ if __name__ == '__main__':
     from pydatemm.raster_matching import multichannel_raster_matcher
     from pydatemm.triple_generation import mirror_Pprime_kl, generate_consistent_triples
     from itertools import permutations
-    np.random.seed(82310)
+    np.random.seed(8221) # what works np.random.seed(82310)
     nchannels = 7
-    audio, distmat, arraygeom, _ = simulate_1source_and1reflector_general(nmics=nchannels)
+    audio, distmat, arraygeom, source_reflect = simulate_1source_and1reflector_general(nmics=nchannels)
     fs = 192000
     
     kwargs = {'twrm': 50/fs,
@@ -414,38 +439,62 @@ if __name__ == '__main__':
         true_tdoas[chpair] = tdoa
     consistent_triples = generate_consistent_triples(tdoas_mirrored, **kwargs)
     sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)  
-    used_triple_pool = deepcopy(sorted_triples_full)
+    #used_triple_pool = deepcopy(sorted_triples_full)
     #%% choose triplet with highest quality score and then begin to build out
-    potential_source_tdoas = []
-    seed_triples_present = True
-    rounds = 0
-    while seed_triples_present:
-        best_triple = used_triple_pool[0]
-        potential_quads = generate_quads_from_seed_triple(best_triple, used_triple_pool)
-        nodeset_combis = group_into_nodeset_combis(potential_quads)
-        for each_combi in nodeset_combis:
-            if len(each_combi)>0:
-                star1 = merge_quads_to_star(each_combi)
-                success, ff_star  = fill_up_triple_hole_in_star(star1, used_triple_pool)     
-                if success:
-                    # remove all component triplets that went into making the filled star
-                    comp_triples = get_component_triples(ff_star)   
-                    used_triple_pool = remove_objects_in_pool(comp_triples, used_triple_pool)
-                    # append the filled star to a list of potential sources
-                    potential_source_tdoas.append(ff_star)
-                else:
-                    # move onto the next nodeset combination
-                    pass
-        rounds += 1 
-        if rounds>= len(used_triple_pool):
-            break
+    def build_full_tdoas(sortedtriples):
+        '''
+        Starts with the most promising triple, and proceeds to build
+        quadruples, stars and complete graphs. 
         
-
+        Parameters
+        ----------
+        sortedtriples : list
+            List with triples sorted by their quality.
+        
+        Returns
+        -------
+        potential_source_tdoas : list
+            List with various TDOA objects.
+        '''
+        potential_source_tdoas = []
+        seed_triples_present = True
+        rounds = 0
+        used_triple_pool = deepcopy(sortedtriples)
+        while seed_triples_present:
+            best_triple = used_triple_pool[0]
+            potential_quads = generate_quads_from_seed_triple(best_triple,
+                                                              used_triple_pool)
+            nodeset_combis = group_into_nodeset_combis(potential_quads)
+            for each_combi in nodeset_combis:
+                if len(each_combi)>0:
+                    star1 = merge_quads_to_star(each_combi)
+                    success, ff_star  = fill_up_triple_hole_in_star(star1, used_triple_pool)     
+                    if success:
+                        # remove all component triplets that went into making the filled star
+                        comp_triples = get_component_triples(ff_star)   
+                        used_triple_pool = remove_objects_in_pool(comp_triples, used_triple_pool)
+                        # append the filled star to a list of potential sources
+                        potential_source_tdoas.append(ff_star)
+                    else:
+                        # move onto the next nodeset combination
+                        pass
+            rounds += 1 
+            if rounds>= len(used_triple_pool):
+                break
+        return used_triple_pool, potential_source_tdoas
+    #%%
+    trippool, pot_tdoas = build_full_tdoas(sorted_triples_full)
+    #%% Let's try to localise the sources from each of the sound sources
+    from pydatemm.localisation import spiesberger_wahlberg_solution
+    d_0 = pot_tdoas[0].graph[1:,0]*340
+    sources = spiesberger_wahlberg_solution(arraygeom,  d=d_0)
+    print(sources)
     #%%   
-    # #%% Actuall gra
-    # source1_graph = np.zeros([kwargs['nchannels']]*2)
-    # for i in range(kwargs['nchannels']):
-    #     for j in range(kwargs['nchannels']):
-    #         diff_dist = j-i
-    #         source1_graph[i,j] = diff_dist/340
+    #%% Actuall graph if everything was correct
+        
+    source1_graph = np.zeros([kwargs['nchannels']]*2)
+    for i in range(kwargs['nchannels']):
+        for j in range(kwargs['nchannels']):
+            diff_dist = distmat[0,j]-distmat[0,i]
+            source1_graph[i,j] = diff_dist
     
