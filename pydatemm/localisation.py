@@ -18,7 +18,7 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     Parameters
     ----------
     array_geometry: (Nmics,3) np.array
-        A Nmicsx3 array with xyz coordinates of >= 4 mics.
+        A Nmicsx3 array with xyz coordinates of > 4 mics.
         The first mic will be taken as the reference microphone.
     d:  (Nmics-1,1) np.array
         A Nmics-1 np.array with the range_differences in metres to the source. 
@@ -30,24 +30,31 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
 
     Returns
     -------
-    s : list
-        A list with two 3x1 np.arrays with the x,y,z positions of the source.
-        The two xyz positions describe two possible solutions to the given 
-        array geometry and range differences.
+    s : (3,1) np.array
+        The x,y,z position of the source.
     
     Notes
     -----
-    The first mic in this formulation must be the origin (0,0,0). If array_geometry
+    * When speed of sound is homogeneous the Spiesberger-Wahlberg method
+    provides two potential solutions - only one of which is the valid one.
+    Here only the 'correct' solution is defined as the one resulting
+    in the same/similar TDOAs as the input TDOA.
+
+    * The first mic in this formulation must be the origin (0,0,0). If array_geometry
     doesn't have the first mic's position as 0,0,0 - this is taken care of using 
     relative subtraction and addition. 
-    
-    Code taken from the batracker package.
     
     Reference
     ---------
     1. Spiesberger & Wahlberg 2002, Probability density functions for hyperbolic and isodiachronic locations, 
        JASA, 112, 3046 (2002); doi: 10.1121/1.1513648
+       
+    Code modified from the batracker package.
     '''
+    nmics = array_geometry.shape[0]
+    if nmics<=4:
+        raise ValueError(f'Array with {nmics} input. Cannot provide unique solutions')
+
     c = kwargs.get('c', 340.0) # m/s
     # check that the 1st mic is origin - else set it to 0,0,0
     if not np.array_equal(array_geometry[0,:], np.array([0,0,0])):
@@ -99,13 +106,62 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     if mic1_notorigin:
         for each in s:
             each += mic1
-    return s
+    
+    valid_solution = choose_SW_valid_solution(s, array_geometry, d, **kwargs)
+    
+    return valid_solution
+
+def euclid_dist(X,Y):
+    try:
+        dist = spatial.distance.euclidean(X,Y)
+    except ValueError:
+        dist = np.nan
+    return dist
+        
+
+def choose_SW_valid_solution(sources, array_geom, rangediffs, **kwargs):
+    '''
+    Parameters
+    ----------
+    sources : list
+        List with 2 sources. Each source is a (3,)/(3,1) np.array
+    array_geom
+    rangediffs : np.array
+        Range differences to reference microphone. The ref. microphone
+        is assumed to be the first row of the array_geom.
+    '''
+    source_rangediffs =  [ make_rangediff_mat(each, array_geom)[1:,0] for each in sources]
+    residuals = [np.nansum(np.abs(each-rangediffs)) for each in source_rangediffs]
+    # choose the source with lower rangediff residuals
+    lower_error_source = np.argmin(residuals)
+    valid_solution = sources[lower_error_source]
+    return valid_solution
+    
+def make_rangediff_mat(source, array_geom):
+    distmat = np.apply_along_axis(euclid_dist, 1, array_geom, source)
+    rangediff = np.zeros((distmat.size, distmat.size))
+    for i in range(rangediff.shape[0]):
+        for j in range(rangediff.shape[1]):
+            rangediff[i,j] = distmat[i]-distmat[j]
+    return rangediff
+
+#%%
 
 if __name__ == '__main__':
-    from simdata import simulate_1source_and_1reflector, simulate_1source_and_1reflector_3dtristar
-    audio, distmat, array_geom, (source,ref)= simulate_1source_and_1reflector()
+    from simdata import simulate_1source_and1reflector_general, simulate_1source_and_1reflector_3dtristar
+    audio, distmat, array_geom, (source,ref)= simulate_1source_and1reflector_general(**{'nmics':5})
+    
     d = np.array([each-distmat[0,0] for each in distmat[0,1:]])
-    loc1, loc2 = spiesberger_wahlberg_solution(array_geom,d, c=340)
+    source_pos = spiesberger_wahlberg_solution(array_geom,d, c=340)
+    # get the expected tdoa match from each source 
+    print(source_pos)
+    
+    
+    #%%
+   
+    
+    
+    
 
     
     

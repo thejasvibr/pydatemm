@@ -23,6 +23,78 @@ from pydatemm.tdoa_objects import quadruple, star
 from itertools import combinations, product
 from copy  import deepcopy
 #%%
+def build_full_tdoas(sortedtriples):
+    '''
+    Starts with the most promising triple, and proceeds to build
+    quadruples, stars and complete graphs. 
+    
+    Parameters
+    ----------
+    sortedtriples : list
+        List with triples sorted by their quality.
+    
+    Returns
+    -------
+    potential_source_tdoas : list
+        List with complete TDOA objects representing potential
+        sources.
+    
+    Notes
+    -----
+    This function implements the 'core' of the DATEMM algorithm described
+    in Steps S4-S8 in Table 1 of the Scheuing & Yang 2008 paper. 
+    
+    TODO
+    ----
+    * Have separate lists with seed-triples and triples used to fill 
+    TOAD holes
+    '''
+    potential_source_tdoas = []
+    seed_triples_present = True
+    rounds = 0
+    used_triple_pool = deepcopy(sortedtriples)
+    seed_pool = deepcopy(sortedtriples)
+    print('miaow...')
+    while seed_triples_present:
+        best_triple = seed_pool[0] # choose the highest quality triple.
+        seed_success = 0
+        # S4: generate potential combinations of quadruples from sets
+        potential_quads = generate_quads_from_seed_triple(best_triple,
+                                                          used_triple_pool)
+        # S5: Find all groups of quads to make into stars with 1 common triple
+        nodeset_combis = group_into_nodeset_combis(potential_quads)
+        for i,each_combi in enumerate(nodeset_combis):
+            
+            if len(each_combi)>0:
+                # S6: Attempt filling and expanding the star
+                star1 = merge_quads_to_star(each_combi)
+                success, ff_star  = fill_up_triple_hole_in_star(star1,
+                                                        used_triple_pool)     
+                if success:
+                    # remove all component triplets that went into making the filled star
+                    comp_triples = get_component_triples(ff_star)   
+                    used_triple_pool = remove_objects_in_pool(comp_triples,
+                                                        used_triple_pool)
+                    seed_pool = remove_objects_in_pool(comp_triples, seed_pool)
+                    # append the filled star to a list of potential sources
+                    potential_source_tdoas.append(ff_star)
+                    seed_success +=1 
+                else:
+                    # move onto the next nodeset combination
+                    pass
+        # when this particular seed triple fails to generate useful
+        # a synthesis, move onto the next one.
+        if seed_success==0:
+            seed_pool = remove_objects_in_pool([best_triple],
+                                                seed_pool)
+        if len(seed_pool)<=1:
+            seed_triples_present = False
+        
+        rounds += 1 
+        #print(rounds)
+        # if rounds>= len(used_triple_pool):
+        #     break
+    return used_triple_pool, potential_source_tdoas
 
 def fill_up_triple_hole_in_star(star_in, triple_pool):
     '''
@@ -381,9 +453,19 @@ def gamma_tftm(tdoa_ab, tdoa_bc, tdoa_ca,**kwargs):
 
 def generate_quads_from_seed_triple(seed_triple, sorted_triples):
     '''
+    Parameters
+    ----------
+    seed_triple : triple dataclass
+    sorted_triples : list
+        List with triple objects.
+    
+    Returns
+    -------
+    unique_quads : list
+        List with unique quadruple objects.
     '''
 
-    # Keep only those tripley which with 2 common nodes
+    # Keep only those triples which with 2 common nodes
     two_nodes_common = lambda X,Y : len(set(X).intersection(set(Y)))==2
     valid_triple_pool = []
     for each in sorted_triples:
@@ -412,9 +494,9 @@ if __name__ == '__main__':
     from pydatemm.raster_matching import multichannel_raster_matcher
     from pydatemm.triple_generation import mirror_Pprime_kl, generate_consistent_triples
     from itertools import permutations
-    seednum = 8210 # 8221, 82319, 78464
+    seednum = 988 # 8221, 82319, 78464
     np.random.seed(seednum) # what works np.random.seed(82310)
-    nchannels = 7
+    nchannels = 9
     audio, distmat, arraygeom, source_reflect = simulate_1source_and1reflector_general(nmics=nchannels)
     fs = 192000
 
@@ -428,7 +510,7 @@ if __name__ == '__main__':
     cc_peaks = get_multich_tdoas(multich_cc, min_height=2, fs=192000)
     multiaa = get_multich_aa_tdes(multich_ac, fs=192000,
                                   min_height=2) 
-   
+
     tdoas_rm = multichannel_raster_matcher(cc_peaks, multiaa,
                                            **kwargs)
     tdoas_mirrored = mirror_Pprime_kl(tdoas_rm)
@@ -444,55 +526,15 @@ if __name__ == '__main__':
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
     #%% choose triplet with highest quality score and then begin to build out
     
-    def build_full_tdoas(sortedtriples):
-        '''
-        Starts with the most promising triple, and proceeds to build
-        quadruples, stars and complete graphs. 
-        
-        Parameters
-        ----------
-        sortedtriples : list
-            List with triples sorted by their quality.
-        
-        Returns
-        -------
-        potential_source_tdoas : list
-            List with complete TDOA objects representing potential
-            sources.
-        '''
-        potential_source_tdoas = []
-        seed_triples_present = True
-        rounds = 0
-        used_triple_pool = deepcopy(sortedtriples)
-        while seed_triples_present:
-            best_triple = used_triple_pool[0]
-            potential_quads = generate_quads_from_seed_triple(best_triple,
-                                                              used_triple_pool)
-            nodeset_combis = group_into_nodeset_combis(potential_quads)
-            for each_combi in nodeset_combis:
-                if len(each_combi)>0:
-                    star1 = merge_quads_to_star(each_combi)
-                    success, ff_star  = fill_up_triple_hole_in_star(star1, used_triple_pool)     
-                    if success:
-                        # remove all component triplets that went into making the filled star
-                        comp_triples = get_component_triples(ff_star)   
-                        used_triple_pool = remove_objects_in_pool(comp_triples, used_triple_pool)
-                        # append the filled star to a list of potential sources
-                        potential_source_tdoas.append(ff_star)
-                    else:
-                        # move onto the next nodeset combination
-                        pass
-            rounds += 1 
-            if rounds>= len(used_triple_pool):
-                break
-        return used_triple_pool, potential_source_tdoas
+    
     #%%
     trippool, pot_tdoas = build_full_tdoas(sorted_triples_full)
     #%% Let's try to localise the sources from each of the sound sources
     from pydatemm.localisation import spiesberger_wahlberg_solution
-    d_0 = pot_tdoas[0].graph[1:,0]*340
-    sources = spiesberger_wahlberg_solution(arraygeom,  d=d_0)
-    print(sources)
+    for each in pot_tdoas:
+        d_0 = each.graph[1:,0]*340
+        sources = spiesberger_wahlberg_solution(arraygeom,  d=d_0)
+        print(sources)
     #%%   
     #%% Actuall graph if everything was correct
         

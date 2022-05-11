@@ -51,8 +51,7 @@ def  simulate_1source_and1reflector_general(**kwargs):
     t = np.linspace(0,chirp_durn,int(fs*chirp_durn))
     chirp = signal.chirp(t,80000,t[-1],25000)
     chirp *= signal.hann(chirp.size)*0.5
-    
-    
+
     vsound = 340.0
     toa_sounds = dist_mat/vsound
     audio = np.zeros((int(fs*np.max(toa_sounds+0.01)),nmics))
