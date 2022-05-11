@@ -58,7 +58,7 @@ def  simulate_1source_and1reflector_general(**kwargs):
     audio = np.zeros((int(fs*np.max(toa_sounds+0.01)),nmics))
     toa_samples = np.int64(toa_sounds*fs)
     for channel in range(nmics):
-        random_atten = np.random.choice(np.linspace(0.2,0.9,20),2)
+        random_atten = np.random.choice(np.linspace(0.7,0.9,20),2)
         start_direct, start_indirect = toa_samples[0,channel], toa_samples[1,channel]
         audio[start_direct:start_direct+chirp.size,channel] += chirp*random_atten[0]
         audio[start_indirect:start_indirect+chirp.size,channel] += chirp*random_atten[1]

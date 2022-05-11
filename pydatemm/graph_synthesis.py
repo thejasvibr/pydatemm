@@ -412,11 +412,12 @@ if __name__ == '__main__':
     from pydatemm.raster_matching import multichannel_raster_matcher
     from pydatemm.triple_generation import mirror_Pprime_kl, generate_consistent_triples
     from itertools import permutations
-    np.random.seed(8221) # what works np.random.seed(82310)
+    seednum = 8210 # 8221, 82319, 78464
+    np.random.seed(seednum) # what works np.random.seed(82310)
     nchannels = 7
     audio, distmat, arraygeom, source_reflect = simulate_1source_and1reflector_general(nmics=nchannels)
     fs = 192000
-    
+
     kwargs = {'twrm': 50/fs,
               'array_geom':arraygeom,
               'twtm': 192/fs,
@@ -440,7 +441,9 @@ if __name__ == '__main__':
     consistent_triples = generate_consistent_triples(tdoas_mirrored, **kwargs)
     sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)  
     #used_triple_pool = deepcopy(sorted_triples_full)
+    print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
     #%% choose triplet with highest quality score and then begin to build out
+    
     def build_full_tdoas(sortedtriples):
         '''
         Starts with the most promising triple, and proceeds to build
@@ -454,7 +457,8 @@ if __name__ == '__main__':
         Returns
         -------
         potential_source_tdoas : list
-            List with various TDOA objects.
+            List with complete TDOA objects representing potential
+            sources.
         '''
         potential_source_tdoas = []
         seed_triples_present = True
