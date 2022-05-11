@@ -20,6 +20,7 @@ import numpy as np
 from pydatemm.common_funcs import nona, find_unique_Ntuplets, merge_graphs
 from pydatemm.common_funcs import remove_objects_in_pool
 from pydatemm.tdoa_objects import quadruple, star
+from pydatemm.tdoa_quality import triplet_quality, gamma_tftm
 from itertools import combinations, product
 from copy  import deepcopy
 #%%
@@ -417,40 +418,6 @@ def sort_triples_by_quality(triples, **kwargs):
     sorted_triples = [triples[index] for index in argsorted]
     return sorted_triples
 
-def triplet_quality(triplet, **kwargs):
-    '''
-    Calculates triplet quality score- which is the product of the 
-    TFTM output and the sum of individual TDOA qualities.
-    This metric is defined in eqn. 23
-    '''
-    t12, t23, t31 = triplet.tde_ab, triplet.tde_bc, triplet.tde_ca
-    tdoa_quality_sum = t12[1] + t23[1] + t31[1]
-    tdoa_tftm_score = gamma_tftm(t12[0],t23[0],t31[0], **kwargs)
-    quality = tdoa_tftm_score*tdoa_quality_sum
-    return quality 
-
-def gamma_tftm(tdoa_ab, tdoa_bc, tdoa_ca,**kwargs):
-    '''
-    Calculates the tolerance width of triple match.
-    
-    Parameters
-    ----------
-    tdoa_ab,tdoa_bc,tdoa_ca: float
-    twtm : float
-        Tolerance width of triple match
-    Returns
-    -------
-    twtm_out : float
-        Final score
-    '''
-    residual = tdoa_ab + tdoa_bc + tdoa_ca
-    twtm = kwargs['twtm']
-    if abs(residual) < 0.5*twtm:
-        twtm_out = 1 - (abs(residual))/(0.5*twtm)
-    elif abs(residual)>= 0.5*twtm:
-        twtm_out = 0
-    return twtm_out
-
 def generate_quads_from_seed_triple(seed_triple, sorted_triples):
     '''
     Parameters
@@ -496,7 +463,7 @@ if __name__ == '__main__':
     from itertools import permutations
     seednum = 988 # 8221, 82319, 78464
     np.random.seed(seednum) # what works np.random.seed(82310)
-    nchannels = 9
+    nchannels = 6
     audio, distmat, arraygeom, source_reflect = simulate_1source_and1reflector_general(nmics=nchannels)
     fs = 192000
 
@@ -524,17 +491,16 @@ if __name__ == '__main__':
     sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)  
     #used_triple_pool = deepcopy(sorted_triples_full)
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
-    #%% choose triplet with highest quality score and then begin to build out
-    
-    
     #%%
     trippool, pot_tdoas = build_full_tdoas(sorted_triples_full)
     #%% Let's try to localise the sources from each of the sound sources
     from pydatemm.localisation import spiesberger_wahlberg_solution
+    all_sources = []
     for each in pot_tdoas:
         d_0 = each.graph[1:,0]*340
         sources = spiesberger_wahlberg_solution(arraygeom,  d=d_0)
         print(sources)
+        all_sources.append(sources)
     #%%   
     #%% Actuall graph if everything was correct
         
