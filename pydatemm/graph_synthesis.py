@@ -11,7 +11,6 @@ Reference
 ---------
 * Scheuing & Yang 2008, ICASSP
 
-
 TODO
 ----
 * Make the code robust to starter seed :| ...
@@ -21,6 +20,7 @@ from pydatemm.common_funcs import nona, find_unique_Ntuplets, merge_graphs
 from pydatemm.common_funcs import remove_objects_in_pool
 from pydatemm.tdoa_objects import quadruple, star
 from pydatemm.tdoa_quality import triplet_quality, gamma_tftm
+from tqdm import tqdm
 from itertools import combinations, product
 from copy  import deepcopy
 #%%
@@ -64,7 +64,7 @@ def build_full_tdoas(sortedtriples):
                                                           used_triple_pool)
         # S5: Find all groups of quads to make into stars with 1 common triple
         nodeset_combis = group_into_nodeset_combis(potential_quads)
-        for i,each_combi in enumerate(nodeset_combis):
+        for i,each_combi in tqdm(enumerate(nodeset_combis)):
             
             if len(each_combi)>0:
                 # S6: Attempt filling and expanding the star
@@ -76,7 +76,8 @@ def build_full_tdoas(sortedtriples):
                     comp_triples = get_component_triples(ff_star)   
                     used_triple_pool = remove_objects_in_pool(comp_triples,
                                                         used_triple_pool)
-                    seed_pool = remove_objects_in_pool(comp_triples, seed_pool)
+                    seed_pool = remove_objects_in_pool(comp_triples,
+                                                       seed_pool)
                     # append the filled star to a list of potential sources
                     potential_source_tdoas.append(ff_star)
                     seed_success +=1 
@@ -92,7 +93,7 @@ def build_full_tdoas(sortedtriples):
             seed_triples_present = False
         
         rounds += 1 
-        #print(rounds)
+        print(rounds, len(seed_pool))
         # if rounds>= len(used_triple_pool):
         #     break
     return used_triple_pool, potential_source_tdoas
@@ -456,57 +457,77 @@ def generate_quads_from_seed_triple(seed_triple, sorted_triples):
     return unique_quads
 
 if __name__ == '__main__':
+    #%%
     from simdata import simulate_1source_and1reflector_general
     from pydatemm.timediffestim import *
     from pydatemm.raster_matching import multichannel_raster_matcher
     from pydatemm.triple_generation import mirror_Pprime_kl, generate_consistent_triples
+    from pydatemm.tdoa_quality import residual_tdoa_error as ncap
+    from pydatemm.simdata import make_chirp
+    import pyroomacoustics as pra
+    %load_ext line_profiler
     from itertools import permutations
-    seednum = 988 # 8221, 82319, 78464
+    seednum = 900 # 8221, 82319, 78464
     np.random.seed(seednum) # what works np.random.seed(82310)
-    nchannels = 6
-    audio, distmat, arraygeom, source_reflect = simulate_1source_and1reflector_general(nmics=nchannels)
+    
+    #audio, distmat, arraygeom, source_reflect = simulate_1source_and1reflector_general(nmics=nchannels)
+    #%%
+    nchannels = 7
     fs = 192000
-
     kwargs = {'twrm': 50/fs,
-              'array_geom':arraygeom,
               'twtm': 192/fs,
               'nchannels':nchannels,
-              'fs':192000}
+              'fs':fs}
+    room_dim = [5,5,5]
+    room = pra.ShoeBox(room_dim, fs=kwargs['fs'], max_order=1)
+    #mic_locs = np.random.normal(0,2,3*kwargs['nchannels']).reshape(3,nchannels)
+    array_geom = np.abs(np.random.normal(0,2,3*nchannels).reshape(3,nchannels))
+    kwargs['array_geom'] = array_geom.T
+    room.add_microphone_array(array_geom)
+    
+    # add one source
+    pbk_signals = make_chirp()
+    source_positions = [[3,2,1], [2,4,1]]
+    for i,each in enumerate(source_positions):
+        room.add_source(position=each, signal=pbk_signals, delay=i*0.005)
+    room.compute_rir()
+    room.simulate()
+
+    # plt.figure()
+    # plt.specgram(room.mic_array.signals[1,:], Fs=fs)
+    audio = room.mic_array.signals.T
+    #%%
+    
+    
     multich_cc = generate_multich_crosscorr(audio, use_gcc=True)
     multich_ac = generate_multich_autocorr(audio)
-    cc_peaks = get_multich_tdoas(multich_cc, min_height=2, fs=192000)
+    cc_peaks = get_multich_tdoas(multich_cc, min_height=2.5, fs=192000)
     multiaa = get_multich_aa_tdes(multich_ac, fs=192000,
-                                  min_height=2) 
-
+                                  min_height=0.1) 
+    
     tdoas_rm = multichannel_raster_matcher(cc_peaks, multiaa,
                                            **kwargs)
     tdoas_mirrored = mirror_Pprime_kl(tdoas_rm)
-    true_tdoas = {}
-    for chpair, _ in cc_peaks.items():
-        ch1, ch2 = chpair
-        # get true tDOA
-        tdoa = (distmat[0,ch1]-distmat[0,ch2])/340
-        true_tdoas[chpair] = tdoa
+    
     consistent_triples = generate_consistent_triples(tdoas_mirrored, **kwargs)
     sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)  
     #used_triple_pool = deepcopy(sorted_triples_full)
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
     #%%
-    trippool, pot_tdoas = build_full_tdoas(sorted_triples_full)
+    sorted_triples_part = deepcopy(sorted_triples_full)[:20]
+    #trippool, pot_tdoas = build_full_tdoas(sorted_triples_part)
+    %lprun -f build_full_tdoas build_full_tdoas(sorted_triples_part)
     #%% Let's try to localise the sources from each of the sound sources
     from pydatemm.localisation import spiesberger_wahlberg_solution
     all_sources = []
-    for each in pot_tdoas:
+    all_ncap = []
+    for i,each in enumerate(pot_tdoas):
         d_0 = each.graph[1:,0]*340
-        sources = spiesberger_wahlberg_solution(arraygeom,  d=d_0)
-        print(sources)
-        all_sources.append(sources)
-    #%%   
-    #%% Actuall graph if everything was correct
-        
-    source1_graph = np.zeros([kwargs['nchannels']]*2)
-    for i in range(kwargs['nchannels']):
-        for j in range(kwargs['nchannels']):
-            diff_dist = distmat[0,j]-distmat[0,i]
-            source1_graph[i,j] = diff_dist
-    
+        try:
+            sources = spiesberger_wahlberg_solution(kwargs['array_geom'],  d=d_0)
+            print(sources)
+            all_sources.append(sources)
+            all_ncap.append(ncap(each, sources, kwargs['array_geom']))
+        except:
+            all_sources.append(np.nan)
+            all_ncap.append(np.nan)

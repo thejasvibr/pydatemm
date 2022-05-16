@@ -25,7 +25,6 @@ def nan_euclidean(u,v):
         v_nonan = v[~np.isnan(v)]
     dist = euclidean(u_nonan, v_nonan)
     return dist
-        
 
 def triplet_quality(triplet, **kwargs):
     '''
@@ -68,7 +67,7 @@ def graph_connectivity_w(tdoa_object, **kwargs):
     
     '''
     if not tdoa_object.is_complete_graph():
-        raise ValueError(f'Input TDOA object does not have a complete graph.\
+        raise ValueError('Input TDOA object does not have a complete graph.\
                          Cannot proceed')
     # get all component triples
     object_graph = tdoa_object.graph
@@ -93,7 +92,24 @@ def residual_position_error(true_pos, obtained_pos):
 
 def residual_tdoa_error(tdoa_object, source, array_geom, **kwargs):
     '''
-    Eqn. 32
+    Implements Eqn. 32 in Scheuing & Yang 2008. The residual 
+    tdoa error (n cap)  'compares the implicit microphone positions
+    in the TDOA graph with the true ones'. 
+
+    Parameters
+    ----------
+    tdoa_object : tdoa object
+    source : (3)/(3,1) np.array
+    array_geom : (Nmics,3) np.array
+
+
+    References
+    ----------
+    * Scheuing & Yang 2008, ICASSP
+    
+    See Also
+    --------
+    pydatemm.tdoa_objects
     '''
     ref_channel = kwargs.get('ref_channel', 0)
     n_channels = tdoa_object.graph.shape[0]

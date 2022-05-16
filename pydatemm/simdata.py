@@ -14,25 +14,36 @@ import scipy.signal as signal
 
 def  simulate_1source_and1reflector_general(**kwargs):
     '''
-    if nmics>4 , then nmics with an x-y-z 
-    distribution of N(0,2) are created.
+    Simulates the same input sound as it travels through
+    direct paths ('sources') and indirect paths ('reflection points')
 
     Parameters
     ----------
-    sound_pos: (1,3) np.array, optional
-    reflection_source: (1,3) np.array, optional
+    sound_pos: list
+        List with x,y,z of sources as (1,3) np.arrays.
+    reflection_points: list
+        List with x,y,z of reflection points as (1,3) np.arrays
     nmics : int, optional
+        Defaults to 4 mics
+    array_geom: (nmics,3) np.array, optional
+        Defaults to mic positions taken from a 0 centred
+        Gaussian distribution with sd=2
+    fs : int>0, optional 
+        Frequency of sampling, defaults to 192000 Hz.
+    input_sound : np.array, optional 
+        Defaults to a 35ms linear chirp.
+
 
     Returns
     -------
     None.
 
     '''
+    fs = kwargs.get('fs', 192000)
     nmics = kwargs.get('nmics', 4)
-    if nmics == 4:
-        array_geom = make_3dtristar(**kwargs)
-    else:
-        array_geom = np.random.normal(0,2,nmics*3).reshape(-1,3)
+    if nmics<=4:
+        raise NotImplementedError('Simulated audio with <4 channels cannot be made.')
+    array_geom = np.random.normal(0,2,nmics*3).reshape(-1,3)
     
     sound_pos = kwargs.get('sound_pos',np.array([3,2,1]))
     reflection_source = kwargs.get('reflection_source',np.array([1,4,1]))
@@ -45,12 +56,7 @@ def  simulate_1source_and1reflector_general(**kwargs):
     dist_mat[1,:] += source_to_reflectionpoint
     
     # make the direct
-    
-    chirp_durn = 0.003
-    fs = 192000
-    t = np.linspace(0,chirp_durn,int(fs*chirp_durn))
-    chirp = signal.chirp(t,80000,t[-1],25000)
-    chirp *= signal.hann(chirp.size)*0.5
+    chirp = make_chirp(**kwargs)
 
     vsound = 340.0
     toa_sounds = dist_mat/vsound
@@ -64,6 +70,14 @@ def  simulate_1source_and1reflector_general(**kwargs):
     audio += np.random.normal(0,1e-5,audio.size).reshape(audio.shape)
     return audio , dist_mat, array_geom, (sound_pos, reflection_source)
 
+def make_chirp(**kwargs):
+    chirp_durn = kwargs.get('chirp_durn', 0.003)
+    fs = kwargs.get('fs',192000)
+    t = np.linspace(0,chirp_durn,int(fs*chirp_durn))
+    chirp = signal.chirp(t,kwargs.get('start_freq', 80000),
+                         t[-1],kwargs.get('end_freq', 20000))
+    chirp *= signal.hann(chirp.size)*0.5
+    return chirp
 
 def simulate_1source_and_1reflector(**kwargs):
     '''
