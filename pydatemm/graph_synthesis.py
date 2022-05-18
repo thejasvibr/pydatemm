@@ -117,7 +117,8 @@ def fill_up_triple_hole_in_star(star_in, triple_pool, **kwargs):
         for filler_triple in potential_triples:
             triple_graph = make_triplet_graph(filler_triple, **kwargs)
             try:
-                one_triple_filled = merge_graphs([filled_star.graph, triple_graph])
+                one_triple_filled = merge_graphs([filled_star.graph,
+                                                  triple_graph])
                 # if matching triple found - then move onto searching for the next
                 # unique triple nodeset
                 filled_star.graph = one_triple_filled

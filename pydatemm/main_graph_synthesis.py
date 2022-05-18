@@ -26,10 +26,6 @@ def assemble_tdoa_graphs(sorted_triples, **kwargs):
     -------
     tdoa_candidates : list
         List with quadruples, stars, etc. 
-    
-    BUGS
-    ----
-    * INCOMPLETE GRAPHS BEING RETURNED...what's happening
     '''
     pruned_triple_pool = deepcopy(sorted_triples)    
     tdoa_candidates = []
@@ -127,9 +123,9 @@ def make_stars(seed_triple, triple_pool, **kwargs):
             filled, filled_star = fill_up_triple_hole_in_star(this_star, 
                                                               triple_pool, **kwargs)
             if filled:
-                filled_stars.append(this_star)
+                filled_stars.append(filled_star)
         except FilledGraphError:
-            filled_stars.append(this_star)
+            filled_stars.append(filled_star)
     return filled_stars 
 
 if __name__ == '__main__':
@@ -200,7 +196,7 @@ if __name__ == '__main__':
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
     #%%
     #sorted_triples_part = deepcopy(sorted_triples_full)
-    tdoa_sources = assemble_tdoa_graphs(sorted_triples_full, **kwargs)
+    tdoa_sources = assemble_tdoa_graphs(sorted_triples_full[:100], **kwargs)
     #trippool, pot_tdoas = build_full_tdoas(sorted_triples_part)
     #%lprun -f build_full_tdoas build_full_tdoas(sorted_triples_part)
     #%% Let's try to localise the sources from each of the sound sources
