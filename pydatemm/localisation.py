@@ -77,6 +77,7 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     b = np.zeros(Nrec_minus1)
     f = np.zeros(Nrec_minus1)
     g = np.zeros(Nrec_minus1)
+    print(R, tau)
     for i in range(Nrec_minus1):
         b[i] = np.linalg.norm(R[i,:])**2 - (c*tau[i])**2
         f[i] = (c**2)*tau[i]

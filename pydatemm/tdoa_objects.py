@@ -170,6 +170,12 @@ class star():
         else:
             return False
     
+    def forms_complete_subgraph(self):
+        '''Checks that there are consistent subgraphs present in the current
+        graph. 
+        '''
+        
+    
     def missing_nodes(self):
         return set(range(self.graph.shape[0]))-set(self.nodes)
         

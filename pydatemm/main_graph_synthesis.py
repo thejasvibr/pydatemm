@@ -10,7 +10,7 @@ Created on Tue May 17 11:24:01 2022
 """
 from copy import deepcopy
 from pydatemm.graph_synthesis import *
-
+%load_ext line_profiler
 #%%
 def assemble_tdoa_graphs(sorted_triples, **kwargs):
     '''
@@ -143,9 +143,9 @@ if __name__ == '__main__':
     from itertools import permutations
     seednum = 8221 # 8221, 82319, 78464
     np.random.seed(seednum) # what works np.random.seed(82310)
+    array_geom = pd.read_csv('tests/scheuing-yang-2008_micpositions.csv').to_numpy()
 
-
-    nchannels = 6
+    nchannels = array_geom.shape[0]
     fs = 192000
     kwargs = {'twrm': 50/fs,
               'twtm': 192/fs,
@@ -161,7 +161,6 @@ if __name__ == '__main__':
                        materials=pra.Material(0.5), max_order=1)
     #mic_locs = np.random.normal(0,2,3*kwargs['nchannels']).reshape(3,nchannels)
     # array_geom = np.abs(np.random.normal(0,1,3*nchannels).reshape(3,nchannels))
-    array_geom = pd.read_csv('tests/scheuing-yang-2008_micpositions.csv').to_numpy()
     
     kwargs['array_geom'] = array_geom
     room.add_microphone_array(array_geom.T)
@@ -195,25 +194,24 @@ if __name__ == '__main__':
     #used_triple_pool = deepcopy(sorted_triples_full)
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
     #%%
+    %load_ext line_profiler
+    %lprun -f fill_up_triple_hole_in_star make_stars(sorted_triples_full[0], sorted_triples_full[:100],q**kwargs)
+    
+    #%%
     #sorted_triples_part = deepcopy(sorted_triples_full)
-    tdoa_sources = assemble_tdoa_graphs(sorted_triples_full[:100], **kwargs)
+    tdoa_sources = assemble_tdoa_graphs(sorted_triples_full, **kwargs)
     #trippool, pot_tdoas = build_full_tdoas(sorted_triples_part)
-    #%lprun -f build_full_tdoas build_full_tdoas(sorted_triples_part)
-    #%% Let's try to localise the sources from each of the sound sources
     from pydatemm.localisation import spiesberger_wahlberg_solution
     all_sources = []
     all_ncap = []
     for i,each in enumerate(tdoa_sources):
         d_0 = each.graph[1:,0]*340
         try:
-            sources = spiesberger_wahlberg_solution(kwargs['array_geom'],  d=d_0)
+            sources = spiesberger_wahlberg_solution(kwargs['array_geom'],  d_0)
             all_sources.append(sources)
             all_ncap.append(ncap(each, sources, kwargs['array_geom']))
         except:
             all_sources.append(np.nan)
-            all_ncap.append(np.nan)
-    
-    
-    
+            all_ncap.append(np.nan)    
     #%%
     complete = [i.is_complete_graph() for i in tdoa_sources]
