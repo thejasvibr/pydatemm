@@ -9,11 +9,14 @@ References
 * Scheuing & Yang 2008, ICASSP
 '''
 import numpy as np 
+import networkx as nx
 from itertools import combinations
 from pydatemm.tdoa_objects import triple
 
 def generate_consistent_triples(Pprime_kl, **kwargs):
     '''
+    Implements S1 of the DATEMM algorithm (See Table I). 
+
     Generates all possible consistent triples from the detected TDOAs.
     First calculates all possible triple cases (e.g. for 4 channel recording
     (0,1,2), (1,2,3), (2,3,0), (0,1,3), (0,2,3))
@@ -24,6 +27,10 @@ def generate_consistent_triples(Pprime_kl, **kwargs):
     Parameters
     ----------
     Pprime_kl : dict
+        Dictionary with channel pairs as keys, and entries are TDOA peaks repre-
+        sented as tuples. Each peak holds the following information
+        (sample location, TDE in seconds, raw peak value, post raster-matching 
+         peak value)
     nchannels : int
         Number of channels
     twtm : float
@@ -31,22 +38,40 @@ def generate_consistent_triples(Pprime_kl, **kwargs):
     Returns
     -------
     consistent_triples : list
-        List with multiple triple objects. 
+        List with multiple triplet graphs. Each triplet is a 
+        networkx.DiGraph. Each edge had two attributes: 'tde' and 'peak_score'.
 
     See Also
     --------
-    triple
+    pydatemm.raster_matching.multichannel_raster_matcher
     '''
     all_triplet_cases = list(combinations(range(kwargs['nchannels']), 3))
     consistent_triples_raw = []
     for triple_case in all_triplet_cases:
-        consistent_triples_raw = consistent_triples_raw + choose_consistent_triples(triple_case, Pprime_kl, **kwargs)
+        consistent_triples_raw = consistent_triples_raw + choose_consistent_triples(triple_case,
+                                                                                    Pprime_kl,
+                                                                                    **kwargs)
     # reformat the contents
-    consistent_triples = [ triple(each[0], each[1], each[2], each[3]) for each in consistent_triples_raw]
+    consistent_triples = []
+    for each in consistent_triples_raw:
+        triple_name, *tdes = each
+        channel_pairs = make_channel_pairs_from_triple(triple_name)
+        triple_graph = nx.DiGraph()
+        for pair, tde in zip(channel_pairs, tdes):
+            triple_graph.add_edge(pair[0], pair[1],
+                                  **{'tde': tde[0], 'peak_score': tde[1]})
+            triple_graph.add_edge(pair[1], pair[0],
+                                  **{'tde': -tde[0], 'peak_score': tde[1]})
+            
+        consistent_triples.append(triple_graph)
     return consistent_triples
 
 def choose_consistent_triples(triple_name, Pkl, **kwargs):
     '''
+    Checks all possible triplets that can be created given a triplet case
+    e.g. (0,1,2). All triplets that satisfy the cyclic condition (AB+BC-CA=0)
+    within a tolerance are considered consistent.
+
     Parameters
     ----------
     triple_name
@@ -74,7 +99,8 @@ def choose_consistent_triples(triple_name, Pkl, **kwargs):
                 residual = td12[1]+td23[1]+td31[1]
                 if abs(residual) <= kwargs['twtm']:
                     triplet = [triple_name,
-                               (td12[1], td12[-1]), (td23[1], td23[-1]), (td31[1], td31[-1])]
+                               (td12[1], td12[-1]), (td23[1], td23[-1]),
+                               (td31[1], td31[-1])]
                     consistent_triples.append(triplet)
     return consistent_triples
 
