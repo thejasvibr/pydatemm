@@ -15,6 +15,7 @@ TODO
 ----
 * Make the code robust to starter seed :| ...
 '''
+import networkx as nx
 import numpy as np
 from pydatemm.common_funcs import nona, find_unique_Ntuplets, merge_graphs
 from pydatemm.common_funcs import remove_objects_in_pool
@@ -282,73 +283,61 @@ def validate_multi_quad_merge(quads):
     # return mergeable
     
 
-def triplet_to_quadruplet(triplet1, triplet2, triplet3, **kwargs):
+def triplet_to_quadruplet(triplet1, triplet2, triplet3):
     '''
     Parameters
     ----------
-    triplet1,triplet2,triplet3 : list
-        List with tuples representing a triplet. 
-    nchannels: int
-        Number of channels in original input audio.
+    triplet1,triplet2,triplet3 : nx.DiGraph
+        3 node graphs
+
     Returns
     -------
-    quadruplet : (4,4) np.array
-        Array filled with np.nan's if no merge possible, otherwise
-        a valid quadruplet graph.
-        
+    quadruplet : nx.DiGraph
+        If merger is possible. Output is a 4 node graph made from the merger of
+        the 3 input triplet graphs. If not possible, then the output is 
+        an empty nx.DiGraph
     '''
-    graph1, graph2, graph3 = [make_triplet_graph(each, **kwargs) for each in [triplet1, triplet2, triplet3]]
     merge_to_quad = validate_triple_triplet_merge(graph1, graph2, graph3)
     
-    nodes = tuple(set(sorted(triplet1.nodes+triplet2.nodes+triplet3.nodes)))
-    quad_candidate = quadruple(nodes,[])
     if merge_to_quad:
-        quadruplet_graph = make_quadruplet_graph(graph1, graph2, graph3)
-    else:    
-        quadruplet_graph = np.empty([kwargs['nchannels']]*2)
-        quadruplet_graph[:,:] = np.nan
-    quad_candidate.graph = quadruplet_graph
-    quad_candidate.component_triples = [triplet1, triplet2, triplet3]
-    return quad_candidate
+        quadruplet = make_quadruplet_graph(graph1, graph2, graph3)    
+        return quadruplet
+    else:
+        return nx.DiGraph()
 
 def make_quadruplet_graph(graph1, graph2, graph3):
     '''
     '''
-    stacked = np.dstack((graph1, graph2, graph3))
-    quadruplet_graph = np.nanmax(stacked, 2)
-    return quadruplet_graph
+    abc = nx.compose(graph1, graph2)
+    abcd = nx.compose(abc, graph3)
+    return abcd
 
 def validate_triple_triplet_merge(graph1, graph2, graph3):
     '''
     Validates the 'mergeability' of the three triplets into a quadruplet.
     Works on the principle that when all triplets are mergeable, then the
-    the :code:`sum_stacked` graph will reflect that two sides of each node
-    are 'added twice'.
+    each pair (a,b), (b,c), (c,a) will have exactly 2 common edges and 
+    2 common nodes.
 
     Parameters
     ----------
-    graph1, graph2, graph3 : (nchannel,nchannel) np.array
-        Where nchannel is the # of audio channels.
+    graph1, graph2, graph3 : nx.DiGraph
 
     Returns
     -------
     mergeable : bool
         True if the three triplets make a valid quadruple.
     '''
-    sum_stack = add_three_triplets(graph1, graph2, graph3)
-    lower_tri = np.tril_indices(sum_stack.shape[0]) # lower triangle
-    expected_repeats = [2,2,1]
-    repeat_match = []
-    for graph in [graph1, graph2, graph3]:
-        repeat_matrix = sum_stack/graph
-        value_repeats = sorted(nona(repeat_matrix[lower_tri]), reverse=True)
-        match_observation = np.all(value_repeats==expected_repeats)
-        repeat_match.append(match_observation)
-    if np.all(repeat_match):
-        mergeable = True
-    else:
-        mergeable = False
+    all_pairs = [[graph1, graph2],
+                 [graph2, graph3],
+                 [graph3, graph1]]
+    # for each pair check that 2 edges and 2 nodes are shared
+    mergeable = np.all([two_common_nodes_and_edges(X, Y) for (X,Y) in all_pairs])
     return mergeable
+
+def two_common_nodes_and_edges(X, Y):
+    xy = nx.intersection(X, Y)
+    return np.all([len(xy.nodes)==2, len(xy.edges)==2])
 
 def make_triplet_graph(triplet, **kwargs): 
     '''
@@ -406,10 +395,11 @@ def sort_triples_by_quality(triples, **kwargs):
     
     Parameters
     ---------
-    triples : triple dataclass
+    triples : list 
+        List with consistent triple graph objects.
     twtm : float
         Tolerance width of triple match in seconds. 
-    
+
     Returns
     -------
     sorted_triples : list
@@ -443,7 +433,6 @@ def generate_quads_from_seed_triple(seed_triple, sorted_triples, **kwargs):
     unique_quads : list
         List with unique quadruple objects.
     '''
-
     # Keep only those triples which with 2 common nodes
     two_nodes_common = lambda X,Y : len(set(X).intersection(set(Y)))==2
     valid_triple_pool = []

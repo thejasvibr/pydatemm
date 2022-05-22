@@ -31,10 +31,30 @@ def triplet_quality(triplet, **kwargs):
     Calculates triplet quality score- which is the product of the 
     TFTM output and the sum of individual TDOA qualities.
     This metric is defined in eqn. 23
+
+    Parameters
+    ----------
+    triplet: triple graph
+        A nx.DiGraph with 3 nodes. Each edge is expected to have the 
+        'tde' and 'peak_score' weight attributes.
+    twtm : float
+        Tolerance width of triple match in seconds. 
+
+    Returns
+    -------
+    quality : float
+        The triple quality based on how close it is to zero and the 
+        windowing function of :code:`gamma_tftm`
+
+    See Also
+    --------
+    pydatemm.tdoa_quality.gamma_tftm
     '''
-    t12, t23, t31 = triplet.tde_ab, triplet.tde_bc, triplet.tde_ca
-    tdoa_quality_sum = t12[1] + t23[1] + t31[1]
-    tdoa_tftm_score = gamma_tftm(t12[0],t23[0],t31[0], **kwargs)
+    a, b, c = tuple(triplet.nodes)
+    t12, t23, t31 = [triplet.edges[edge]['tde'] for edge in [(a,b), (b,c), (c,a)]]
+    peak_q12, peak_q23, peak_q31 = [triplet.edges[edge]['peak_score'] for edge in [(a,b), (b,c), (c,a)]]
+    tdoa_quality_sum = peak_q12+peak_q23+peak_q31
+    tdoa_tftm_score = gamma_tftm(t12, t23, t31, **kwargs)
     quality = tdoa_tftm_score*tdoa_quality_sum
     return quality 
 
