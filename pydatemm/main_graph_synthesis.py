@@ -10,7 +10,7 @@ Created on Tue May 17 11:24:01 2022
 """
 from copy import deepcopy
 from pydatemm.graph_synthesis import *
-%load_ext line_profiler
+#%load_ext line_profiler
 #%%
 def assemble_tdoa_graphs(sorted_triples, **kwargs):
     '''
@@ -109,8 +109,7 @@ def make_stars(seed_triple, triple_pool, **kwargs):
     if kwargs['nchannels']<=4:
         raise NotImplementedError(f"{kwargs['nchannels']} channel case not handled")
     # assemble groups of 3 triples with klm to make multiple quadruples
-    quadruplets = generate_quads_from_seed_triple(seed_triple, triple_pool,
-                                                              **kwargs)
+    quadruplets = generate_quads_from_seed_triple(seed_triple, triple_pool)
     if not len(quadruplets)>=1:
         return []
     quadruplet_sets = group_into_nodeset_combis(quadruplets)
@@ -168,7 +167,9 @@ if __name__ == '__main__':
     # add one source
     pbk_signals = [make_chirp(chirp_durn=0.025, start_freq=50000)*0.5,
                    make_chirp(chirp_durn=0.05)*0.5]
-    source_positions = [[1.67,1.66,0.71], [2.72,0.65,1.25]]
+    source1 = [1.67,1.66,0.71]
+    source2 = [2.72,0.65,1.25]
+    source_positions = [source1, source2]
     for i,each in enumerate(source_positions):
         room.add_source(position=each, signal=pbk_signals[i])
     room.compute_rir()
@@ -191,27 +192,28 @@ if __name__ == '__main__':
     tdoas_mirrored = mirror_Pprime_kl(tdoas_rm)    
     consistent_triples = generate_consistent_triples(tdoas_mirrored, **kwargs)
     sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)  
+    
     #used_triple_pool = deepcopy(sorted_triples_full)
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
-    #%%
-    %load_ext line_profiler
-    %lprun -f fill_up_triple_hole_in_star make_stars(sorted_triples_full[0], sorted_triples_full[:100],q**kwargs)
+    # #%%
+    # %load_ext line_profiler
+    # %lprun -f fill_up_triple_hole_in_star make_stars(sorted_triples_full[0], sorted_triples_full[:100],q**kwargs)
     
-    #%%
-    #sorted_triples_part = deepcopy(sorted_triples_full)
-    tdoa_sources = assemble_tdoa_graphs(sorted_triples_full, **kwargs)
-    #trippool, pot_tdoas = build_full_tdoas(sorted_triples_part)
-    from pydatemm.localisation import spiesberger_wahlberg_solution
-    all_sources = []
-    all_ncap = []
-    for i,each in enumerate(tdoa_sources):
-        d_0 = each.graph[1:,0]*340
-        try:
-            sources = spiesberger_wahlberg_solution(kwargs['array_geom'],  d_0)
-            all_sources.append(sources)
-            all_ncap.append(ncap(each, sources, kwargs['array_geom']))
-        except:
-            all_sources.append(np.nan)
-            all_ncap.append(np.nan)    
-    #%%
-    complete = [i.is_complete_graph() for i in tdoa_sources]
+    # #%%
+    # #sorted_triples_part = deepcopy(sorted_triples_full)
+    # tdoa_sources = assemble_tdoa_graphs(sorted_triples_full, **kwargs)
+    # #trippool, pot_tdoas = build_full_tdoas(sorted_triples_part)
+    # from pydatemm.localisation import spiesberger_wahlberg_solution
+    # all_sources = []
+    # all_ncap = []
+    # for i,each in enumerate(tdoa_sources):
+    #     d_0 = each.graph[1:,0]*340
+    #     try:
+    #         sources = spiesberger_wahlberg_solution(kwargs['array_geom'],  d_0)
+    #         all_sources.append(sources)
+    #         all_ncap.append(ncap(each, sources, kwargs['array_geom']))
+    #     except:
+    #         all_sources.append(np.nan)
+    #         all_ncap.append(np.nan)    
+    # #%%
+    # complete = [i.is_complete_graph() for i in tdoa_sources]

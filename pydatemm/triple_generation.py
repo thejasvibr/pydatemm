@@ -12,6 +12,7 @@ import numpy as np
 import networkx as nx
 from itertools import combinations
 from pydatemm.tdoa_objects import triple
+from pydatemm.common_funcs import find_unique_graphs
 
 def generate_consistent_triples(Pprime_kl, **kwargs):
     '''
@@ -64,7 +65,8 @@ def generate_consistent_triples(Pprime_kl, **kwargs):
                                   **{'tde': -tde[0], 'peak_score': tde[1]})
             
         consistent_triples.append(triple_graph)
-    return consistent_triples
+    unique_triples = find_unique_graphs(consistent_triples)
+    return unique_triples
 
 def choose_consistent_triples(triple_name, Pkl, **kwargs):
     '''

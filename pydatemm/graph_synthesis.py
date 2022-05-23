@@ -17,7 +17,7 @@ TODO
 '''
 import networkx as nx
 import numpy as np
-from pydatemm.common_funcs import nona, find_unique_Ntuplets, merge_graphs
+from pydatemm.common_funcs import nona, find_unique_graphs, merge_graphs
 from pydatemm.common_funcs import remove_objects_in_pool
 from pydatemm.tdoa_objects import quadruple, star
 from pydatemm.tdoa_quality import triplet_quality, gamma_tftm
@@ -152,14 +152,13 @@ def get_component_triples(tdoa_object):
         for each in component_quads:
             for every in each.component_triples:
                 triple_in_quads.append(every)
-        triple_in_quads = find_unique_Ntuplets(triple_in_quads)
+        triple_in_quads = find_unique_graphs(triple_in_quads)
     except:
         pass
     
     all_triplets_w_repeats = triple_in_quads+tdoa_object.component_triples
-    all_triples_in_obj = find_unique_Ntuplets(all_triplets_w_repeats)
+    all_triples_in_obj = find_unique_graphs(all_triplets_w_repeats)
     return all_triples_in_obj       
-
 
 def group_into_nodeset_combis(quads_w_common_trip):
     '''
@@ -167,7 +166,7 @@ def group_into_nodeset_combis(quads_w_common_trip):
     overlapping triples. Sometimes there can be two 
     quads with the same nodeset, and here we make sure to 
     create unique combinations. 
-    
+
     Parameters
     ----------
     quads_w_common_trip : list
@@ -190,25 +189,31 @@ def group_into_nodeset_combis(quads_w_common_trip):
     '''
     node_sets = {}
     for each in quads_w_common_trip:
-        if each.nodes not in node_sets.keys():
-            node_sets[each.nodes] = []
-        node_sets[each.nodes].append(each)
+        nodes = tuple(each.nodes)
+        try:
+            if nodes not in node_sets.keys():
+                node_sets[nodes] = []
+            node_sets[nodes].append(each)
+        except TypeError:
+            node_sets[nodes] = []
     # generate all possible combinations across node_sets A,B,C
     nodeset_combis = list(product(*node_sets.values()))
     return nodeset_combis
 
 def merge_quads_to_star(quads):
     '''
+    Checks if all quads in a list have a common triple, and if so, then 
+    puts them into a star (>4 node) graph.
 
     Parameters
     ----------
     quads : list
-        List of quadruples
+        List of nx.DiGraph objects with 4 nodes.
 
     Returns
     -------
-    startuplet : tdoa_objects.star
-        Star object
+    startuplet : nx.DiGraph
+        Star graph with >4 nodes.
 
     '''
     # merge graphs
@@ -283,7 +288,7 @@ def validate_multi_quad_merge(quads):
     # return mergeable
     
 
-def triplet_to_quadruplet(triplet1, triplet2, triplet3):
+def triplets_to_quadruplet(triplet1, triplet2, triplet3):
     '''
     Parameters
     ----------
@@ -297,10 +302,12 @@ def triplet_to_quadruplet(triplet1, triplet2, triplet3):
         the 3 input triplet graphs. If not possible, then the output is 
         an empty nx.DiGraph
     '''
-    merge_to_quad = validate_triple_triplet_merge(graph1, graph2, graph3)
-    
+    merge_to_quad = validate_triple_triplet_merge(triplet1, triplet2, 
+                                                  triplet3)
+
     if merge_to_quad:
-        quadruplet = make_quadruplet_graph(graph1, graph2, graph3)    
+        quadruplet = make_quadruplet_graph(triplet1, triplet2, 
+                                                      triplet3)    
         return quadruplet
     else:
         return nx.DiGraph()
@@ -328,16 +335,24 @@ def validate_triple_triplet_merge(graph1, graph2, graph3):
     mergeable : bool
         True if the three triplets make a valid quadruple.
     '''
-    all_pairs = [[graph1, graph2],
-                 [graph2, graph3],
-                 [graph3, graph1]]
-    # for each pair check that 2 edges and 2 nodes are shared
-    mergeable = np.all([two_common_nodes_and_edges(X, Y) for (X,Y) in all_pairs])
+    pairs = combinations([graph1, graph2, graph3], 2)
+    matched = []
+    for (x,y) in pairs:
+        matched.append(two_common_nodes_and_edges(x, y))
+    mergeable = np.all(matched)
     return mergeable
 
 def two_common_nodes_and_edges(X, Y):
     xy = nx.intersection(X, Y)
     return np.all([len(xy.nodes)==2, len(xy.edges)==2])
+
+def two_nodes_common(X,Y):
+    common_nodes = set(X.nodes).intersection(Y.nodes)
+    if len(common_nodes)==2:
+        return True
+    else:
+        return False
+
 
 def make_triplet_graph(triplet, **kwargs): 
     '''
@@ -419,14 +434,14 @@ def sort_triples_by_quality(triples, **kwargs):
     sorted_triples = [triples[index] for index in argsorted]
     return sorted_triples
 
-def generate_quads_from_seed_triple(seed_triple, sorted_triples, **kwargs):
+def generate_quads_from_seed_triple(seed_triple, sorted_triples):
     '''
     Parameters
     ----------
-    seed_triple : triple dataclass
+    seed_triple : nx.DiGraph
+        A graph with 3 nodes
     sorted_triples : list
-        List with triple objects.
-    nchannels: int
+        List with 3 node nx.DiGraphs 
 
     Returns
     -------
@@ -434,26 +449,29 @@ def generate_quads_from_seed_triple(seed_triple, sorted_triples, **kwargs):
         List with unique quadruple objects.
     '''
     # Keep only those triples which with 2 common nodes
-    two_nodes_common = lambda X,Y : len(set(X).intersection(set(Y)))==2
+    
     valid_triple_pool = []
     for each in sorted_triples:
-        if two_nodes_common(each.nodes, seed_triple.nodes):
+        if two_nodes_common(each, seed_triple):
             valid_triple_pool.append(each)
     # Generate all possible pairs from the valid_triple_pool (even thought some of
     # these don't make sense!)
-    possible_pairs = list(combinations(range(len(valid_triple_pool)), 2))
+    possible_pairs = list(combinations(valid_triple_pool, 2))
+    if not len(possible_pairs) >= 1:
+        return []
+
     valid_quads = []
     for (triple2, triple3) in possible_pairs:
-        out = triplet_to_quadruplet(seed_triple,
-                                    valid_triple_pool[triple2],
-                                    valid_triple_pool[triple3], **kwargs)
+        out = triplets_to_quadruplet(seed_triple,
+                                    triple2,
+                                    triple3)
         # if all values are np.nan
-        if np.all(np.isnan(out.graph)):
-            pass
-        else:
+        if len(out.nodes)==4:
             valid_quads.append(out)
+        else:
+            pass
     # get all unique quadruples
-    unique_quads = find_unique_Ntuplets(valid_quads)
+    unique_quads = find_unique_graphs(valid_quads)
     return unique_quads
 
 class FilledGraphError(ValueError):

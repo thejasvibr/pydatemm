@@ -3,6 +3,7 @@ Tests for graph synthesis
 '''
 import unittest
 import networkx as nx
+from networkx.utils.misc import graphs_equal, edges_equal
 from pydatemm.graph_synthesis import *
 
 class TestTripleSorting(unittest.TestCase):
@@ -112,16 +113,37 @@ class TestQuadGeneration(unittest.TestCase):
     def test_quad_creation(self):
         outcome_quad = make_quadruplet_graph(*self.trips)
         expected = created_expected_quad_fig11()
-        expected_match = nx.is_isomorphic(outcome_quad, expected)
+        expected_match = edges_equal(outcome_quad.edges, expected.edges)
         self.assertTrue(expected_match)
-        
-        
-    
-        
-        
 
+class TestGenQuadsFromSeedTriple(unittest.TestCase):
+    '''Generating valid quadruples from a list of triples'''
 
+    def setUp(self):
+        self.trips = make_3_mergeable_triplets()
+        trip_4 = self.trips[0].copy()
+        trip_4 = nx.relabel_nodes(trip_4, {'o':'p'})
+        trip_4.edges[('m','p')]['tde'] = 99
+        trip_4.edges[('p','m')]['tde'] = -99
+        
+        trip_4.edges[('k','p')]['tde'] = 24
+        trip_4.edges[('p','k')]['tde'] = -24
+        self.sorted_triples = [*self.trips[1:], trip_4]
 
+    def test_generate_one_quad(self):
+        out_quads = generate_quads_from_seed_triple(self.trips[0],
+                                                    self.sorted_triples)
+        expected_quad = created_expected_quad_fig11()
+        self.assertEqual(len(out_quads), 1)
+        self.assertTrue(edges_equal(expected_quad.edges, out_quads[0].edges))
+
+    def test_when_multiple_quads(self):
+        self.sorted_triples = [*self.trips[1:], self.trips[-1]]
+        out_quads = generate_quads_from_seed_triple(self.trips[0],
+                                                    self.sorted_triples)
+        expected_quad = created_expected_quad_fig11()
+        #self.assertEqual(len(out_quads), 1)
+        self.assertTrue(edges_equal(expected_quad.edges, out_quads[0].edges))
 #%% Test cases for build full toads 
 # 4, 5, 20 channels
 
@@ -167,24 +189,3 @@ class TestMissingTriplets(unittest.TestCase):
     
 if __name__ == '__main__':
     unittest.main()
-    trip1, trip2, trip3 = [nx.DiGraph() for each in range(3)]
-    trip1.add_edge('k','m', **{'tde':4, 'peak_score':5})
-    trip1.add_edge('m','k', **{'tde':-4, 'peak_score':5})
-    trip1.add_edge('o','m', **{'tde':6, 'peak_score':5})
-    trip1.add_edge('m','o', **{'tde':-6, 'peak_score':5})
-    trip1.add_edge('o','k', **{'tde':2, 'peak_score':5})
-    trip1.add_edge('k','o', **{'tde':-2, 'peak_score':5})
-    
-    trip2.add_edge('k','m', **{'tde':4, 'peak_score':5})
-    trip2.add_edge('m','k', **{'tde':-4, 'peak_score':5})
-    trip2.add_edge('m','l', **{'tde':1, 'peak_score':5})
-    trip2.add_edge('l','m', **{'tde':-1, 'peak_score':5})
-    trip2.add_edge('k','l', **{'tde':5, 'peak_score':5})
-    trip2.add_edge('l','k', **{'tde':-5, 'peak_score':5})
-    
-    trip3.add_edge('k','l', **{'tde':5, 'peak_score':5})
-    trip3.add_edge('l','k', **{'tde':-5, 'peak_score':5})
-    trip3.add_edge('o','l', **{'tde':7, 'peak_score':5})
-    trip3.add_edge('l','o', **{'tde':-7, 'peak_score':5})
-    trip3.add_edge('o','k', **{'tde':2, 'peak_score':5})
-    trip3.add_edge('k','o', **{'tde':-5, 'peak_score':5})

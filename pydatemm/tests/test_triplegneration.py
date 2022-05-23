@@ -12,6 +12,7 @@ import unittest
 from random import random
 import networkx as nx
 from pydatemm.triple_generation import * 
+from pydatemm.common_funcs import find_unique_graphs
 
 class TestGenConsTriples(unittest.TestCase):
     '''
@@ -59,7 +60,12 @@ class TestGenConsTriples(unittest.TestCase):
         for obtained, expected in zip(consistent_triples, [trip1, trip2]):
             graph_match.append(nx.is_isomorphic(obtained, expected))
         self.assertTrue(np.all(graph_match))
-        
+    
+    def test_check_uniqueness(self):
+        '''Check that all consistent triples are unique'''
+        consistent_triples = generate_consistent_triples(self.tdoas, **self.kwargs)
+        unique_triples = find_unique_graphs(consistent_triples)
+        self.assertEqual(len(unique_triples), len(consistent_triples))
         
 if __name__ == '__main__':
     unittest.main()

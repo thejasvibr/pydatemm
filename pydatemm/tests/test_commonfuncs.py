@@ -8,44 +8,28 @@ Created on Mon May  2 17:01:39 2022
 """
 import unittest 
 from pydatemm.common_funcs import *
+from test_graphsynthesis import make_3_mergeable_triplets
+from networkx.utils.misc import graphs_equal
 
-class TestMergeGraphs(unittest.TestCase):
+class TestFindUniqueGraphs(unittest.TestCase):
     
-    def  setUp(self):
-        self.a = np.empty((4,4))
-        self.a[:,:] = np.nan
-        self.b = self.a.copy()
-    
-    def prep_good_merge(self):
-        '''
-        Makes two symmetric, incomplete and mergeable 4 node graphs
-        '''
-        self.a[1,0] = -0.5; self.a[0,1] = 0.5 
-        self.a[2,0] = 1; self.a[0,2] = -1
-        self.a[3,1] = 1; self.a[1,3] = -1
-        
-        self.b[2,0] = 1; self.b[0,2] = -1
-        self.b[3,0] = 2; self.b[0,3] = -2
-        self.b[3,1] = 1; self.b[1,3] = -1
-    
-    def test_simple_merge(self):
-        self.prep_good_merge()
-        output_graph = merge_graphs([self.a, self.b])
-        num_valid_entries = int(np.sum(~np.isnan(output_graph))*0.5)
-        expected_valid_entries = 4
-        self.assertEqual(num_valid_entries, expected_valid_entries)
-    
-    def test_bad_merge(self):
-        self.prep_good_merge()
-        self.a[2,0] = 2; self.a[0,2] = -2
-        with self.assertRaises(ValueError, msg='Unmergeable graphs. Some entries are incompatible'):
-            output_graph = merge_graphs([self.a, self.b])    
-    
-    def test_asymm_merge(self):
-        self.prep_good_merge()
-        self.a[2,0] = 5;
-        with self.assertRaises(ValueError, msg='The 0th graph in input list is not symmetric. Cannot proceed.'):
-            output_graph = merge_graphs([self.a, self.b])    
+    def setUp(self):
+        self.trips = make_3_mergeable_triplets()
+    def test_simple(self):
+        '''All entries unique. Input==Output'''
+        out = find_unique_graphs([*self.trips])
+        matches = []
+        for (each,every) in zip(out, [*self.trips]):
+            matches.append(graphs_equal(each,every))
+        self.assertTrue(np.all(matches))
+    def test_twotimesreps(self):
+        double_repeat = [*self.trips, *self.trips]
+        out = find_unique_graphs(double_repeat)
+        matches = []
+        for (each,every) in zip(out, [*self.trips]):
+            matches.append(graphs_equal(each,every))
+        self.assertTrue(np.all(matches))
+
 
 if __name__ == '__main__':
     unittest.main()
