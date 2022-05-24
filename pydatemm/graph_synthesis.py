@@ -216,14 +216,44 @@ def merge_quads_to_star(quads):
         Star graph with >4 nodes.
 
     '''
-    # merge graphs
-    merged_graph = merge_graphs([each.graph for each in quads])
+    # check that all quads have the same triple in them
+    quads_mergeable = quads_have_common_triple(quads)
+    # merge all quads with the common triple into a star
+    if quads_mergeable:
+        star = merge_quads(quads)
+        return star
+    else:
+        return nx.DiGraph()
 
-    star_nodesets = [each.nodes for each in quads]
-    star_nodes = tuple(np.unique(np.array(star_nodesets).flatten()))
-    startuplet = star(star_nodes, merged_graph)
-    startuplet.component_quads = quads
-    return startuplet
+def merge_quads(quads):
+    ''' Combines all quads in a list into one big graph.
+
+    Parameters
+    ----------
+    quads : list
+        List of nx.DiGraph quadruplets.
+
+    Returns
+    -------
+    nx.DiGraph
+    '''
+    return nx.compose_all(quads)
+
+def quads_have_common_triple(quads):
+    '''
+    Design decisions to be made - what if not all quads have a common 
+    triple? Do you want to go down the potential combinations to recover
+    the quads that do have a common quad? 
+    '''
+    quad_nodes = [set(each.nodes) for each in quads]
+    common_nodes = set.intersection(*quad_nodes)
+    if len(common_nodes)==3:
+        return True
+    elif len(common_nodes)==0:
+        raise NotImplementedError('Some quads do not share the common triple\
+                                  this case not implemented.')
+    elif len(common_nodes) != 3:
+        return False
 
 def missing_triplets(graph):
     '''

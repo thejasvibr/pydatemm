@@ -36,8 +36,8 @@ class TestGeomValidTDES(unittest.TestCase):
             # add spurious TDEs
             for i in range(2):
                 invlid_tdes = np.linspace(-(maxdelay+1), maxdelay+1, 20)
-                self.tdes[pair].append(np.random.choice(invlid_tdes,1))
-
+                self.tdes[pair].append(np.random.choice(invlid_tdes,3))
+# 
     def test_tristar_case(self):
         self.check_tdes_are_valid()
 
