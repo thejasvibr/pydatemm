@@ -10,30 +10,38 @@ Created on Wed May 18 08:34:11 2022
 
 import unittest
 import random
+import networkx as nx
+from networkx.utils.misc import edges_equal
 from pydatemm.tdoa_objects import triple
 from pydatemm.main_graph_synthesis import *
 
-class TestPruneObjects(unittest.TestCase):
+
+class TestFillUpTripleHols(unittest.TestCase):
     
+    def test_00(self):
+        self.assertTrue(False)
+
+class TestGetUsableTDOAs(unittest.TestCase):
     def setUp(self):
-        self.triple_list = []
-        for each in range(10):
-            threenodes = tuple((random.randint(1,10) for each in range(3)))
-            three_tdes = tuple(((random.random(), random.random()) for i in  range(3)))
-            self.triple_list.append(triple(threenodes, *three_tdes))
-
-    def test_remove1(self):
-        '''Removes the first triple in the list'''
-        pruned = prune_triple_pool(self.triple_list[0], self.triple_list, [])
-        self.assertEqual(pruned, self.triple_list[1:])
-    
-    def test_remove_nonexistent(self):
-        '''when you try to remove a triple that isn't in the pool'''
-        threenodes = tuple((random.randint(11,20) for each in range(3)))
-        three_tdes = tuple(((random.random(), random.random()) for i in  range(3)))
-        madeup_triple = triple(threenodes, *three_tdes)
-        pruned = prune_triple_pool(madeup_triple, self.triple_list, [])
-        print(len(pruned))
-
+        self.G = nx.generators.classic.complete_graph(5, create_using=nx.DiGraph)
+    def remove_01(self):
+        self.G.remove_edge(0,1)
+        self.G.remove_edge(1,0)
+    def gen_expected_graphs(self):
+        G1 = nx.generators.classic.complete_graph(4, create_using=nx.DiGraph)
+        G2 = nx.generators.classic.complete_graph(4, create_using=nx.DiGraph)
+        G1 = nx.relabel.relabel_nodes(G1, {0:4},copy=False)
+        G2 = nx.relabel_nodes(G2, {1:4}, copy=False)
+        return [G2, G1]
+    def test_simple(self):
+        # remove one edge pair
+        self.remove_01()
+        obtained_tdoas = get_usable_TDOAs_from_graph(self.G)
+        expected_tdoas = self.gen_expected_graphs()
+        graph_match = []
+        for (exp,obs) in zip(expected_tdoas, obtained_tdoas):
+            graph_match.append(edges_equal(exp.edges, obs.edges))
+        self.assertTrue(np.all(graph_match))
+        
 if __name__ == '__main__':
     unittest.main()

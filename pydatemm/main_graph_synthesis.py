@@ -10,7 +10,7 @@ Created on Tue May 17 11:24:01 2022
 """
 from copy import deepcopy
 from pydatemm.graph_synthesis import *
-#%load_ext line_profiler
+from networkx.algorithms.clique import find_cliques
 #%%
 def assemble_tdoa_graphs(sorted_triples, **kwargs):
     '''
@@ -18,14 +18,14 @@ def assemble_tdoa_graphs(sorted_triples, **kwargs):
     Parameters
     ----------
     sorted_triples : list
-        List with triples
+        List with nx.DiGraphs with 3 nodes
     **kwargs : TYPE
         DESCRIPTION.
 
     Returns
     -------
     tdoa_candidates : list
-        List with quadruples, stars, etc. 
+        List with nx.DiGraphs of >= 4 nodes
     '''
     pruned_triple_pool = deepcopy(sorted_triples)    
     tdoa_candidates = []
@@ -35,7 +35,7 @@ def assemble_tdoa_graphs(sorted_triples, **kwargs):
         seed_triple = pruned_triple_pool[0]
         # steps S4-S7 in the paper
         tdoa_sources = make_stars(seed_triple, pruned_triple_pool, **kwargs)
-        if len(tdoa_sources)>1:
+        if len(tdoa_sources)>=1:
             #print('sources present')
             for tdoas in tdoa_sources:
                 tdoa_candidates.append(tdoas)
@@ -60,11 +60,12 @@ def prune_triple_pool(seed_triple, triple_pool, tdoas):
     '''
     Parameters
     ----------
-    seed_triple : tdoa_objects.triple class
+    seed_triple : nx.DiGraph
+        3 node graph
     triple_pool : list
-        List with triples
+        List with triples (3 node nx.DiGraphs)
     tdoas : list
-        List with >=5 nodes
+        List with >=5 node nx.DiGraphs
 
     Returns
     -------
@@ -73,7 +74,7 @@ def prune_triple_pool(seed_triple, triple_pool, tdoas):
         component triples of all the tdoas
     '''
     # remove the seed_triple from triple_pool
-    pruned_pool = remove_objects_in_pool([seed_triple], triple_pool)
+    pruned_pool = remove_graphs_in_pool([seed_triple], triple_pool)
     # get all component triples in each of the sources
     source_triples = []
     if len(tdoas)>0:
@@ -82,7 +83,8 @@ def prune_triple_pool(seed_triple, triple_pool, tdoas):
             for every in triples_in_source:
                 source_triples.append(every)
         # remove component triples from triple_pool
-        pruned_pool = remove_objects_in_pool(source_triples, pruned_pool)
+        unique_source_triples = find_unique_graphs(source_triples)
+        pruned_pool = remove_graphs_in_pool(unique_source_triples, pruned_pool)
     return pruned_pool 
 
 def make_stars(seed_triple, triple_pool, **kwargs):
@@ -105,7 +107,7 @@ def make_stars(seed_triple, triple_pool, **kwargs):
     TODO
     ----
     * What if there are only 4 channels?
-    '''        
+    '''
     if kwargs['nchannels']<=4:
         raise NotImplementedError(f"{kwargs['nchannels']} channel case not handled")
     # assemble groups of 3 triples with klm to make multiple quadruples
@@ -119,13 +121,28 @@ def make_stars(seed_triple, triple_pool, **kwargs):
     filled_stars = []
     for this_star in stars:
         try:
-            filled, filled_star = fill_up_triple_hole_in_star(this_star, 
-                                                              triple_pool, **kwargs)
+            filled, filled_star = fill_up_triple_hole_in_star(this_star,
+                                                              triple_pool,
+                                                              **kwargs)
             if filled:
                 filled_stars.append(filled_star)
+            else:
+                # if not filled then find the maximum clique with >= 4  nodes
+                # and add it into filled_stars
+                usable_tdoa_graphs = get_usable_TDOAs_from_graph(filled_star)
+                for each in usable_tdoa_graphs:
+                    filled_stars.append(each)
         except FilledGraphError:
-            filled_stars.append(filled_star)
+            filled_stars.append(this_star)
     return filled_stars 
+
+def get_usable_TDOAs_from_graph(partial_star):
+    largest_cliques = find_cliques(partial_star.to_undirected())
+    usable_TDOAS = []
+    for each in largest_cliques:
+        if len(each)>=4:
+            usable_TDOAS.append(partial_star.subgraph(each))
+    return usable_TDOAS
 
 if __name__ == '__main__':
     #%%
@@ -133,13 +150,16 @@ if __name__ == '__main__':
     from pydatemm.timediffestim import *
     from pydatemm.raster_matching import multichannel_raster_matcher
     from pydatemm.triple_generation import mirror_Pprime_kl, generate_consistent_triples
+    from pydatemm.graph_synthesis import sort_triples_by_quality
     from pydatemm.tdoa_quality import residual_tdoa_error as ncap
     from pydatemm.simdata import make_chirp
     import pyroomacoustics as pra
     import pandas as pd
     import soundfile as sf
-    #%load_ext line_profiler
+    import time
+    %load_ext line_profiler
     from itertools import permutations
+    print('starting sim audio...')
     seednum = 8221 # 8221, 82319, 78464
     np.random.seed(seednum) # what works np.random.seed(82310)
     array_geom = pd.read_csv('tests/scheuing-yang-2008_micpositions.csv').to_numpy()
@@ -179,25 +199,32 @@ if __name__ == '__main__':
     # plt.specgram(room.mic_array.signals[1,:], Fs=fs)
     audio = room.mic_array.signals.T
     sf.write('pyroom_audio.wav', audio, fs)
-    
+    print('done w sim audio...')
     #%%
+    print('starting cc and acc...')
     multich_cc = generate_multich_crosscorr(audio, use_gcc=True)
     multich_ac = generate_multich_autocorr(audio)
-    cc_peaks = get_multich_tdoas(multich_cc, min_height=17, fs=192000)
+    cc_peaks = get_multich_tdoas(multich_cc, min_height=18, fs=192000)
     multiaa = get_multich_aa_tdes(multich_ac, fs=192000,
-                                  min_height=8) 
-    
+                                  min_height=3) 
+    print('raster matching...')
     tdoas_rm = multichannel_raster_matcher(cc_peaks, multiaa,
                                            **kwargs)
     tdoas_mirrored = mirror_Pprime_kl(tdoas_rm)    
+    print('triple generation')
+    start = time.time()
     consistent_triples = generate_consistent_triples(tdoas_mirrored, **kwargs)
+    print(f'time taken generating: {time.time()-start}')
     sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)  
-    
-    #used_triple_pool = deepcopy(sorted_triples_full)
+    print(f'time taken sorting: {time.time()-start}')
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
-    # #%%
-    # %load_ext line_profiler
-    # %lprun -f fill_up_triple_hole_in_star make_stars(sorted_triples_full[0], sorted_triples_full[:100],q**kwargs)
+    #%%
+    #used_triple_pool = deepcopy(sorted_triples_full)
+    
+    one_star = make_stars(sorted_triples_full[0], sorted_triples_full[1:50], **kwargs)
+    print('miaow')
+    #%%
+    %lprun -f fill_up_triple_hole_in_star make_stars(sorted_triples_full[0], sorted_triples_full[1:50], **kwargs)
     
     # #%%
     # #sorted_triples_part = deepcopy(sorted_triples_full)

@@ -144,6 +144,9 @@ class TestGenQuadsFromSeedTriple(unittest.TestCase):
         expected_quad = created_expected_quad_fig11()
         #self.assertEqual(len(out_quads), 1)
         self.assertTrue(edges_equal(expected_quad.edges, out_quads[0].edges))
+
+
+
 #%% Test cases for build full toads 
 # 4, 5, 20 channels
 
@@ -172,20 +175,31 @@ class TestProgressSeedIndex(unittest.TestCase):
 class TestMissingTriplets(unittest.TestCase):
     
     def setUp(self):
-        self.graph = np.random.normal(0,1,25).reshape(5,5)
-        self.graph[np.diag_indices(5)] = np.nan
-        self.graph[2,1] = np.nan; self.graph[1,2] = np.nan
+        '''Generate a fully connected graph, and then progressive remove
+        some edges to test'''
+        self.G = nx.generators.classic.complete_graph(4, create_using=nx.DiGraph)
 
-    def test_2_missing_weight(self):
-        output = missing_triplets(self.graph)
-        expected = [(0,1,2), (1,2,3), (1,2,4)]
+    def remove_01(self):
+        self.G.remove_edge(0,1)
+        self.G.remove_edge(1,0)
+
+    def remove_13(self):
+        self.G.remove_edge(1,3)
+        self.G.remove_edge(3,1)
+
+    def test_1edge_missing(self):
+        self.remove_01()
+        output = missing_triplets(self.G)
+        expected = set([(0,1,2), (0,1,3)])
         self.assertEqual(output, expected)
 
-    def test_three_missing_weights(self):
-        self.graph[1,3] = np.nan; self.graph[3,1] = np.nan
-        output = missing_triplets(self.graph)
-        expected = [(1,2,3)]
+    def test_2edge_missing(self):
+        self.remove_01()
+        self.remove_13()
+        output = missing_triplets(self.G)
+        expected = expected = set([(0,1,2), (0,1,3), (0,1,3), (1,2,3)])
         self.assertEqual(output, expected)
-    
+
+
 if __name__ == '__main__':
     unittest.main()

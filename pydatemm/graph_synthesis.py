@@ -16,9 +16,10 @@ TODO
 * Make the code robust to starter seed :| ...
 '''
 import networkx as nx
+from networkx.algorithms.triads import all_triplets
 import numpy as np
 from pydatemm.common_funcs import nona, find_unique_graphs, merge_graphs
-from pydatemm.common_funcs import remove_objects_in_pool
+from pydatemm.common_funcs import remove_graphs_in_pool
 from pydatemm.tdoa_objects import quadruple, star
 from pydatemm.tdoa_quality import triplet_quality, gamma_tftm
 from tqdm import tqdm
@@ -87,78 +88,78 @@ def find_triple_indices(target_triples, triple_list):
 
 def fill_up_triple_hole_in_star(star_in, triple_pool, **kwargs):
     '''
-    Tries to fill a missing triple in a star's graph.
+    Tries to fill missing triples in a star's graph based on those available
+    in the triple pool. 
 
     Parameters
     ----------
-    star_in : dataclass
-        tdoa_objects.star instance
+    star_in : nx.DiGraph
+        A DiGraph with >= 4 nodes
     triple_pool : list
-        List with consistent triples sorted by quality
+        List with 3 node DiGraphs which form consistent triples.
 
     Returns
     -------
     filled : bool
         Whether the star could be filled up or not.
-    filled_star : dataclass
-        A copy of the input :code:`star` object. If fillled, then 
-        with a different graph structure, else an identical copy.
+    filled_star : nx.DiGraph
+        If filled is False, then a copy of :code:`star_in`, else a modified
+        copy with a complete graph.
+
+    Raises
+    ------
+    FilledGraphError : if the input star already has all the necessary
+        edges to make it a clique.
     '''
     filled_star = deepcopy(star_in)
-    if not star_in.is_complete_graph():
-        num_missing_entries = np.sum(np.isnan(star_in.graph))-star_in.graph.shape[0]
-        num_missing_entries *= 0.5 # consider only one of the lower/upper triangles
-    else: 
-        raise FilledGraphError('Complete graph input - cannot fill up triple holes')  
-    target_triple_nodes = missing_triplets(star_in.graph)
+    target_triple_nodes = list(missing_triplets(star_in))
+    if len(target_triple_nodes)==0:
+        raise FilledGraphError('Complete graph input - cannot fill up triple holes')
 
     for each in target_triple_nodes:
-        potential_triples = list(filter(lambda X: X.nodes==each,
+        potential_triples = list(filter(lambda X: set(X.nodes)==set(each),
                                                             triple_pool))
         for filler_triple in potential_triples:
-            triple_graph = make_triplet_graph(filler_triple, **kwargs)
             try:
-                one_triple_filled = merge_graphs([filled_star.graph,
-                                                  triple_graph])
                 # if matching triple found - then move onto searching for the next
-                # unique triple nodeset
-                filled_star.graph = one_triple_filled
-                filled_star.component_triples.append(filler_triple)
+                # unique triple hole to fill
+                filled_star = merge_triple_to_unfilled_star(filler_triple,
+                                                                filled_star)
                 break
-            except:
+            except UnmergeableTripleError:
                 # what if the merge can't happen with this candidate triple??
                 # then move onto next potential triple
                 pass
-    filled =  filled_star.is_complete_graph()
+    filled =  len(missing_triplets(filled_star))==0
     return filled, filled_star
 
-def get_component_triples(tdoa_object):
+def merge_triple_to_unfilled_star(triple, star):
+    # check that at least 4 edges of the triple are already in the star
+    common_edges = set(triple.edges).intersection(set(star.subgraph(triple.nodes).edges))
+    if len(common_edges)==4:
+        return nx.compose(triple, star)
+    # if not then raise error
+    else:
+        raise UnmergeableTripleError
+
+def get_component_triples(graph):
     '''
-    Generates all unique triples that went into construction of 
-    this object
-    
+    Generates all unique triple graphs that are in this object
+
     Parameters
     ----------
-    tdoa_object : quadruple or star object
-    
+    graph : nx.DiGraph
+        nx.DiGraph with >=4 nodes
+
     Returns
     -------
-    all_triples_in_obj : list
-        List with triples
+    all_triplet_graphs : list
+        List with triple nx.DiGraphs
     '''
-    triple_in_quads = []
-    try:
-        component_quads = tdoa_object.component_quads
-        for each in component_quads:
-            for every in each.component_triples:
-                triple_in_quads.append(every)
-        triple_in_quads = find_unique_graphs(triple_in_quads)
-    except:
-        pass
-    
-    all_triplets_w_repeats = triple_in_quads+tdoa_object.component_triples
-    all_triples_in_obj = find_unique_graphs(all_triplets_w_repeats)
-    return all_triples_in_obj       
+    # get all possible 3 node combinations
+    three_node_combis = list(all_triplets(graph))
+    all_triplet_graphs = [graph.subgraph(node_combi) for node_combi in three_node_combis]
+    return all_triplet_graphs       
 
 def group_into_nodeset_combis(quads_w_common_trip):
     '''
@@ -257,32 +258,26 @@ def quads_have_common_triple(quads):
 
 def missing_triplets(graph):
     '''
-    Finds missing weights, and the appropriate triplets
+    Finds missing weights, and the appropriate triplets.
 
     Parameters
     ----------
-    graph : np.array
-    
+    graph : nx.DiGraph
+        Graph with >=4 nodes and at least one 'tde' weight attribute
+
     Returns
     -------
-    target_triples : list 
-        List with tuples with missing tuple nodes.
+    target_triples : list
+        List with tuples with missing nodes.
     '''
-    # search all possible triples in sorted consistent triples list
-    missing_entries = np.argwhere(np.isnan(graph))
-     # remove diagonal elements
-    offdiagonal_inds = [each for each in missing_entries if not each[0]==each[1]]
-    target_triple_nodes = tuple(set(np.array(offdiagonal_inds).flatten()))
-    if len(target_triple_nodes)>=3:
-        target_triples = list(combinations(target_triple_nodes, 3))
-    elif len(target_triple_nodes)==2:
-        # generate all possible combinations of 
-        other_nodes = set(range(graph.shape[0]))-set(target_triple_nodes)
-        target_triples = [ sorted([*target_triple_nodes, each]) for each in other_nodes]
-        target_triples = [tuple(each) for each in target_triples]
-    else:
-        raise ValueError('Unable to find target triple nodes!')
+    all_possible_triplets = list(all_triplets(graph))
+    observed_triplets = [each for each in all_possible_triplets if triple_ingraph(each, graph)]
+    target_triples = set(all_possible_triplets) - set(observed_triplets)
     return target_triples
+
+def triple_ingraph(triple, big_graph):
+    '''Checks if a triple nodeset is already present in a bigger graph'''
+    return len(big_graph.subgraph(triple).edges)==6 
 
 def validate_multi_quad_merge(quads):
     '''
@@ -507,6 +502,10 @@ def generate_quads_from_seed_triple(seed_triple, sorted_triples):
 class FilledGraphError(ValueError):
     def __init__(self, errormsg):
         print(errormsg)
+
+class UnmergeableTripleError(ValueError):
+    def __init__(self):
+        pass
 
 if __name__ == '__main__':
     #%%
