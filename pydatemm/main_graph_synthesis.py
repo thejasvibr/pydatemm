@@ -34,18 +34,22 @@ def assemble_tdoa_graphs(sorted_triples, **kwargs):
     while enough_seed_triples:
         seed_triple = pruned_triple_pool[0]
         # steps S4-S7 in the paper
+        print('...making stars')
         tdoa_sources = make_stars(seed_triple, pruned_triple_pool, **kwargs)
+        print('...star making done...')
         if len(tdoa_sources)>=1:
-            #print('sources present')
+            print('sources present')
             for tdoas in tdoa_sources:
                 tdoa_candidates.append(tdoas)
-            # remove all triples used to build tdoa graphs
+        # remove all triples used to build tdoa graphs
+        print('pruning...')
         pruned_triple_pool = prune_triple_pool(seed_triple,
                                                pruned_triple_pool,
                                                tdoa_sources)
         enough_seed_triples = check_for_enough_seed_triples(pruned_triple_pool)
+        print('checking enough seed triples')
         roundnum +=1 
-        if len(pruned_triple_pool) % 20 < 3:
+        if len(pruned_triple_pool) % 5 < 3:
             print('AAAAAAAAAAAAAA',len(pruned_triple_pool))
         #print(len(pruned_triple_pool), roundnum)
     return tdoa_candidates
@@ -160,7 +164,7 @@ if __name__ == '__main__':
     %load_ext line_profiler
     from itertools import permutations
     print('starting sim audio...')
-    seednum = 8221 # 8221, 82319, 78464
+    seednum = 78464 # 8221, 82319, 78464
     np.random.seed(seednum) # what works np.random.seed(82310)
     array_geom = pd.read_csv('tests/scheuing-yang-2008_micpositions.csv').to_numpy()
 
@@ -188,7 +192,7 @@ if __name__ == '__main__':
     pbk_signals = [make_chirp(chirp_durn=0.025, start_freq=50000)*0.5,
                    make_chirp(chirp_durn=0.05)*0.5]
     source1 = [1.67,1.66,0.71]
-    source2 = [2.72,0.65,1.25]
+    source2 = deepcopy(source1) #[2.72,0.65,1.25]
     source_positions = [source1, source2]
     for i,each in enumerate(source_positions):
         room.add_source(position=each, signal=pbk_signals[i])
@@ -215,30 +219,37 @@ if __name__ == '__main__':
     start = time.time()
     consistent_triples = generate_consistent_triples(tdoas_mirrored, **kwargs)
     print(f'time taken generating: {time.time()-start}')
-    sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)  
+    sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)
+    triple_quality = [triplet_quality(each, **kwargs) for each in sorted_triples_full]
+    
+    triples_goodq = []
+    for (quality, triple) in zip(triple_quality, sorted_triples_full):
+        if quality>0:
+            triples_goodq.append(triple)
+
     print(f'time taken sorting: {time.time()-start}')
-    print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}')
+    print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}, nonzero quality: {len(triples_goodq)}')
     #%%
     #used_triple_pool = deepcopy(sorted_triples_full)
-    
-    one_star = make_stars(sorted_triples_full[0], sorted_triples_full[1:50], **kwargs)
+    #one_star = make_stars(sorted_triples_full[0], sorted_triples_full[:100], **kwargs)
     print('miaow')
     #%%
-    %lprun -f fill_up_triple_hole_in_star make_stars(sorted_triples_full[0], sorted_triples_full[1:50], **kwargs)
-    
-    # #%%
+    #%lprun -f fill_up_triple_hole_in_star make_stars(triples_goodq[0], triples_goodq[:30], **kwargs)
+    tdoas = assemble_tdoa_graphs(triples_goodq[:100], **kwargs)
+    #%%
     # #sorted_triples_part = deepcopy(sorted_triples_full)
     # tdoa_sources = assemble_tdoa_graphs(sorted_triples_full, **kwargs)
     # #trippool, pot_tdoas = build_full_tdoas(sorted_triples_part)
     # from pydatemm.localisation import spiesberger_wahlberg_solution
     # all_sources = []
     # all_ncap = []
-    # for i,each in enumerate(tdoa_sources):
-    #     d_0 = each.graph[1:,0]*340
+    # for i,each in enumerate(one_star):
+    #     d_0 = nx.to_numpy_array(each,weight='tde')[1:,0]*340
+    #     array_geom = kwargs['array_geom'][list(each.nodes),:]
     #     try:
-    #         sources = spiesberger_wahlberg_solution(kwargs['array_geom'],  d_0)
+    #         sources = spiesberger_wahlberg_solution(array_geom,  d_0)
     #         all_sources.append(sources)
-    #         all_ncap.append(ncap(each, sources, kwargs['array_geom']))
+    #         all_ncap.append(ncap(nx.to_numpy_array(each,weight='tde'), sources, array_geom))
     #     except:
     #         all_sources.append(np.nan)
     #         all_ncap.append(np.nan)    

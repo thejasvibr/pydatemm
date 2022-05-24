@@ -110,7 +110,7 @@ def residual_position_error(true_pos, obtained_pos):
     '''
     return euclidean(true_pos, obtained_pos)
 
-def residual_tdoa_error(tdoa_object, source, array_geom, **kwargs):
+def residual_tdoa_error(tdoa_array, source, array_geom, **kwargs):
     '''
     Implements Eqn. 32 in Scheuing & Yang 2008. The residual 
     tdoa error (n cap)  'compares the implicit microphone positions
@@ -118,7 +118,8 @@ def residual_tdoa_error(tdoa_object, source, array_geom, **kwargs):
 
     Parameters
     ----------
-    tdoa_object : tdoa object
+    tdoa_array : np.array
+        TDOA array
     source : (3)/(3,1) np.array
     array_geom : (Nmics,3) np.array
 
@@ -132,10 +133,10 @@ def residual_tdoa_error(tdoa_object, source, array_geom, **kwargs):
     pydatemm.tdoa_objects
     '''
     ref_channel = kwargs.get('ref_channel', 0)
-    n_channels = tdoa_object.graph.shape[0]
+    n_channels = kwargs['nchannels']
     distmat = np.apply_along_axis(euclidean, 1, array_geom, source)
     # the TDOA vector measured from data
-    measured_n_cap = tdoa_object.graph[:,ref_channel]
+    measured_n_cap = tdoa_array[:,ref_channel]
     obtained_n_tilde = np.zeros(n_channels)
     for i in range(n_channels):
         diff = distmat[i] - distmat[ref_channel]
