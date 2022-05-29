@@ -161,7 +161,7 @@ if __name__ == '__main__':
     import pandas as pd
     import soundfile as sf
     import time
-    %load_ext line_profiler
+    # %load_ext line_profiler
     from itertools import permutations
     print('starting sim audio...')
     seednum = 78464 # 8221, 82319, 78464
@@ -169,13 +169,15 @@ if __name__ == '__main__':
     array_geom = pd.read_csv('tests/scheuing-yang-2008_micpositions.csv').to_numpy()
 
     nchannels = array_geom.shape[0]
-    fs = 192000
-    kwargs = {'twrm': 50/fs,
-              'twtm': 192/fs,
+    fs = 96000
+    paper_twrm = 7/fs
+    paper_twtm = 9/fs
+    kwargs = {'twrm': paper_twrm,
+              'twtm': paper_twtm,
               'nchannels':nchannels,
               'fs':fs}
     room_dim = [4,2,2]
-    
+
     # We invert Sabine's formula to obtain the parameters for the ISM simulator
     
     rt60 = 0.3
@@ -192,7 +194,7 @@ if __name__ == '__main__':
     pbk_signals = [make_chirp(chirp_durn=0.025, start_freq=50000)*0.5,
                    make_chirp(chirp_durn=0.05)*0.5]
     source1 = [1.67,1.66,0.71]
-    source2 = deepcopy(source1) #[2.72,0.65,1.25]
+    source2 = [2.72,0.65,1.25]
     source_positions = [source1, source2]
     for i,each in enumerate(source_positions):
         room.add_source(position=each, signal=pbk_signals[i])
@@ -208,7 +210,7 @@ if __name__ == '__main__':
     print('starting cc and acc...')
     multich_cc = generate_multich_crosscorr(audio, use_gcc=True)
     multich_ac = generate_multich_autocorr(audio)
-    cc_peaks = get_multich_tdoas(multich_cc, min_height=18, fs=192000)
+    cc_peaks = get_multich_tdoas(multich_cc, min_height=15, fs=192000)
     multiaa = get_multich_aa_tdes(multich_ac, fs=192000,
                                   min_height=3) 
     print('raster matching...')
@@ -231,11 +233,11 @@ if __name__ == '__main__':
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}, nonzero quality: {len(triples_goodq)}')
     #%%
     #used_triple_pool = deepcopy(sorted_triples_full)
-    #one_star = make_stars(sorted_triples_full[0], sorted_triples_full[:100], **kwargs)
+    one_star = make_stars(sorted_triples_full[0], sorted_triples_full[:30], **kwargs)
     print('miaow')
     #%%
     #%lprun -f fill_up_triple_hole_in_star make_stars(triples_goodq[0], triples_goodq[:30], **kwargs)
-    tdoas = assemble_tdoa_graphs(triples_goodq[:100], **kwargs)
+    #tdoas = assemble_tdoa_graphs(triples_goodq[:100], **kwargs)
     #%%
     # #sorted_triples_part = deepcopy(sorted_triples_full)
     # tdoa_sources = assemble_tdoa_graphs(sorted_triples_full, **kwargs)

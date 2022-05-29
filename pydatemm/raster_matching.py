@@ -15,20 +15,19 @@ import numpy as np
 from itertools import combinations
 from pydatemm.timediffestim import geometrically_valid
 
-
 def multichannel_raster_matcher(multich_Pkl, multich_aa, **kwargs):
     '''
     Performs raster matching on multichannel crosscor/autocor input.
     Also eliminates geometrically invalid TDOAs which exceed max expected
     mic-to-mic straight-line delay.
-    
+
     Parameters
     ----------
     multich_Pkl,multich_aa : dict
         Keys are channel pairs/channel IDs and entry is a list with tuples
         containing peaks.
     array_geom : np.array
-    
+
     **kwargs : TYPE
         DESCRIPTION.
 
@@ -41,29 +40,33 @@ def multichannel_raster_matcher(multich_Pkl, multich_aa, **kwargs):
     '''
     # keep only geometrically valid TDOAs across channels
     geomvalid_Pkl = geometrically_valid(multich_Pkl, **kwargs)
-   
+
     multich_Pprime_kl = {}
     for ch_pair, Pkl in geomvalid_Pkl.items():
         ch1, ch2 = ch_pair
         Pkk, Pll = multich_aa[(ch1,ch1)], multich_aa[(ch2,ch2)]
         Pprime_kl = channel_pair_raster_matcher(Pkl, Pkk, Pll, **kwargs)
         multich_Pprime_kl[ch_pair] = Pprime_kl
-
     return multich_Pprime_kl
 
 def channel_pair_raster_matcher(Pkl, Pkk, Pll, **kwargs):
     '''
     Compares TDOAs in a channel pair and filters out spurious TDOA peaks caused
     by echo paths.
+    Cross-correlation pairs whose time-difference corresponds to an auto-corre-
+    lation peak in either Pkk or Pll are evaluated further. If a peak is an 
+    'arrow-tail' (the earlier cross-cor peak of a pair), then its score incre-
+    ases. If a peak is an 'arrow-head' (the later cross-cor peak of a pair), 
+    then its score decreases. Peaks whose score drops beyond their original 
+    peak value are eliminated.
 
     Parameters
     ----------
-    Pkl : dict
-        Keys are channel pairs, entry is a list with tuples. Each tuple 
+    Pkl : list
+        List with tuples. Each tuple 
         is a geometrically valid TDOA peak from   cross-correlations
-    Pkk,Pll : dict
-        Keys are channel numbers repeated twice in a tuple. Entries  are lists
-        with tuples containing valid (positive) autocorr peaks.
+    Pkk,Pll : List
+        List with tuples containing valid (positive) autocorr peaks.
     twrm : float
         Tolerance width of raster matching in seconds. 
 
@@ -84,16 +87,97 @@ def channel_pair_raster_matcher(Pkl, Pkk, Pll, **kwargs):
     make_Pprime_kl
     
     '''
-    # 
     Pprime_kk = make_Pprime(Pkk, Pkl, **kwargs)
     Pprime_ll = make_Pprime(Pll, Pkl, **kwargs)
-    #%% 
     # Now calculate the quality score 
-    peak_quality = calculate_eta_mu_quality(Pkl, Pprime_kk, Pprime_ll)   
+    peak_quality = calculate_quality_eta_mu(Pkl, Pprime_kk, Pprime_ll)   
     # 
     Pprime_kl = make_Pprime_kl(Pkl, peak_quality)
     return Pprime_kl
 
+def make_Pprime(Paa, Pkl, **kwargs):
+    '''
+    Keeps all autocorrelation peaks of a channel corresponding to
+    TDOA peak differences
+
+    Parameters
+    ----------
+    Paa : list
+        Autocorrelation peaks
+        List with tuple entries for a channel. Each tuple identifies an autocorr peak.
+    Pkl : list
+        Cross-correlation peaks
+        List with tuple entries for a channel pair.
+    twrm : float
+        Tolerance width of raster matching in seconds.
+
+    Returns
+    -------
+    Pprime : list
+        Autocorrelation peaks which are recaptured in the difference
+        of cross-cor peaks. List with sub-lists. The list has the following str
+        ucture :math:`P'_{kk/ll}` =
+        [ [:math:`\eta_{\eta}`, (:math:`\eta_{\mu}, \eta_{\\nu}`) ], ....  ]
+        Here :math:`\eta_{\mu},\eta_{\\nu}` are peaks with their associated
+        data described by tuples.
+
+    See Also
+    --------
+    pydatemm.timediffestim.get_multich_tdoas
+    pydatemm.timediffestim.get_multich_aa_tdes
+    '''
+    # 
+    peaks_s = [each[1] for each in Pkl] # peak locations in seconds
+    cross_cor_combis_inds = list(combinations(range(len(peaks_s)),2))
+    cross_cor_combis = [(peaks_s[p1], peaks_s[p2]) for (p1,p2) in cross_cor_combis_inds]
+    crosscor_combi_diffs = []
+    for (peak1,peak2) in cross_cor_combis:
+        peak_diff = abs(peak1-peak2) # abs(eta_mu - eta_gamma)
+        crosscor_combi_diffs.append(peak_diff)
+    
+    # keep all the aa peaks which approx. raster match
+    Pprime = []
+    for eta_eta in Paa:
+        sample, aa_time, rkk = eta_eta
+        # calculate all 
+        eta_diff = abs(abs(aa_time) - abs(np.array(crosscor_combi_diffs)))
+        for i, each_diff in enumerate(eta_diff):
+            if each_diff < 0.5*kwargs['twrm']:
+                peak1, peak2 = cross_cor_combis_inds[i]
+                eta_mu = Pkl[peak1]
+                eta_nu = Pkl[peak2]
+                Pprime.append([eta_eta, (eta_mu, eta_nu)])
+    return Pprime
+
+def calculate_quality_eta_mu(Pkl, Pp_kk, Pp_ll):
+    '''
+    Implements :math:`q(\eta_{mu})` calculation as defined in eqn. 13
+    
+    Parameters
+    ----------
+    Pkl: list
+        List with cross-correlation peaks
+    Pp_kk, Pp_ll : list
+        Lists with Pprime_k and Pprime_l 
+
+    Returns
+    -------
+    None.
+
+    Notes
+    -----
+    
+    '''
+    eta_mu_w_q = [] # Each peak is still a tuple, but now with an additional 4th 
+    # entry - the quality score
+    for peak in Pkl:
+        _, eta_mu, rkl = peak
+        quality = rkl
+        quality =+ raster_match_score(eta_mu, Pp_kk)
+        quality =+ raster_match_score(eta_mu, Pp_ll, reverse_order=True)
+        peak_props = (_, eta_mu, rkl, quality)
+        eta_mu_w_q.append(peak_props)
+    return eta_mu_w_q
 
 def gamma_tfrm(eta, **kwargs):
     '''
@@ -121,85 +205,6 @@ def gamma_tfrm(eta, **kwargs):
         tfrm_out = 0
     return tfrm_out
 
-def make_Pprime(Paa, Pkl, **kwargs):
-    '''
-    Filter out all autocorrelation peaks of a channel corresponding to
-    TDOA peak differences
-
-    Parameters
-    ----------
-    Paa : list
-        Autocorrelation peaks
-        List with tuple entries for a channel. Each tuple identifies an autocorr peak.
-    Pkl : list
-        Cross-correlation peaks
-        List with tuple entries for a channel pair.
-    twrm : float
-        Tolerance width of raster matching in seconds.
-
-    Returns
-    -------
-    Pprime : list
-        Autocorrelation peaks which are recaptured in the difference
-        of cross-cor peaks. List with sub-lists. The list has the following str
-        ucture :math:`P'_{kk/ll}` =
-        [ [:math:`\eta_{eta}`, (:math:`\eta_{\mu}, \eta_{\\nu}`) ], ....  ]
-        Here :math:`\eta_{\mu},\eta_{\\nu}` are peaks with their associated
-        data described by tuples.
-
-    See Also
-    --------
-    pydatemm.timediffestim.get_multich_tdoas
-    pydatemm.timediffestim.get_multich_aa_tdes
-    '''
-    # 
-    peaks_s = [each[1] for each in Pkl] # peak locations in seconds
-    cross_cor_combis_inds = list(combinations(range(len(peaks_s)),2))
-    cross_cor_combis = [(peaks_s[p1], peaks_s[p2]) for (p1,p2) in cross_cor_combis_inds]
-    crosscor_combi_diffs = []
-    for (peak1,peak2) in cross_cor_combis:
-        peak_diff = abs(peak1-peak2) # abs(eta_mu - eta_gamma)
-        crosscor_combi_diffs.append(peak_diff)
-    
-    # keep all the aa peaks which approx. raster match
-    Pprime = []
-    for eta_eta in Paa:
-        sample, aa_time, rkk = eta_eta
-        # calculate all 
-        eta_diff = abs(abs(aa_time) - abs(np.array(crosscor_combi_diffs)))
-        for i, each_diff in enumerate(eta_diff):
-            if each_diff < 0.5*kwargs['twrm']:
-                
-                peak1, peak2 = cross_cor_combis_inds[i]
-                eta_mu = Pkl[peak1]
-                eta_nu = Pkl[peak2]
-                Pprime.append([eta_eta, (eta_mu, eta_nu)])
-    return Pprime
-
-def calculate_eta_mu_quality(Pkl, Pp_kk, Pp_ll):
-    '''
-    Implements :math:`q(\eta_{mu})` calculation as defined in eqn. 13
-
-    Parameters
-    ----------
-
-    Returns
-    -------
-    None.
-
-    Notes
-    -----
-    
-    '''
-    eta_mu_w_q = [] # Each peak is still a tuple, but now with an additional 4th 
-    # entry - the quality score
-    for peak in Pkl:
-        _, eta_mu, rkl = peak
-        quality = rkl + raster_match_score(eta_mu, Pp_kk) + raster_match_score(eta_mu,
-                                                                               Pp_ll, reverse_order=True)
-        peak_props = (_, eta_mu, rkl, quality)
-        eta_mu_w_q.append(peak_props)
-    return eta_mu_w_q
 
 def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
     '''
@@ -236,7 +241,6 @@ def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
         eta_Mu_tdoa = eta_Mu[1]
         if eta_mu==eta_Mu_tdoa:
             in_rastermatch = True
-            
         if not in_rastermatch:
             # if eta_mu is not raster-matched
             part12 = 0

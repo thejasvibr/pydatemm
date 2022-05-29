@@ -17,7 +17,6 @@ sources in reverberant environments. IEEE transactions on audio, speech, and
 language processing, 16(8), 1479-1489.
 """
 
-
 import matplotlib.pyplot as plt
 import numpy as np 
 import scipy.signal as signal 
@@ -146,7 +145,6 @@ def get_multich_aa_tdes(multich_aa, **kwargs):
 
 def get_multich_tdoas(multich_cc, **kwargs):
     '''
-    
 
     Parameters
     ----------
@@ -223,7 +221,7 @@ def get_peaks(X,  **kwargs):
     '''
     min_peak_diff = kwargs.get('min_peak_diff', 1e-4)
     min_height = kwargs.get('min_height', 0.11)
-    return signal.find_peaks(X, min_height,distance=int(kwargs['fs']*min_peak_diff))[0] 
+    return signal.find_peaks(X, min_height, distance=int(kwargs['fs']*min_peak_diff))[0] 
 
 def geometrically_valid(multich_tdoas:dict, **kwargs):
     '''
