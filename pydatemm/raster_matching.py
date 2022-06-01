@@ -236,7 +236,7 @@ def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
     raster_match_score = 0
     for each in Pprimekk:
         in_rastermatch = False
-        eta_eta, (eta_Mu, eta_Nu) = each # eta_Mu and eta_Nu are those peaks 
+        eta_eta, (eta_Mu, eta_gamma) = each # eta_Mu and eta_Nu are those peaks 
         # that are raster matched
         eta_Mu_tdoa = eta_Mu[1]
         if eta_mu==eta_Mu_tdoa:
@@ -247,15 +247,14 @@ def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
         else:
             # if eta_mu is raster-matched, then also include the auto-corr
             # peak coefficient and so on
-            delay_mu = eta_Mu[1]
-            delay_nu = eta_Nu[1]
+            delay_mu, delay_gamma = eta_Mu[1], eta_gamma[1]
             # the sign and auto-corr coefficient part
             if reverse_order:
-                part1 = np.sign(delay_mu-delay_nu)*np.abs(eta_eta[-1])
+                part1 = np.sign(delay_gamma-delay_mu)*np.abs(eta_eta[-1])
             else:
-                part1 = np.sign(delay_nu-delay_mu)*np.abs(eta_eta[-1])
+                part1 = np.sign(delay_mu-delay_gamma)*np.abs(eta_eta[-1])
             # the gamma function part
-            part2 = gamma_tfrm(eta_eta[1] - np.abs(delay_mu-delay_nu))
+            part2 = gamma_tfrm(eta_eta[1] - np.abs(delay_mu-delay_gamma))
             part12 = part1*part2
         raster_match_score += part12
     return raster_match_score
