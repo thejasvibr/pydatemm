@@ -7,11 +7,19 @@ Created on Wed May 25 08:23:51 2022
 @author: thejasvi beleyur
 '''
 import unittest 
+import pandas as pd
 from pydatemm.raster_matching import * 
 
-
-
-
+def make_scheuingyang08_data_fig17():
+    '''
+    Digitised peaks using Ankit Rohatgi's WebPlotDigitiser. 
+    '''
+    fig17_data = pd.read_csv('fig17_scheuingyang2008.csv', sep=';',
+                             header=None, decimal=',')
+    
+    fig17_data.loc[:,0] = np.around(fig17_data.loc[:,0])
+    return fig17_data
+    
 class TestMakePprime(unittest.TestCase):
     def setUp(self):
         self.paa = [(10, 10, 1),
@@ -36,8 +44,7 @@ def make_scheuingyang08_data():
     Generates the data behind the example for Fig. 18 in the Scheuing & Yang
     2008 paper
     '''
-    p12 = [-81, -31, -4, 21, 48, 109, 162, 188, 267, 327,
-                                  337, 347, 358, 438, 448]
+    p12 = make_scheuingyang08_data_fig17()
     # all right pointing arrows
     p11 = [10, 21, 28, 142];
     # all left pointing arrows
@@ -47,9 +54,13 @@ def make_scheuingyang08_data():
 def format_p12_p11_p22_into_dicts():
     p12, p11, p22 = make_scheuingyang08_data()
     # for each tde, now make them into a peak object
-    Pkl = [(each, each, 5 ) for each in p12]
-    Pkk = [(each, each, 5 ) for each in p11]
-    Pll = [(each, each, 5 ) for each in p22]
+    Pkl = []
+    for i, (peak_location, peak_value) in p12.iterrows():
+        Pkl.append((peak_location, peak_location, peak_value))
+    #Pkl = [(each, each, 5 ) for each in p12]
+
+    Pkk = [(each, each, 0.1 ) for each in p11]
+    Pll = [(each, each, 0.1 ) for each in p22]
     return Pkl, Pkk, Pll
 
 def expected_P12_prime():

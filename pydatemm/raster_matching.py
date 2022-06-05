@@ -173,8 +173,8 @@ def calculate_quality_eta_mu(Pkl, Pp_kk, Pp_ll):
     for peak in Pkl:
         _, eta_mu, rkl = peak
         quality = rkl
-        quality =+ raster_match_score(eta_mu, Pp_kk)
-        quality =+ raster_match_score(eta_mu, Pp_ll, reverse_order=True)
+        quality += raster_match_score(eta_mu, Pp_kk)
+        quality += raster_match_score(eta_mu, Pp_ll, reverse_order=True)
         peak_props = (_, eta_mu, rkl, quality)
         eta_mu_w_q.append(peak_props)
     return eta_mu_w_q
@@ -218,7 +218,8 @@ def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
     eta_mu : tuple
         The tuple which identifies :math:`\eta_{\mu}`
     Pprimekk : List
-        List with sub-lists. Each sub-list
+        List with sub-lists of the following structure -
+            [[(eta_eta), (eta_mu, eta_gamma)], ....]
     reverse_order : bool, optional 
         In equation 13, do :math:`\eta_{\\nu}-\eta_{\\mu}` instead of 
         :math:`\eta_{\mu}-\eta_{\\nu}`. Defaults to False, which then 
@@ -235,16 +236,10 @@ def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
     # first check if this eta_mu is part of a raster-match at all
     raster_match_score = 0
     for each in Pprimekk:
-        in_rastermatch = False
-        eta_eta, (eta_Mu, eta_gamma) = each # eta_Mu and eta_Nu are those peaks 
+        eta_eta, (eta_Mu, eta_gamma) = each  # eta_Mu and eta_Nu are those peaks
         # that are raster matched
         eta_Mu_tdoa = eta_Mu[1]
-        if eta_mu==eta_Mu_tdoa:
-            in_rastermatch = True
-        if not in_rastermatch:
-            # if eta_mu is not raster-matched
-            part12 = 0
-        else:
+        if eta_Mu_tdoa == eta_mu:
             # if eta_mu is raster-matched, then also include the auto-corr
             # peak coefficient and so on
             delay_mu, delay_gamma = eta_Mu[1], eta_gamma[1]
@@ -256,6 +251,8 @@ def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
             # the gamma function part
             part2 = gamma_tfrm(eta_eta[1] - np.abs(delay_mu-delay_gamma))
             part12 = part1*part2
+        else:
+            part12 = 0
         raster_match_score += part12
     return raster_match_score
 
