@@ -90,7 +90,7 @@ def channel_pair_raster_matcher(Pkl, Pkk, Pll, **kwargs):
     Pprime_kk = make_Pprime(Pkk, Pkl, **kwargs)
     Pprime_ll = make_Pprime(Pll, Pkl, **kwargs)
     # Now calculate the quality score 
-    peak_quality = calculate_quality_eta_mu(Pkl, Pprime_kk, Pprime_ll)   
+    peak_quality = calculate_quality_eta_mu(Pkl, Pprime_kk, Pprime_ll, **kwargs)   
     # 
     Pprime_kl = make_Pprime_kl(Pkl, peak_quality)
     return Pprime_kl
@@ -144,12 +144,13 @@ def make_Pprime(Paa, Pkl, **kwargs):
         for i, each_diff in enumerate(eta_diff):
             if each_diff < 0.5*kwargs['twrm']:
                 peak1, peak2 = cross_cor_combis_inds[i]
+                # sort the peaks by their locations.
                 eta_mu = Pkl[peak1]
                 eta_nu = Pkl[peak2]
                 Pprime.append([eta_eta, (eta_mu, eta_nu)])
     return Pprime
 
-def calculate_quality_eta_mu(Pkl, Pp_kk, Pp_ll):
+def calculate_quality_eta_mu(Pkl, Pp_kk, Pp_ll, **kwargs):
     '''
     Implements :math:`q(\eta_{mu})` calculation as defined in eqn. 13
     
@@ -159,7 +160,8 @@ def calculate_quality_eta_mu(Pkl, Pp_kk, Pp_ll):
         List with cross-correlation peaks
     Pp_kk, Pp_ll : list
         Lists with Pprime_k and Pprime_l 
-
+    twrm : float>0
+    
     Returns
     -------
     None.
@@ -171,11 +173,11 @@ def calculate_quality_eta_mu(Pkl, Pp_kk, Pp_ll):
     eta_mu_w_q = [] # Each peak is still a tuple, but now with an additional 4th 
     # entry - the quality score
     for peak in Pkl:
-        _, eta_mu, rkl = peak
+        _, peak_s, rkl = peak
         quality = rkl
-        quality += raster_match_score(eta_mu, Pp_kk)
-        quality += raster_match_score(eta_mu, Pp_ll, reverse_order=True)
-        peak_props = (_, eta_mu, rkl, quality)
+        quality += raster_match_score_v2(peak, Pp_kk, **kwargs)
+        quality += raster_match_score_v2(peak, Pp_ll, reverse_order=True, **kwargs)
+        peak_props = (_, peak_s, rkl, quality)
         eta_mu_w_q.append(peak_props)
     return eta_mu_w_q
 
@@ -186,8 +188,8 @@ def gamma_tfrm(eta, **kwargs):
     eta : float
         I interpret it to mean the difference 
         between TDEs :math:`\eta= \eta_{\mu}-\eta_{\\nu}` (eqn. 12)
-    tfrm: float>0
-        twrm - tolerance width of raster matching
+    twrm: float>0
+        Tolerance width of raster matching in seconds.
 
     Returns
     -------
@@ -197,14 +199,12 @@ def gamma_tfrm(eta, **kwargs):
     -----
     This function is defined in eqn. 14 of Scheuing & Yang 2008
     '''
-    
-    twrm = kwargs.get('twrm', 5.21e-5) # 
+    twrm = kwargs['twrm']
     if abs(eta) < 0.5*twrm:
         tfrm_out = 1 - (abs(eta))/(0.5*twrm)
     elif abs(eta)>= 0.5*twrm:
         tfrm_out = 0
     return tfrm_out
-
 
 def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
     '''
@@ -255,6 +255,31 @@ def raster_match_score(eta_mu, Pprimekk, reverse_order=False):
             part12 = 0
         raster_match_score += part12
     return raster_match_score
+
+def raster_match_score_v2(eta_mu, Pprimekk, **kwargs):
+    '''
+    '''
+    reverse_order = kwargs.get('reverse_order', False)
+    _, etamu_s, rkl = eta_mu
+    
+    summation_score = 0
+    for each_pprime in Pprimekk:
+        eta_eta, (eta_mu_saved, eta_gamma) = each_pprime
+        _, aa_s, rkk = eta_eta 
+        if eta_mu_saved==eta_mu:
+            etagamma_s = eta_gamma[1]
+            peak_match_residual = aa_s - np.abs(etamu_s-etagamma_s)
+            if not reverse_order:                
+                value = np.sign(etagamma_s-etamu_s)*np.abs(rkk)
+            else:
+                value = np.sign(etamu_s-etagamma_s)*np.abs(rkk)
+            value *= gamma_tfrm(peak_match_residual, **kwargs)
+            summation_score += value
+    return summation_score
+
+        
+    
+    
 
 def make_Pprime_kl(Pkl, peak_qualities):
     '''

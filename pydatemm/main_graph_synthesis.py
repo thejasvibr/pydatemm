@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
     # We invert Sabine's formula to obtain the parameters for the ISM simulator
     
-    rt60 = 0.3
+    rt60 = 0.1
     e_absorption, max_order = pra.inverse_sabine(rt60, room_dim)
     room = pra.ShoeBox(room_dim, fs=kwargs['fs'],
                        materials=pra.Material(0.5), max_order=1)
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     print('miaow')
     #%%
     #%lprun -f fill_up_triple_hole_in_star make_stars(triples_goodq[0], triples_goodq[:30], **kwargs)
-    #tdoas = assemble_tdoa_graphs(triples_goodq[:100], **kwargs)
+    tdoas = assemble_tdoa_graphs(triples_goodq[:100], **kwargs)
     #%%
     # #sorted_triples_part = deepcopy(sorted_triples_full)
     # tdoa_sources = assemble_tdoa_graphs(sorted_triples_full, **kwargs)
