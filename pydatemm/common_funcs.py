@@ -3,13 +3,20 @@ Common functions
 ================
 A bunch of general purpose purpose functions
 '''
-
+from itertools import chain
+from joblib import Parallel, delayed
 import numpy as np
 import networkx as nx
+from networkx.algorithms.isomorphism import is_isomorphic, numerical_edge_match
 from networkx.utils.misc import edges_equal
 nona = lambda X: X[~np.isnan(X)]
 # removes all np.nans and checks that all entries are the same
 nancompare = lambda X,Y: np.all(nona(X)==nona(Y))
+
+tde_match = numerical_edge_match('tde', 0)
+
+def graphs_equal(X,Y):
+    return is_isomorphic(X,Y, edge_match=tde_match)
 
 def find_unique_graphs(graphs):
     '''
@@ -109,9 +116,50 @@ def remove_graphs_in_pool(objs_to_remove, object_pool):
     '''
     pool_indices = []
     for each in objs_to_remove:
-        for i, every in enumerate(object_pool):
-            if edges_equal(each.edges, every.edges):
-                pool_indices.append(i)
+        i = graph_argwhere(each, object_pool)
+        if len(i)>0:
+            pool_indices.append(i)
+    pool_indices = list(chain(*pool_indices))
     indices_to_keep = set(range(len(object_pool))) - set(pool_indices)
     filtered_object_pools = [object_pool[j] for j in indices_to_keep]
     return filtered_object_pools
+
+def graph_argwhere(object_to_compare, object_pool):
+    pool_inds = []
+    for i,every in enumerate(object_pool):        
+        if graphs_equal(object_to_compare, every):
+            pool_inds.append(i)
+    return pool_inds
+
+def remove_graphs_in_pool_pll(objs_to_remove, object_pool):
+    '''
+    Parameters
+    ----------
+    objs_to_remove : list
+        List with tdoa objects to be removed
+    object_pool : list
+        List with the whole pool of tdoa objects.
+
+    Returns
+    -------
+    filtered_object_pools : list
+        List with a subset of tdoa objects - without objs_to_remove
+    
+    Notes
+    -----
+    If the input has a 'foreign' object (that's not in the object pool),
+    then an unaltered copy of the object_pool is returned.
+    '''
+    # create as many tasks as there are objs_to_remove
+    pool_indices = Parallel(n_jobs=-1)(delayed(graph_argwhere)(each, object_pool) for each in objs_to_remove)
+    pool_indices = list(chain(*pool_indices))
+    indices_to_keep = set(range(len(object_pool))) - set(pool_indices)
+    filtered_object_pools = [object_pool[j] for j in indices_to_keep]
+    return filtered_object_pools
+
+def remove_graphs_in_pool_setstyle(objs_to_remove, object_pool):
+    '''
+    '''
+    remaining = set(object_pool) - set(objs_to_remove)
+    return list(remaining)
+    

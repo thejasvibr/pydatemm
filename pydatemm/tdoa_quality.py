@@ -12,6 +12,7 @@ Created on Wed May 11 07:51:27 2022
 """
 from itertools import combinations
 import numpy as np
+import networkx as nx
 from scipy.spatial import distance
 euclidean = distance.euclidean
 
@@ -110,7 +111,7 @@ def residual_position_error(true_pos, obtained_pos):
     '''
     return euclidean(true_pos, obtained_pos)
 
-def residual_tdoa_error(tdoa_array, source, array_geom, **kwargs):
+def residual_tdoa_error(source_graph, source, array_geom, **kwargs):
     '''
     Implements Eqn. 32 in Scheuing & Yang 2008. The residual 
     tdoa error (n cap)  'compares the implicit microphone positions
@@ -118,10 +119,10 @@ def residual_tdoa_error(tdoa_array, source, array_geom, **kwargs):
 
     Parameters
     ----------
-    tdoa_array : np.array
-        TDOA array
+    source_graph : nx.DiGraph
+        Graph representing a source with N nodes
     source : (3)/(3,1) np.array
-    array_geom : (Nmics,3) np.array
+    array_geom : (N,3) np.array
 
 
     References
@@ -133,24 +134,21 @@ def residual_tdoa_error(tdoa_array, source, array_geom, **kwargs):
     pydatemm.tdoa_objects
     '''
     ref_channel = kwargs.get('ref_channel', 0)
-    n_channels = kwargs['nchannels']
+    n_channels = len(source_graph.nodes)
     distmat = np.apply_along_axis(euclidean, 1, array_geom, source)
     # the TDOA vector measured from data
+    tdoa_array = nx.to_numpy_array(source_graph, weight='tde')
     measured_n_cap = tdoa_array[:,ref_channel]
     obtained_n_tilde = np.zeros(n_channels)
     for i in range(n_channels):
         diff = distmat[i] - distmat[ref_channel]
-        if diff == 0:
-            obtained_n_tilde[i] = np.nan
-        else:
-            obtained_n_tilde[i] = diff
+        obtained_n_tilde[i] = diff
     obtained_n_tilde /= kwargs.get('c', 340)
     # tdoa residual 
-    print(measured_n_cap, obtained_n_tilde)
-    tdoa_resid = nan_euclidean(measured_n_cap, obtained_n_tilde)
+    #print(measured_n_cap, obtained_n_tilde)
+    tdoa_resid = euclidean(measured_n_cap, obtained_n_tilde)
     tdoa_resid /= np.sqrt(n_channels)
     return tdoa_resid
-    
     
     
     

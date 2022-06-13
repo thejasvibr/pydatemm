@@ -107,7 +107,7 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     if mic1_notorigin:
         for each in s:
             each += mic1
-    
+
     valid_solution = choose_SW_valid_solution(s, array_geometry, d, **kwargs)
     
     return valid_solution

@@ -10,6 +10,7 @@ Created on Tue May 17 11:24:01 2022
 """
 from copy import deepcopy
 from pydatemm.graph_synthesis import *
+from pydatemm.common_funcs import remove_graphs_in_pool_pll, remove_graphs_in_pool_setstyle
 from networkx.algorithms.clique import find_cliques
 #%%
 def assemble_tdoa_graphs(sorted_triples, **kwargs):
@@ -46,6 +47,7 @@ def assemble_tdoa_graphs(sorted_triples, **kwargs):
         pruned_triple_pool = prune_triple_pool(seed_triple,
                                                pruned_triple_pool,
                                                tdoa_sources)
+        print('pruned...')
         enough_seed_triples = check_for_enough_seed_triples(pruned_triple_pool)
         print('checking enough seed triples')
         roundnum +=1 
@@ -77,8 +79,6 @@ def prune_triple_pool(seed_triple, triple_pool, tdoas):
         Subset of input triple pool without the seed_triple and 
         component triples of all the tdoas
     '''
-    # remove the seed_triple from triple_pool
-    pruned_pool = remove_graphs_in_pool([seed_triple], triple_pool)
     # get all component triples in each of the sources
     source_triples = []
     if len(tdoas)>0:
@@ -87,8 +87,11 @@ def prune_triple_pool(seed_triple, triple_pool, tdoas):
             for every in triples_in_source:
                 source_triples.append(every)
         # remove component triples from triple_pool
+        source_triples.append(seed_triple)
         unique_source_triples = find_unique_graphs(source_triples)
-        pruned_pool = remove_graphs_in_pool(unique_source_triples, pruned_pool)
+        pruned_pool = remove_graphs_in_pool_setstyle(unique_source_triples, triple_pool)
+    else:
+        pruned_pool = remove_graphs_in_pool_setstyle([seed_triple], triple_pool)
     return pruned_pool 
 
 def make_stars(seed_triple, triple_pool, **kwargs):
@@ -161,13 +164,15 @@ if __name__ == '__main__':
     import pandas as pd
     import soundfile as sf
     import time
-    # %load_ext line_profiler
+    
     from itertools import permutations
     print('starting sim audio...')
     seednum = 78464 # 8221, 82319, 78464
     np.random.seed(seednum) # what works np.random.seed(82310)
     array_geom = pd.read_csv('tests/scheuing-yang-2008_micpositions.csv').to_numpy()
-
+    # reduce the # of channels 
+    array_geom = array_geom[:5,:]
+    
     nchannels = array_geom.shape[0]
     fs = 96000
     paper_twrm = 7/fs
@@ -183,7 +188,7 @@ if __name__ == '__main__':
     rt60 = 0.1
     e_absorption, max_order = pra.inverse_sabine(rt60, room_dim)
     room = pra.ShoeBox(room_dim, fs=kwargs['fs'],
-                       materials=pra.Material(0.5), max_order=1)
+                       materials=pra.Material(0.5), max_order=0)
     #mic_locs = np.random.normal(0,2,3*kwargs['nchannels']).reshape(3,nchannels)
     # array_geom = np.abs(np.random.normal(0,1,3*nchannels).reshape(3,nchannels))
     
@@ -191,18 +196,19 @@ if __name__ == '__main__':
     room.add_microphone_array(array_geom.T)
     
     # add one source
-    pbk_signals = [make_chirp(chirp_durn=0.025, start_freq=50000)*0.5,
-                   make_chirp(chirp_durn=0.05)*0.5]
+    pbk_signals = [make_chirp(chirp_durn=0.05, start_freq=80000, end_freq=50000)*0.5,
+                   make_chirp(chirp_durn=0.05, start_freq=40000, end_freq=10000)*0.5]
     source1 = [1.67,1.66,0.71]
     source2 = [2.72,0.65,1.25]
+    sources = np.vstack((source1, source2))
     source_positions = [source1, source2]
     for i,each in enumerate(source_positions):
-        room.add_source(position=each, signal=pbk_signals[i])
+        room.add_source(position=each, signal=pbk_signals[i], delay=i*0.02)
     room.compute_rir()
     room.simulate()
 
-    # plt.figure()
-    # plt.specgram(room.mic_array.signals[1,:], Fs=fs)
+    plt.figure()
+    plt.specgram(room.mic_array.signals[1,:], Fs=fs)
     audio = room.mic_array.signals.T
     sf.write('pyroom_audio.wav', audio, fs)
     print('done w sim audio...')
@@ -210,7 +216,7 @@ if __name__ == '__main__':
     print('starting cc and acc...')
     multich_cc = generate_multich_crosscorr(audio, use_gcc=True)
     multich_ac = generate_multich_autocorr(audio)
-    cc_peaks = get_multich_tdoas(multich_cc, min_height=15, fs=192000)
+    cc_peaks = get_multich_tdoas(multich_cc, min_height=10, fs=192000)
     multiaa = get_multich_aa_tdes(multich_ac, fs=192000,
                                   min_height=3) 
     print('raster matching...')
@@ -223,26 +229,68 @@ if __name__ == '__main__':
     print(f'time taken generating: {time.time()-start}')
     sorted_triples_full = sort_triples_by_quality(consistent_triples, **kwargs)
     triple_quality = [triplet_quality(each, **kwargs) for each in sorted_triples_full]
-    
+    quality_thresh = np.nanpercentile(triple_quality,[0])
     triples_goodq = []
     for (quality, triple) in zip(triple_quality, sorted_triples_full):
-        if quality>0:
+        if quality>quality_thresh:
             triples_goodq.append(triple)
 
     print(f'time taken sorting: {time.time()-start}')
     print(f'seed: {seednum}, len-sorted-trips{len(sorted_triples_full)}, nonzero quality: {len(triples_goodq)}')
     #%%
     #used_triple_pool = deepcopy(sorted_triples_full)
-    one_star = make_stars(sorted_triples_full[0], sorted_triples_full[:30], **kwargs)
+    #one_star = make_stars(sorted_triples_full[0], sorted_triples_full[:30], **kwargs)
     print('miaow')
-    #%%
-    #%lprun -f fill_up_triple_hole_in_star make_stars(triples_goodq[0], triples_goodq[:30], **kwargs)
-    tdoas = assemble_tdoa_graphs(triples_goodq[:100], **kwargs)
+    # #%%
+    # #%load_ext line_profiler
+    # #%lprun -f prune_triple_pool assemble_tdoa_graphs(triples_goodq[:20],  **kwargs)
+    tdoas = assemble_tdoa_graphs(triples_goodq[:20],  **kwargs)
+    # actual_tdoas = [each for each in tdoas if len(each.nodes)>0]
+    # #%%
+    # from pydatemm.localisation import spiesberger_wahlberg_solution
+    # from pydatemm.tdoa_quality import residual_tdoa_error
+    # def track_from_tdoa(tdoa_nx, **kwargs):
+    #     vsound = kwargs.get('vsound', 340)
+    #     d_0 = nx.to_numpy_array(tdoa_nx, weight='tde')[1:,0]*vsound
+    #     #d_0 = nx.to_numpy_array(tdoa_nx, weight='tde')[0,1:]*vsound
+    #     array_geom_part = kwargs['array_geom'][list(tdoa_nx.nodes),:]
+    #     try:
+    #         source = spiesberger_wahlberg_solution(array_geom_part,  d_0)
+    #     except:
+    #         source = np.nan
+    #     return source, array_geom_part
+    # #%%
+    # all_sources = []
+    # ncap = []
+    # for i, each in enumerate(actual_tdoas):
+    #     source, part_array = track_from_tdoa(each, **kwargs)
+    #     if not np.sum(np.isnan(source))>0:
+    #         # if euclidean(source, source2)<0.3:
+    #         #     print(i,'good source')
+    #         all_sources.append(source)
+    #         ncap_source = residual_tdoa_error(each, source, part_array)
+    #         ncap.append(ncap_source)
+    # all_sources = np.array(all_sources)
+    # #%%
+    # plt.figure()
+    # plt.subplot(211)
+    # plt.plot(all_sources[:,0], all_sources[:,1], '*')
+    # plt.plot(source2[0], source2[1], 'r^')
+    # plt.plot(source1[0], source1[1], 'g^')
+    # plt.xlabel('x', labelpad=-5.5);plt.ylabel('y')
+    # plt.subplot(212)
+    # plt.plot(all_sources[:,1], all_sources[:,2], '*')
+    # plt.plot(source2[1], source2[2], 'r^')
+    # plt.plot(source1[1], source1[2], 'g^')
+    # plt.xlabel('z');plt.ylabel('y')
+    # #%%
+    # plt.figure()
+    # plt.hist(ncap)
     #%%
     # #sorted_triples_part = deepcopy(sorted_triples_full)
     # tdoa_sources = assemble_tdoa_graphs(sorted_triples_full, **kwargs)
     # #trippool, pot_tdoas = build_full_tdoas(sorted_triples_part)
-    # from pydatemm.localisation import spiesberger_wahlberg_solution
+    # 
     # all_sources = []
     # all_ncap = []
     # for i,each in enumerate(one_star):
