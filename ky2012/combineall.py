@@ -69,11 +69,11 @@ def combine_all(Acc, V, l, X):
     # determine N_v(l) and !N_v(l)
     # !N_v(l) are the vertices incompatible with the current solution
     N_vl, N_not_vl = get_Nvl(Acc, V, l), get_NOT_Nvl(Acc, V, l)
-    print(f'l:{l}, X:{X}, V:{V}, N_vl:{N_vl}, N_notvl:{N_not_vl}')
+    #print(f'l:{l}, X:{X}, V:{V}, N_vl:{N_vl}, N_notvl:{N_not_vl}')
     solutions_l = []
     if len(N_vl) == 0:
         solutions_l.append(l)
-        print(f'\n yes \n solution: {l}')
+        #print(f'\n yes \n solution: {l}')
     else:
         # remove conflicting neighbour
         V = V.difference(N_not_vl)
@@ -87,10 +87,9 @@ def combine_all(Acc, V, l, X):
                 solutions_l.append(solution)
             X = X.union(set([n]))
     return solutions_l
+#%%
 
-#V = set(range(1,7)); Acc = deepcopy(A); V = set([]); l = set([]); X=set([])
-
-
+# Now need to find a way to flatten the solution outputs.
 qq = combine_all(A, set([1,2,3,4,5,6]), set([]), set([]))
 # qq = combine_all(A, set([1,3,4,5,6]), set([2]), set([1]))
 # qq = combine_all(A, set([1,2,3,4,6]), set([5]), set([1,2,3,4]))        
