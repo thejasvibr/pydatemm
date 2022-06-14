@@ -249,6 +249,10 @@ for each in tqdm.tqdm(cfl_triples[fundamental_loops[0]][:100]):
 def combine_graphs(X, Y):
     return nx.compose(X, Y)
 
+def two_nodes_common(X,Y):
+    xx = set(X).intersection(set(Y))
+    return len(xx)==2
+
 def ccg_determine(X,Y):
     if two_common_nodes_one_edge(X, Y):
         return 1
@@ -260,8 +264,6 @@ def ccg_determine(X,Y):
     else:
         raise NotImplementedError('This case not implemented')
 #%%
-        
-
 all_possible_trip_combis = product(*[cfl_triples[each][:25] for each in fundamental_loops[:4]])
 
 for combiset in all_possible_trip_combis:
