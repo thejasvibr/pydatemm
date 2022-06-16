@@ -20,9 +20,10 @@ from scipy.spatial import distance_matrix, distance
 euc_dist = distance.euclidean
 import pandas as pd
 import soundfile as sf
-import tqdm 
+import tqdm
 import time
 from combineall import combine_all
+from kreissig_yang_2012_iterative import iterative_merge_loops
 #%%
 
 def printout_edge_weights(graph_list):
@@ -44,7 +45,7 @@ array_geom = array_geom[:5,:]
 nchannels = array_geom.shape[0]
 fs = 192000
 
-paper_twtm = 1e-5
+paper_twtm = 1e-4
 kwargs = {'twtm': paper_twtm,
           'nchannels':nchannels,
           'fs':fs}
@@ -55,7 +56,7 @@ room_dim = [4,2,2]
 rt60 = 0.1
 e_absorption, max_order = pra.inverse_sabine(rt60, room_dim)
 room = pra.ShoeBox(room_dim, fs=kwargs['fs'],
-                   materials=pra.Material(0.5), max_order=0)
+                   materials=pra.Material(0.5), max_order=1)
 #mic_locs = np.random.normal(0,2,3*kwargs['nchannels']).reshape(3,nchannels)
 # array_geom = np.abs(np.random.normal(0,1,3*nchannels).reshape(3,nchannels))
 
@@ -76,7 +77,7 @@ room.simulate()
 audio = room.mic_array.signals.T
 multich_cc = generate_multich_crosscorr(audio, use_gcc=True)
 multich_ac = generate_multich_autocorr(audio)
-cc_peaks = get_multich_tdoas(multich_cc, min_height=15, fs=fs, min_peak_diff=1e-4)
+cc_peaks = get_multich_tdoas(multich_cc, min_height=15, fs=fs, min_peak_diff=0.5e-4)
 
 def sort_cc_peaks_by_quality(multich_ccpks, top_N=15):
     sorted_cc_peaks = {}
@@ -140,7 +141,7 @@ def plot_graph_w_labels(graph, curr_ax):
             weight_labels[e] = np.around(graph.edges[e]['weight'], 3)
     nx.draw_networkx_edge_labels(graph, pos,edge_labels=weight_labels,
                                  ax=curr_ax)
-
+#%%
 plt.figure()
 a0 = plt.subplot(111)
 plot_graph_w_labels(sourceG, a0)
@@ -163,7 +164,7 @@ for edge in co_tree.edges():
     fundamental_loops.append(fl_nodes)
 #%%
 # Assemble all possible consistent triples from the fundamental loops!
-kwargs = {'twtm':1e-6}
+kwargs = {'twtm':1e-4}
 cFLs = {}
 for each in fundamental_loops:
     funda_loops = choose_consistent_triples(each, tdoas_mirrored, **kwargs)
@@ -271,8 +272,8 @@ def ccg_definer(X,Y):
 # First let's extract the first 10 cFLs for each FL set into a list. 
 from itertools import chain, combinations, product
 first_N = 5
-fNcfl = [cfls[:first_N] for fl_set, cfls in cfl_triples.items()]
-fNcfl = list(chain(*fNcfl))
+fNcfl_by_key = [cfls[:first_N] for fl_set, cfls in cfl_triples.items()]
+fNcfl = list(chain(*fNcfl_by_key))
 
 num_cfls = len(fNcfl)
 ccg = np.zeros((num_cfls, num_cfls))
@@ -289,15 +290,47 @@ qq = combine_all(ccg, set(range(1,num_cfls+1)), set([]), set([]))
 #     ccg[j,i] = define_compatibility_or_conflict(first10_cfls[j], first10_cfls[i])
 #%%
 #trip1, trip2 = first10_cfls[178], first10_cfls[201]
-compatible_inds = np.array([1,2,3])-1
+compatible_inds = [np.array([1,8,9,11,12,13])-1,
+                   np.array([1,7,11,13,14])-1,
+                   np.array([1,9,12,14])-1]
 
+def combine_graphs(graph_list, idxs):
+    gg = graph_list[idxs[0]]
+    for each in idxs[1:]:
+        gg = nx.compose(gg, graph_list[each])
+    return gg
+
+pgraphs  = [combine_graphs(fNcfl, each) for each in compatible_inds]
+
+# plt.figure()
+# for i, idx in enumerate(compatible_inds):
+#     plt.subplot(100*len(compatible_inds)+11+i)
+#     plot_graph_w_labels(fNcfl[idx],plt.gca())
+for g in pgraphs:
+    plt.figure()
+    plot_graph_w_labels(g, plt.gca())
+#%%
+first_N_cfltriples = {}
+for loop, each in cfl_triples.items():
+    first_N_cfltriples[loop] = each[:100]
+
+iml_out = iterative_merge_loops(first_N_cfltriples)
+print(len(iml_out))
+#%%
+for g in iml_out[:5]:
+    plt.figure()
+    plot_graph_w_labels(g, plt.gca())
+#%%
 plt.figure()
-for i, idx in enumerate(compatible_inds):
-    plt.subplot(100*len(compatible_inds)+11+i)
-    plot_graph_w_labels(fNcfl[idx],plt.gca())
+a0 = plt.subplot(111)
+plot_graph_w_labels(sourceG, a0)
+#%%
+def edge_weight(edge_name, graph):
+    try:
+        weight =  graph.edges()[edge_name]['tde']
+        return weight
+    except:
+        return []
 
-gg = [fNcfl[each] for each in compatible_inds]
-yy = nx.compose(nx.compose(gg[0],gg[1]), gg[2])
-
-plt.figure()
-plot_graph_w_labels(yy, plt.gca())
+tdes_34 = sorted([edge_weight((0,1), each) for each in iml_out])
+np.sum(list(chain(*tdes_34)))
