@@ -19,9 +19,9 @@ def get_Nvl(Acc, V, l):
     if len(l)>0:
         for v in V:
             for u in l:
-                if Acc[v-1,u-1]==1:
+                if Acc[v,u]==1:
                     Nvl.append(v)
-                elif Acc[v-1,u-1]==-1:
+                elif Acc[v,u]==-1:
                     if v in Nvl:
                         Nvl.pop(Nvl.index(v))
     else:
@@ -33,9 +33,9 @@ def get_NOT_Nvl(Acc, V, l):
     if len(l)>0:
         for v in V:
             for u in l:
-                if Acc[v-1,u-1]==-1:
+                if Acc[v,u]==-1:
                     N_not_vl.append(v)
-                elif Acc[v-1,u-1]==1:
+                elif Acc[v,u]==1:
                     if v in N_not_vl:
                         N_not_vl.pop(N_not_vl.index(v))
     else:
@@ -126,11 +126,10 @@ if __name__ == '__main__':
                   [-1, 0, 1,-1, 0, 1],
                   [-1, 1, 0, 0, 1, 0]])
     # Now need to find a way to flatten the solution outputs.
-    qq = combine_all(A, set([1,2,3,4,5,6]), set([]), set([]))
-
+    qq = combine_all(A, set(range(6)), set([]), set([]))
     A[:,0] = 0
     A[[1,5],0] = -1
-    qq2 = combine_all(A, set([1,2,3,4,5,6]), set([]), set([]))
+    qq2 = combine_all(A, set(range(6)), set([]), set([]))
     # qq = combine_all(A, set([1,3,4,5,6]), set([2]), set([1]))
     # qq = combine_all(A, set([1,2,3,4,6]), set([5]), set([1,2,3,4]))        
 

@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np 
 import networkx as nx
 from scipy.spatial import distance_matrix
-from combineall import combine_all
+from combineall import combine_all, format_combineall
 seednum = 78464 # 8221, 82319, 78464
 np.random.seed(seednum) # what works np.random.seed(82310)
 vsound = 340
@@ -76,18 +76,18 @@ def make_edges_for_fundamental_loops(nchannels):
     existing_edges = []
     triple_definition = {}
     for fun_loop in funda_loops:
-        edges = make_channel_pairs_from_triple(fun_loop)
+        edges = make_triple_pairs(fun_loop)
         triple_definition[fun_loop] = []
         # if the edge (ab) is present but the 'other' way round (ba) - then 
         # reverse polarity. 
         for edge in edges:
-            if edge_present_with_reversed_polarity(edge, existing_edges):
-                polarity = -1
-                edge = edge[::-1]
-            else:
-                polarity = 1
-                existing_edges.append(edge)
-            triple_definition[fun_loop].append((polarity, edge))
+            # if edge_present_with_reversed_polarity(edge, existing_edges):
+            #     polarity = -1
+            #     edge = edge[::-1]
+            # else:
+            #     polarity = 1
+            #     existing_edges.append(edge)
+            triple_definition[fun_loop].append(edge)
     return triple_definition
 
 def edge_present_with_reversed_polarity(edge, existing_edges):
@@ -119,9 +119,11 @@ def make_all_fundaloops_from_tdemat(tdematrix):
     all_edges_fls = make_edges_for_fundamental_loops(tdematrix.shape[0])
     all_cfls = []
     for fundaloop, edges in all_edges_fls.items():
-        this_cfl = nx.DiGraph()
-        for (polarity, e) in edges:
-            this_cfl.add_edge(e[0], e[1], tde=polarity*tdematrix[e[0],e[1]])
+        print(fundaloop)
+        this_cfl = nx.ordered.Graph()
+        for e in sorted(edges):
+            print(e)
+            this_cfl.add_edge(e[0], e[1], tde=tdematrix[e[0],e[1]])
         all_cfls.append(this_cfl)
     return all_cfls
 
@@ -131,10 +133,11 @@ def weight_sum(triple):
 
 def check_for_one_common_edge(X,Y):
     '''Checks that X and Y have one common edge 
-    with the same ABSOLUTE weight.
+    with the same weight.
+    X and Y are assumed to be undirected graphs!!
     '''
-    X_edge_weights = [ (i, abs(X.edges()[i]['tde'])) for i in X.edges]
-    Y_edge_weights = [ (i, abs(Y.edges()[i]['tde'])) for i in Y.edges]
+    X_edge_weights = [ X.edges()[i]['tde'] for i in X.edges]
+    Y_edge_weights = [ Y.edges()[i]['tde'] for i in Y.edges]
     common_edge = set(Y_edge_weights).intersection(set(X_edge_weights))
     if len(common_edge)==1:
         return 1
@@ -178,7 +181,29 @@ def make_ccg_matrix(cfls):
         cc_out = ccg_definer(trip1, trip2)
         ccg[i,j] = cc_out; ccg[j,i] = cc_out
     return ccg
-#%%
+
+def combine_compatible_triples(compatible_triples):
+    combined = nx.compose_all(compatible_triples)
+    nodesorted = nx.Graph()
+    nodesorted.add_nodes_from(sorted(combined.nodes(data=True)))
+    nodesorted.add_edges_from(combined.edges(data=True))
+    return nodesorted
+    
+
+def make_triple_pairs(triple):
+    pairs = combinations(sorted(triple),2)
+    # reverse order to make them into j,i pairs from i,j pairs
+    ji_pairs = list(map(lambda X: X[::-1], pairs))
+    return ji_pairs
+
+def get_graph_weights(graph):
+    edge_weights = {}
+    for e in graph.edges():
+        edge_weights[e] = graph.edges()[e]['tde']
+    return edge_weights
+
+
+
 if __name__ == '__main__':
     array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
     array_geom = array_geom[:5,:]
@@ -204,16 +229,41 @@ if __name__ == '__main__':
     # Make the cfls now:
     cfls_s12 = [make_all_fundaloops_from_tdemat(deltaR) for deltaR in [deltaR1, deltaR2]]
     ccg_s12 = [make_ccg_matrix(cfls_s) for cfls_s in cfls_s12]
-    qq1 = combine_all(ccg_s12[0], set(range(1,nchannels+1)), set([]), set([]))
-    qq2 = combine_all(ccg_s12[1], set(range(1,nchannels+1)), set([]), set([]))
+    qq1 = combine_all(ccg_s12[0], set(range(nchannels)), set([]), set([]))
+    qq2 = combine_all(ccg_s12[1], set(range(nchannels)), set([]), set([]))
     # And now let's combine the two cfls sets together and see how well it all
     # works
     cfls_combined = list(chain(*cfls_s12))
     ccg_combined = make_ccg_matrix(cfls_combined)
-    qq_combined = combine_all(ccg_combined, set(range(1,len(ccg_combined)+1)), set([]), set([]))    
+    qq_combined = combine_all(ccg_combined, set(range(len(ccg_combined))), set([]), set([]))    
+    comp_cfls = format_combineall(qq_combined)
     #%%
-    g_s1 = nx.from_numpy_array(deltaR1)
-    g_s2 = nx.from_numpy_array(deltaR2)
-    
+    all_channel_pairs = combinations(range(nchannels),2)
+    part_R1 = np.zeros(deltaR1.shape)
+    for (i,j) in all_channel_pairs:
+        part_R1[j,i] = deltaR1[j,i]
+    g_parts1 = nx.from_numpy_array(part_R1)
+    plt.figure()
+    plot_graph_w_labels(g_parts1, plt.gca())
+    #%%
+    g_s1 = nx.from_numpy_array(deltaR1*1e3)
+    g_s2 = nx.from_numpy_array(deltaR2*1e3)
+
     plt.figure()
     plot_graph_w_labels(g_s1, plt.gca())
+    plt.title('Original S1')
+    #%%
+    # Compose. 
+    cfl1 = [cfls_combined[each] for each in comp_cfls[0]]
+    s1_composed = combine_compatible_triples(cfl1)
+    s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
+    print(spiesberger_wahlberg_solution(array_geom, s1c_tde[1:,0]*340))
+    #%%
+    # Now let's try to combine the compatible triples. 
+    #qq_s1, qq_s2 = comp_cfls
+    #trips_s1 = [cfls_combined[each] for each in qq_s1]
+    plt.figure()
+    for i,subp in enumerate(range(511, 516)):
+        plt.subplot(subp)
+        plot_graph_w_labels(cfls_s12[0][i], plt.gca())
+    

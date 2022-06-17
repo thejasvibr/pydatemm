@@ -130,7 +130,7 @@ def get_triple_weights(triple, tde_array):
     a,b,c = triple
     return (tde_array[a,b], tde_array[b,c], tde_array[c,a])
 
-def plot_graph_w_labels(graph, curr_ax):
+def plot_graph_w_labels(graph, curr_ax=plt.gca()):
     pos = nx.circular_layout(graph)
     nx.draw_circular(graph, with_labels=True)
     weight_labels = {}
