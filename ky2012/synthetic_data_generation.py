@@ -206,7 +206,7 @@ def get_graph_weights(graph):
 
 if __name__ == '__main__':
     array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
-    array_geom = array_geom[:5,:]
+    array_geom = array_geom[:6,:]
     
     nchannels = array_geom.shape[0]
     sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([0,0,0])]
@@ -226,13 +226,15 @@ if __name__ == '__main__':
     #%%
     # Make the cfls now:
     cfls_s12 = [make_all_fundaloops_from_tdemat(deltatde) for deltatde in delta_tdes]
+    print('Making CCG Matrix now...')
     ccg_s12 = [make_ccg_matrix(cfls_s) for cfls_s in cfls_s12]
-    qq1 = combine_all(ccg_s12[0], set(range(nchannels)), set([]), set([]))
-    qq2 = combine_all(ccg_s12[1], set(range(nchannels)), set([]), set([]))
+    # qq1 = combine_all(ccg_s12[0], set(range(nchannels)), set([]), set([]))
+    # qq2 = combine_all(ccg_s12[1], set(range(nchannels)), set([]), set([]))
     # And now let's combine the two cfls sets together and see how well it all
     # works
     cfls_combined = list(chain(*cfls_s12))
     ccg_combined = make_ccg_matrix(cfls_combined)
+    print('Running CombineAll..')
     qq_combined = combine_all(ccg_combined, set(range(len(ccg_combined))), set([]), set([]))    
     comp_cfls = format_combineall(qq_combined)
     #%%

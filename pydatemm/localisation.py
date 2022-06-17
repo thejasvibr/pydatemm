@@ -108,8 +108,8 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
         for each in s:
             each += mic1
 
-    valid_solution = choose_SW_valid_solution(s, array_geometry, d, **kwargs)
-    
+    valid_solution = choose_SW_valid_solution(s, array_geometry+mic1, d,
+                                                                      **kwargs)
     return valid_solution
 
 def euclid_dist(X,Y):
@@ -145,8 +145,8 @@ def choose_SW_valid_solution(sources, array_geom, rangediffs, **kwargs):
         The correct solution of the two potential solutions.
     '''
     source_rangediffs =  [ make_rangediff_mat(each, array_geom) for each in sources]
-    tau_ch1_expected = [each[1:,0] for each in source_rangediffs]
-    residuals = [np.sqrt(np.sum(rangediffs**2+np.abs(tauch1)**2)) for tauch1 in tau_ch1_expected]
+    tau_ch1_sources = [each[0,1:] for each in source_rangediffs]
+    residuals = [np.sum(np.abs(tauch1)-np.abs(rangediffs)) for tauch1 in tau_ch1_sources]
     # choose the source with lower rangediff residuals
     lower_error_source = np.argmin(residuals)
     valid_solution = sources[lower_error_source]
