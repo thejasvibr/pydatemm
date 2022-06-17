@@ -122,6 +122,14 @@ def euclid_dist(X,Y):
 
 def choose_SW_valid_solution(sources, array_geom, rangediffs, **kwargs):
     '''
+    The Spiesberger-Wahlberg 2002 method always provides 2 potential solutions.
+    The authors themselves suggest comparing the observed channel 5 and 1
+    time difference ():math:`\tau_{51}` ) and the predicted :math:`\tau_{51}`
+    from each source to see which one is a better fit. 
+
+    Here however, the entire :math:`\tau_{21,31,41,51}` are compared. The source
+    with the best fit is chosen finally.    
+
     Parameters
     ----------
     sources : list
@@ -130,14 +138,20 @@ def choose_SW_valid_solution(sources, array_geom, rangediffs, **kwargs):
     rangediffs : np.array
         Range differences to reference microphone. The ref. microphone
         is assumed to be the first row of the array_geom.
+    
+    Returns
+    -------
+    valid_solution : (3)/(3,1) np.array
+        The correct solution of the two potential solutions.
     '''
-    source_rangediffs =  [ make_rangediff_mat(each, array_geom)[1:,0] for each in sources]
-    residuals = [np.nansum(np.abs(each-rangediffs)) for each in source_rangediffs]
+    source_rangediffs =  [ make_rangediff_mat(each, array_geom) for each in sources]
+    tau_ch1_expected = [each[1:,0] for each in source_rangediffs]
+    residuals = [np.sqrt(np.sum(rangediffs**2+np.abs(tauch1)**2)) for tauch1 in tau_ch1_expected]
     # choose the source with lower rangediff residuals
     lower_error_source = np.argmin(residuals)
     valid_solution = sources[lower_error_source]
     return valid_solution
-    
+
 def make_rangediff_mat(source, array_geom):
     distmat = np.apply_along_axis(euclid_dist, 1, array_geom, source)
     rangediff = np.zeros((distmat.size, distmat.size))

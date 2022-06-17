@@ -209,25 +209,23 @@ if __name__ == '__main__':
     array_geom = array_geom[:5,:]
     
     nchannels = array_geom.shape[0]
-    source1 = np.array([1,2,3])
-    source2 = np.array([5,0.5,-2])
+    sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([0,0,0])]
     
     def mic2source(sourcexyz, arraygeom):
         mic_source= distance_matrix(np.vstack((sourcexyz, arraygeom)),
                                      np.vstack((sourcexyz, arraygeom)))[1:,0]
         return mic_source
     
-    mic2sources = [mic2source(each, array_geom) for each in [source1, source2]]
-    mic2source1, mic2source2 = mic2sources
-    
-    deltaR1 = np.zeros((nchannels, nchannels))
-    deltaR2 = deltaR1.copy()
+    mic2sources = [mic2source(each, array_geom) for each in sources]    
+    delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
+
     for i,j in product(range(nchannels), range(nchannels)):
-        deltaR1[i,j] = (mic2source1[j]-mic2source1[i])/vsound
-        deltaR2[i,j] = (mic2source2[j]-mic2source2[i])/vsound
+        for source_num, each in enumerate(delta_tdes):
+            each[i,j] = (mic2sources[source_num][j]-mic2sources[source_num][i])
+            each[i,j] /= vsound
     #%%
     # Make the cfls now:
-    cfls_s12 = [make_all_fundaloops_from_tdemat(deltaR) for deltaR in [deltaR1, deltaR2]]
+    cfls_s12 = [make_all_fundaloops_from_tdemat(deltatde) for deltatde in delta_tdes]
     ccg_s12 = [make_ccg_matrix(cfls_s) for cfls_s in cfls_s12]
     qq1 = combine_all(ccg_s12[0], set(range(nchannels)), set([]), set([]))
     qq2 = combine_all(ccg_s12[1], set(range(nchannels)), set([]), set([]))
@@ -238,26 +236,27 @@ if __name__ == '__main__':
     qq_combined = combine_all(ccg_combined, set(range(len(ccg_combined))), set([]), set([]))    
     comp_cfls = format_combineall(qq_combined)
     #%%
-    all_channel_pairs = combinations(range(nchannels),2)
-    part_R1 = np.zeros(deltaR1.shape)
-    for (i,j) in all_channel_pairs:
-        part_R1[j,i] = deltaR1[j,i]
-    g_parts1 = nx.from_numpy_array(part_R1)
-    plt.figure()
-    plot_graph_w_labels(g_parts1, plt.gca())
+    # all_channel_pairs = combinations(range(nchannels),2)
+    # part_1 = np.zeros(deltaR1.shape)
+    # for (i,j) in all_channel_pairs:
+    #     part_R1[j,i] = deltaR1[j,i]
+    # g_parts1 = nx.from_numpy_array(part_R1)
+    # plt.figure()
+    # plot_graph_w_labels(g_parts1, plt.gca())
     #%%
-    g_s1 = nx.from_numpy_array(deltaR1*1e3)
-    g_s2 = nx.from_numpy_array(deltaR2*1e3)
+    # g_s1 = nx.from_numpy_array(deltaR1*1e3)
+    # g_s2 = nx.from_numpy_array(deltaR2*1e3)
 
-    plt.figure()
-    plot_graph_w_labels(g_s1, plt.gca())
-    plt.title('Original S1')
+    # plt.figure()
+    # plot_graph_w_labels(g_s1, plt.gca())
+    # plt.title('Original S1')
     #%%
     # Compose. 
-    cfl1 = [cfls_combined[each] for each in comp_cfls[0]]
-    s1_composed = combine_compatible_triples(cfl1)
-    s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
-    print(spiesberger_wahlberg_solution(array_geom, s1c_tde[1:,0]*340))
+    for compat_cfls in comp_cfls:
+        source_cfls = [cfls_combined[each] for each in compat_cfls]
+        s1_composed = combine_compatible_triples(source_cfls)
+        s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
+        print(spiesberger_wahlberg_solution(array_geom, s1c_tde[1:,0]*340))
     #%%
     # Now let's try to combine the compatible triples. 
     #qq_s1, qq_s2 = comp_cfls
@@ -266,4 +265,3 @@ if __name__ == '__main__':
     for i,subp in enumerate(range(511, 516)):
         plt.subplot(subp)
         plot_graph_w_labels(cfls_s12[0][i], plt.gca())
-    
