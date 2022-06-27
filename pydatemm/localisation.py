@@ -63,7 +63,7 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
         array_geometry = array_geometry - mic1
     else:
         mic1_notorigin = False
-        
+
     # the receiver matrix- excluding the first channel.
     R = array_geometry[1:,:]
     tau = d.copy()/c # to keep symbol conventions the same
@@ -99,11 +99,10 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     t_solution1 = (-b_quad + np.sqrt(b_quad**2 - 4*a_quad*c_quad))/(2*a_quad)
     t_solution2 = (-b_quad - np.sqrt(b_quad**2 - 4*a_quad*c_quad))/(2*a_quad)
     t1 = (t_solution1 , t_solution2)
-    
-    
-    
+
     s = [matmul(R_inv,b*0.5) - matmul(R_inv,f)*t1[0],
          matmul(R_inv,b*0.5) - matmul(R_inv,f)*t1[1]]
+
     if mic1_notorigin:
         for each in s:
             each += mic1
@@ -127,9 +126,6 @@ def choose_SW_valid_solution(sources, array_geom, rangediffs, **kwargs):
     time difference ():math:`\tau_{51}` ) and the predicted :math:`\tau_{51}`
     from each source to see which one is a better fit. 
 
-    Here however, the entire :math:`\tau_{21,31,41,51}` are compared. The source
-    with the best fit is chosen finally.    
-
     Parameters
     ----------
     sources : list
@@ -145,10 +141,10 @@ def choose_SW_valid_solution(sources, array_geom, rangediffs, **kwargs):
         The correct solution of the two potential solutions.
     '''
     source_rangediffs =  [ make_rangediff_mat(each, array_geom) for each in sources]
-    tau_ch1_sources = [each[0,1:] for each in source_rangediffs]
-    residuals = [np.sum(np.abs(tauch1)-np.abs(rangediffs)) for tauch1 in tau_ch1_sources]
+    tau_ch1_sources = [each[4,0] for each in source_rangediffs]
+    residuals = [rangediffs[3]-tauch1 for tauch1 in tau_ch1_sources]
     # choose the source with lower rangediff residuals
-    lower_error_source = np.argmin(residuals)
+    lower_error_source = np.argmin(np.abs(residuals))
     valid_solution = sources[lower_error_source]
     return valid_solution
 
@@ -162,14 +158,14 @@ def make_rangediff_mat(source, array_geom):
 
 #%%
 
-if __name__ == '__main__':
-    from simdata import simulate_1source_and1reflector_general, simulate_1source_and_1reflector_3dtristar
-    audio, distmat, array_geom, (source,ref)= simulate_1source_and1reflector_general(**{'nmics':5})
+# if __name__ == '__main__':
+#     from simdata import simulate_1source_and1reflector_general, simulate_1source_and_1reflector_3dtristar
+#     audio, distmat, array_geom, (source,ref)= simulate_1source_and1reflector_general(**{'nmics':5})
     
-    d = np.array([each-distmat[0,0] for each in distmat[0,1:]])
-    source_pos = spiesberger_wahlberg_solution(array_geom,d, c=340)
-    # get the expected tdoa match from each source 
-    print(source_pos)
+#     d = np.array([each-distmat[0,0] for each in distmat[0,1:]])
+#     source_pos = spiesberger_wahlberg_solution(array_geom,d, c=340)
+#     # get the expected tdoa match from each source 
+#     print(source_pos)
     
     
     #%%

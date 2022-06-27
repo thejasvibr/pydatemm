@@ -206,10 +206,10 @@ def get_graph_weights(graph):
 
 if __name__ == '__main__':
     array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
-    array_geom = array_geom[:6,:]
+    array_geom = array_geom[:5,:]
     
     nchannels = array_geom.shape[0]
-    sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([0,0,0])]
+    sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([8,-2,10])]
     
     def mic2source(sourcexyz, arraygeom):
         mic_source= distance_matrix(np.vstack((sourcexyz, arraygeom)),
