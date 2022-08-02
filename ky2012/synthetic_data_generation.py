@@ -225,10 +225,10 @@ def get_graph_weights(graph):
 
 if __name__ == '__main__':
     array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
-    array_geom = array_geom[:,:]
+    #array_geom = array_geom[:,:]
     
     nchannels = array_geom.shape[0]
-    sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([8,-2,10])]
+    sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([8,-2.5,10])]
     
     def mic2source(sourcexyz, arraygeom):
         mic_source= distance_matrix(np.vstack((sourcexyz, arraygeom)),
@@ -240,7 +240,7 @@ if __name__ == '__main__':
 
     for i,j in product(range(nchannels), range(nchannels)):
         for source_num, each in enumerate(delta_tdes):
-            each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j]
+            each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
             each[i,j] /= vsound
     #%%
     # Make the cfls now:
