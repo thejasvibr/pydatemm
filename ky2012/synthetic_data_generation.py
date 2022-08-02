@@ -2,8 +2,21 @@
 """
 Generate synthetic data to troubleshoot Kreissig Yang algorithm
 ===============================================================
+The Kreissig-Yang 2012 algorithm figures out the 'correct' consistent network
+for overlapping sound TDOA localisation. 
 
-Created on Thu Jun 16 08:40:49 2022
+The first step is to split an M-node network into its fundamental loops (FL). 
+A FL is obtained by adding one edge to the complementary tree.
+An M node network will have N - M + 1 FLs, where N is the number of vertices
+between the nodes (N = (MxM-1)/2). Thus a 5 node network will have 6 FLs, and a 
+6 node network will have 10 FLs. 
+
+From the available set of TDEs all possible consistent triples are built using
+the nodes defined in the FL set. Let's say we have X consistent FLs across
+all the possible FL triples. From here on the compatibility of each
+consistent FL (cFL) to the other is defined in an X x X matrix where two
+cFLs can be compatible (+1, one common edge with same TDE), conflict (-1,
+3 common edges, or 2 common nodes with different TDEs) or be 0 (1 common node).
 
 @author: theja
 """
@@ -147,7 +160,14 @@ def check_for_one_common_edge(X,Y):
 def ccg_definer(X,Y):
     '''
     Assesses the compatibility, conflict or lack of connection between 
-    two triples. 
+    two triples.
+    
+    `When two consistent subgraphs have the same TDOAs on common
+    edges, they are called compatible and we can combine them together
+    to a larger graph containing both subgraphs. If the TDOAs on com-
+    mon edges are different, the two subgraphs are in conflict and we
+    are not allowed to combine them. The same applies when the two
+    subgraphs have no common edges at all. ` (Kreissig-Yang ICASSP 2013)
 
     Parameters
     ----------
@@ -160,15 +180,16 @@ def ccg_definer(X,Y):
         1 means compatible, 0 means no common edges, -1 means conflict.
 
     '''
-    xx = nx.intersection(X,Y)
+    xx = nx.intersection(X, Y)
     n_common_nodes = len(xx.nodes)
     if n_common_nodes >= 2:
-        if n_common_nodes==3:
-            relation = -1
+        if n_common_nodes < 3:
+            relation = check_for_one_common_edge(X, Y)
         else:
-            relation = check_for_one_common_edge(X,Y)
+            # all nodes the same
+            relation = -1
     else:
-        relation = 0
+        relation = -1
     return relation
 
 def make_ccg_matrix(cfls):
@@ -204,7 +225,7 @@ def get_graph_weights(graph):
 
 if __name__ == '__main__':
     array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
-    array_geom = array_geom[:-1,:]
+    array_geom = array_geom[:,:]
     
     nchannels = array_geom.shape[0]
     sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([8,-2,10])]
@@ -256,7 +277,8 @@ if __name__ == '__main__':
         source_cfls = [cfls_combined[each] for each in compat_cfls]
         s1_composed = combine_compatible_triples(source_cfls)
         s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
-        print(spiesberger_wahlberg_solution(array_geom, s1c_tde[1:,0]*340))
+        channels = list(s1_composed.nodes)
+        print(spiesberger_wahlberg_solution(array_geom[channels,:],s1c_tde[1:,0]*340))
     #%%
     # Now let's try to combine the compatible triples. 
     #qq_s1, qq_s2 = comp_cfls
