@@ -12,23 +12,57 @@ Created on Tue Jun 14 11:59:03 2022
 """
 import numpy as np 
 from copy import deepcopy
-from itertools import chain
+from itertools import chain, product
+from numba import jit
+#%load_ext line_profiler
 
-def get_Nvl(Acc, V, l):
+def get_Nvl(Acc, V_t, l):
+    '''
+    Parameters
+    ----------
+    Acc : (N_cfl,N_cfl) np.array
+        The compatibility-conflict graph.
+    V_t : set
+        V_tilda. The currently considered vertices (a sub-set of V, all vertices)
+    l : set
+        The solution consisting of the currently compatible vertices.        
+
+    Returns
+    -------
+    Nvl : set
+        Solution of vertices that are compatible to at least one other vertex
+        and not in conflict with any of the other vertices.
+    '''
     Nvl = []
     if len(l)>0:
-        for v in V:
+        for v in V_t:
             for u in l:
                 if Acc[v,u]==1:
                     Nvl.append(v)
                 elif Acc[v,u]==-1:
                     if v in Nvl:
                         Nvl.pop(Nvl.index(v))
+        return set(Nvl)
     else:
-        Nvl = deepcopy(V)
-    return set(Nvl)
+        return V_t
+@jit
+def get_Nvl_fast(Acc, V_t, l):
+    '''
+    '''
+    if len(l)>0:
+        all_uv = np.array(np.meshgrid(V_t, l)).T.reshape(-1,2)
+        def get_acc(X):
+            return Acc[X[0], X[1]]
+        Acc_values = np.apply_along_axis(get_acc, 1, all_uv)
+        rows_w_min1 = np.where(Acc_values<0)
+        v_vals_w_conflicts = np.unique(all_uv[rows_w_min1,0])
+        Nvl = np.setdiff1d(V_t, v_vals_w_conflicts)
+        return Nvl
+    else:
+        return V_t
 
-def get_NOT_Nvl(Acc, V, l):
+
+def get_NOT_Nvl(Acc:np.array, V:set, l:set):
     N_not_vl = []
     if len(l)>0:
         for v in V:
@@ -98,7 +132,8 @@ def combine_all(Acc, V, l, X):
     '''
     # determine N_v(l) and !N_v(l)
     # !N_v(l) are the vertices incompatible with the current solution
-    N_vl, N_not_vl = get_Nvl(Acc, V, l), get_NOT_Nvl(Acc, V, l)
+    N_vl = get_Nvl(Acc, V, l)
+    N_not_vl = get_NOT_Nvl(Acc, V, l)
     #print(f'l:{l}, X:{X}, V:{V}, N_vl:{N_vl}, N_notvl:{N_not_vl}')
     solutions_l = []
     if len(N_vl) == 0:
@@ -126,10 +161,13 @@ if __name__ == '__main__':
                   [-1, 0, 1,-1, 0, 1],
                   [-1, 1, 0, 0, 1, 0]])
     # Now need to find a way to flatten the solution outputs.
-    qq = combine_all(A, set(range(6)), set([]), set([]))
-    A[:,0] = 0
-    A[[1,5],0] = -1
-    qq2 = combine_all(A, set(range(6)), set([]), set([]))
+    qq = combine_all(A, set(range(6)), set([1]), set([2]))
+    #A[:,0] = 0
+    #A[[1,5],0] = -1
+    # qq2 = combine_all(A, set(range(6)), set([]), set([]))
+    #%lprun -f get_Nvl combine_all(A, set(range(6)), set([]), set([]))
     # qq = combine_all(A, set([1,3,4,5,6]), set([2]), set([1]))
-    # qq = combine_all(A, set([1,2,3,4,6]), set([5]), set([1,2,3,4]))        
-
+    # qq = combine_all(A, set([1,2,3,4,6]), set([5]), set([1,2,3,4]))
+    #%%
+    # %timeit get_Nvl(A, [1], [2,3])
+    # %timeit get_Nvl_fast(A, np.array([1]), np.array([2,3]))
