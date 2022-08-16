@@ -279,7 +279,8 @@ if __name__ == '__main__':
         s1_composed = combine_compatible_triples(source_cfls)
         s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
         channels = list(s1_composed.nodes)
-        print(spiesberger_wahlberg_solution(array_geom[channels,:],s1c_tde[1:,0]*340))
+        if array_geom[channels,:].shape[0]>4:
+            print(spiesberger_wahlberg_solution(array_geom[channels,:],s1c_tde[1:,0]*340))
     #%%
     # Now let's try to combine the compatible triples. 
     #qq_s1, qq_s2 = comp_cfls
