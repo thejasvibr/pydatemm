@@ -3,20 +3,9 @@
 Generate synthetic data to troubleshoot Kreissig Yang algorithm
 ===============================================================
 The Kreissig-Yang 2012 algorithm figures out the 'correct' consistent network
-for overlapping sound TDOA localisation. 
-
-The first step is to split an M-node network into its fundamental loops (FL). 
-A FL is obtained by adding one edge to the complementary tree.
-An M node network will have N - M + 1 FLs, where N is the number of vertices
-between the nodes (N = (MxM-1)/2). Thus a 5 node network will have 6 FLs, and a 
-6 node network will have 10 FLs. 
-
-From the available set of TDEs all possible consistent triples are built using
-the nodes defined in the FL set. Let's say we have X consistent FLs across
-all the possible FL triples. From here on the compatibility of each
-consistent FL (cFL) to the other is defined in an X x X matrix where two
-cFLs can be compatible (+1, one common edge with same TDE), conflict (-1,
-3 common edges, or 2 common nodes with different TDEs) or be 0 (1 common node).
+for overlapping sound TDOA localisation. Here I check if my implementation rec-
+overs the 'correct' sources if given just the 'correct' TDEs (without spurious)
+reflections. 
 
 @author: theja
 """
@@ -28,10 +17,11 @@ import pandas as pd
 import numpy as np 
 import networkx as nx
 from scipy.spatial import distance_matrix
-from combineall import combine_all, format_combineall
+from combineall import combine_all
+from joblib import Parallel, delayed
 seednum = 78464 # 8221, 82319, 78464
 np.random.seed(seednum) # what works np.random.seed(82310)
-vsound = 340
+vsound = 343
 #%%
 def plot_graph_w_labels(graph, curr_ax):
     pos = nx.circular_layout(graph)
@@ -111,7 +101,6 @@ def edge_present_with_reversed_polarity(edge, existing_edges):
     '''
     edges_wo_considering_order = list(map(lambda X: set(X), existing_edges))
     if set(edge) in edges_wo_considering_order:
-        
         edge_location = edges_wo_considering_order.index(set(edge))
         existing_edge = existing_edges[edge_location]
         # same order as previously seen edge
@@ -202,6 +191,7 @@ def make_ccg_matrix(cfls):
         cc_out = ccg_definer(trip1, trip2)
         ccg[i,j] = cc_out; ccg[j,i] = cc_out
     return ccg
+
 
 def combine_compatible_triples(compatible_triples):
     combined = nx.compose_all(compatible_triples)

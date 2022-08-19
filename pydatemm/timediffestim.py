@@ -154,8 +154,8 @@ def get_multich_tdoas(multich_cc, **kwargs):
     fs : int
         Frequency of sampling in Hz
     
-    **kwargs : TYPE
-        DESCRIPTION.
+    **kwargs : 
+        min_height, min_peak_diff
 
     Returns
     -------
@@ -181,6 +181,10 @@ def get_multich_tdoas(multich_cc, **kwargs):
     position is >=0. The centred peak position calculates the relative time
     difference in seconds, and the third entry provides the value
     :math:`r_{kl}(\eta_{\mu})` of the  peak :math:`\eta_{\mu}`.
+
+    See Also
+    --------
+    get_peaks
     '''
     multich_tdoas = {}
     for ch_pair, crosscor in multich_cc.items():
