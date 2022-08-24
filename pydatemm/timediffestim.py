@@ -22,6 +22,14 @@ import numpy as np
 import scipy.signal as signal 
 import scipy.spatial as spatial
 from itertools import combinations
+from gccestimating import GCC
+
+
+def max_interch_delay(array_geom, chBA, vsound=343):
+    chB, chA = chBA
+    interch_dist = spatial.distance.euclidean(array_geom[chB,:],
+                                              array_geom[chA,:])/vsound
+    return interch_dist
 
 def estimate_gcc(signal1, ref_ch):
     '''
@@ -44,6 +52,18 @@ def estimate_gcc(signal1, ref_ch):
     ifft_gcc = np.roll(ifft_gcc, int(ifft_gcc.size*0.5))
     return ifft_gcc
 
+def perform_gcc_variant(Y,X,variant):
+    ch_gcc = GCC(Y,X)
+    if variant == 'phat':
+        out = ch_gcc.phat().sig
+    elif variant == 'scot':
+        out = ch_gcc.scot().sig
+    elif variant == 'roth':
+        out =  ch_gcc.roth().sig
+    else:
+        raise ValueError(f'Variant {variant} not found. Valid are: phat, scot or roth')
+    return out
+
 def generate_multich_crosscorr(input_audio, **kwargs):
     '''
     Generates all unique pair cross-correlations: (NxN-1)/2 pairs. Each pair is
@@ -56,7 +76,10 @@ def generate_multich_crosscorr(input_audio, **kwargs):
     gcc : boolean
         Whether to use a gcc instead of the standard cross-correlation.    
         Defaults to False.
+    gcc_variant : str
+        One of ['phat', 'roth', 'scot'] - default is 'phat'. 
         
+
     Returns
     -------
     multichannel_cc : dictionary 
@@ -64,6 +87,9 @@ def generate_multich_crosscorr(input_audio, **kwargs):
         Each cross-correlation has M samples (same size as one audio channel).
     '''
     use_gcc = kwargs.get('gcc',False)
+    if use_gcc:
+        gcc_variant = kwargs.get('gcc_variant', 'phat')
+
     num_channels = input_audio.shape[1]
     unique_pairs = list(combinations(range(num_channels), 2))
     multichannel_cc = {}
@@ -71,20 +97,29 @@ def generate_multich_crosscorr(input_audio, **kwargs):
         # make sure the lower channel number is the reference signal 
         signal_ch, ref_signal = sorted([cha, chb], reverse=True)
         if use_gcc:
-            multichannel_cc[(signal_ch, ref_signal)] = estimate_gcc(input_audio[:,signal_ch],
-                                                                     input_audio[:,ref_signal])
+            # multichannel_cc[(signal_ch, ref_signal)] = estimate_gcc(input_audio[:,signal_ch],
+            #                                                          input_audio[:,ref_signal])
+            multichannel_cc[(signal_ch, ref_signal)] = perform_gcc_variant(input_audio[:,signal_ch]
+                                                                           , input_audio[:,ref_signal],
+                                                                           gcc_variant)
         else:
             multichannel_cc[(signal_ch, ref_signal)] = signal.correlate(input_audio[:,signal_ch],
                                                                  input_audio[:,ref_signal],'full')
     return multichannel_cc
 
-def generate_multich_autocorr(input_audio):
+def generate_multich_autocorr(input_audio, **kwargs):
     '''
     
     Parameters
     ----------
     input_audio : np.array
         M samples x Nchannels
+    gcc : boolean
+        Whether to use a gcc instead of the standard cross-correlation.    
+        Defaults to False.
+    gcc_variant : str
+        Required if gcc=True.
+        One of ['phat', 'roth', 'scot'] - default is 'phat'. 
 
     Returns 
     -------
@@ -92,11 +127,18 @@ def generate_multich_autocorr(input_audio):
         Keys are (channel,channel) and entry is an np.array of the 
         autocorrelation
     '''
-    multich_aa_array = np.apply_along_axis(lambda X: signal.correlate(X,X,'same'),0, input_audio)
     channels = input_audio.shape[1]
     multichannel_autocor = {}
-    for i in range(channels):
-        multichannel_autocor[(i,i)] = multich_aa_array[:,i]
+    if kwargs.get('use_gcc', False):
+        gcc_variant = kwargs.get('gcc_variant', 'phat')
+        for channel in range(channels):
+            multichannel_autocor[(channel, channel)] = perform_gcc_variant(input_audio[:,channel],
+                                                                            input_audio[:,channel],
+                                                                            gcc_variant)
+    else:
+        multich_aa_array = np.apply_along_axis(lambda X: signal.correlate(X,X,'same'),0, input_audio)
+        for i in range(channels):
+            multichannel_autocor[(i,i)] = multich_aa_array[:,i]
     return multichannel_autocor
 
 def get_multich_aa_tdes(multich_aa, **kwargs):
@@ -227,6 +269,31 @@ def get_peaks(X,  **kwargs):
     min_height = kwargs.get('min_height', 0.11)
     return signal.find_peaks(X, min_height, distance=int(kwargs['fs']*min_peak_diff))[0] 
 
+def get_percentile_peaks(X, **kwargs):
+    '''
+
+
+    Parameters
+    ----------
+    X : np.array
+    pctile_thresh : float>0
+        Percentile threshold for peak detection. Defaults to 95
+    min_peak_diff : float>0
+        Minimum difstance in seconds between peaks. Defaults to 
+        0.1 ms. 
+    fs : int>0
+        Sampling frequency. 
+
+    Returns
+    -------
+    peak_indices : np.array
+        Peak indices in sample.
+    '''
+    min_peak_diff = kwargs.get('min_peak_diff', 1e-4)
+    pctile_thresh = kwargs.get('pctile_thresh', 95)
+    min_height = np.percentile(X, pctile_thresh)
+    return signal.find_peaks(X, min_height, distance=int(kwargs['fs']*min_peak_diff))[0] 
+
 def geometrically_valid(multich_tdoas:dict, **kwargs):
     '''
     Checks that all time differences are <= max delay defined by inter-mic
@@ -297,7 +364,10 @@ if __name__ == '__main__':
     uu = {}
     for k, pks in cc_peaks.items():
         uu[k] = [each[1]*10**3 for each in pks]
-    
+    #%%
+    multich_gcc = generate_multich_crosscorr(audio, gcc=True, gcc_variant='roth')
+    multich_acc = generate_multich_autocorr(audio, gcc=False, gcc_variant='roth')
+    get_percentile_peaks(multich_gcc[(1,0)], fs=192000)
     
 
     

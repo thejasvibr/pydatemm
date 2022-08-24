@@ -29,7 +29,7 @@ array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv'
 # from the pra docs
 room_dim = [9, 7.5, 3.5]  # meters
 fs = 192000
-ref_order = 0
+ref_order = 1
 
 reflection_max_order = ref_order
 # room = pra.ShoeBox(
@@ -44,14 +44,14 @@ room = pra.ShoeBox(
 call_durn = 5e-3
 t_call = np.linspace(call_durn, int(fs*call_durn))
 batcall = signal.chirp(t_call, 9000, t_call[-1], 85000,'linear')
-batcall *= signal.hanning(batcall.size)
+batcall *= signal.hamming(batcall.size)
 batcall *= 0.6
-sources = [[2.5, 5, 3],
+sources = [[2.5, 5, 2.5],
            [4, 3, 1.5],
-           [1, 4, 0.5],
+           [1, 4, 1.0],
            [2,4,2]]
 
-delay = np.linspace(0,0.50,len(sources))
+delay = np.linspace(0,0.050,len(sources))
 for each, emission_delay in zip(sources, delay):
     room.add_source(position=each, signal=batcall, delay=emission_delay)
 
@@ -211,9 +211,12 @@ if __name__ == '__main__':
     # print('..done making the ccg matrix')
     # #%%
     # Call the ui_combineall exe implemented in Cpp
-    import os
-    os.system('ui_combineall.exe flatA.txt')
-    
+    import os, platform
+    if platform.system() == 'Windows':
+        os.system('ui_combineall.exe flatA.txt')
+    elif platform.system()=='Linux':
+        os.system('./ui_combineall flatA.txt')
+
     # #%%
     # Load the 'jagged' csv file 
     output_file = 'combineall_solutions.csv'
