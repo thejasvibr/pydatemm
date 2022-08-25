@@ -35,10 +35,14 @@ reflection_max_order = ref_order
 # room = pra.ShoeBox(
 #     room_dim, fs=fs, max_order=reflection_max_order
 # )
+
+rt60_tgt = 0.3  # seconds
+e_absorption, max_order = pra.inverse_sabine(rt60_tgt, room_dim)
+
 room = pra.ShoeBox(
-    room_dim, fs=fs, materials=pra.Material('rough_concrete'),
+    room_dim, fs=fs, materials=pra.Material(e_absorption),
     max_order=ref_order,
-    ray_tracing=False,
+    ray_tracing=True,
     air_absorption=True)
 
 call_durn = 5e-3
@@ -60,7 +64,10 @@ room.compute_rir()
 print('room simultation started...')
 room.simulate()
 print('room simultation ended...')
+# choose only the first 0.2 s 
 sim_audio = room.mic_array.signals.T
+if sim_audio.shape[0]>(int(fs*0.2)):
+    sim_audio = sim_audio[:int(fs*0.2),:]
 nchannels = array_geom.shape[0]
 
 import soundfile as sf
@@ -81,22 +88,26 @@ kwargs = {'twrm': paper_twrm,
           'twtm': paper_twtm,
           'nchannels':nchannels,
           'fs':fs,
-          'array_geom':array_geom}
-
+          'array_geom':array_geom,
+          'pctile_thresh': 95,
+          'use_gcc':True,
+          'gcc_variant':'phat', 
+          'min_peak_diff':1e-4, 
+          'vsound' : 343.0}
+#%%
 # Estimate inter-channel TDES
-multich_cc = generate_multich_crosscorr(sim_audio, use_gcc=True)
-multich_ac = generate_multich_autocorr(sim_audio)
-multiaa = get_multich_aa_tdes(multich_ac, fs=192000,
-                              min_height=0.1) 
-cc_peaks = get_multich_tdoas(multich_cc, min_height=0.15, fs=192000,
-                             min_peak_diff=1e-4)
-
+multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
+kwargs['use_gcc'] = False
+multich_ac = generate_multich_autocorr(sim_audio, **kwargs)
+#%%
+multiaa = get_multich_aa_tdes(multich_ac, **kwargs) 
+cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
 valid_tdoas = multichannel_raster_matcher(cc_peaks, multiaa,
                                        **kwargs)
 
 # remove impossible pairwise TDOAs based on array geometry
 # valid_tdoas = geometrically_valid(cc_peaks, array_geom=array_geom, vsound=343)
-
+#%%
 # choose only K=5 (top 5)
 K = 10
 top_K_tdes = {}
@@ -108,22 +119,20 @@ for ch_pair, tdes in valid_tdoas.items():
             top_K_tdes[ch_pair].append(descending_quality[i])
         except:
             pass
+# ch_pait = (7,0)
+# plt.figure()
+# plt.plot(multich_cc[ch_pait])
+# for i, tde in enumerate(top_K_tdes[ch_pait]):
+#     plt.plot(tde[0], tde[2], '*')
+#     plt.text(tde[0], tde[2]+0.001, str(i))
+# for possible in valid_tdoas[ch_pait]:
+#     plt.plot(possible[0], possible[2],'o')
 
-
-ch_pait = (7,0)
-plt.figure()
-plt.plot(multich_cc[ch_pait])
-for i, tde in enumerate(top_K_tdes[ch_pait]):
-    plt.plot(tde[0], tde[2], '*')
-    plt.text(tde[0], tde[2]+0.001, str(i))
-for possible in valid_tdoas[ch_pait]:
-    plt.plot(possible[0], possible[2],'o')
-
-#%%
-cc_ch = multich_cc[(1,0)]
-t_cc = np.linspace(-0.5*cc_ch.size/fs,0.5*cc_ch.size/fs,cc_ch.size)
-plt.figure()
-plt.plot(t_cc, cc_ch)
+# #%%
+# cc_ch = multich_cc[(1,0)]
+# t_cc = np.linspace(-0.5*cc_ch.size/fs,0.5*cc_ch.size/fs,cc_ch.size)
+# plt.figure()
+# plt.plot(t_cc, cc_ch)
 #%% create cFLs from TDES
 # First get all Fundamental Loops
 def make_consistent_fls(multich_tdes, nchannels, **kwargs):
@@ -185,9 +194,10 @@ def make_ccg_pll(cfls, **kwargs):
     return ccg
 
 if __name__ == '__main__':
+
     print('making the cfls...')
     cfls_from_tdes = make_consistent_fls(top_K_tdes, nchannels,
-                                         max_loop_residual=0.5e-3)
+                                         max_loop_residual=1e-4)
     cfls_from_tdes = list(set(cfls_from_tdes))
     output = cfls_from_tdes[::]
     print(f'# of cfls in list: {len(output)}')
@@ -202,9 +212,9 @@ if __name__ == '__main__':
     print('done making the cfls...')
     #print(f'Normal run time: {stop_time_normal-start}, Pll run time: {stop_time_pll-stop_time_normal}')
     #%% generate CCG from cFLs
-    ccg_matrix = make_ccg_matrix(cfls_from_tdes)
+    # ccg_matrix = make_ccg_matrix(cfls_from_tdes)
     print('..making the ccg matrix')
-    smaller_cflset = cfls_from_tdes[::]
+    # smaller_cflset = cfls_from_tdes[::]
     # print(f'cflsets: {len(smaller_cflset)}')
     # smaller_ccg = make_ccg_matrix(smaller_cflset) 
     np.savetxt('flatA.txt',ccg_pll.flatten(),delimiter=',',fmt='%i')
@@ -216,7 +226,8 @@ if __name__ == '__main__':
         os.system('ui_combineall.exe flatA.txt')
     elif platform.system()=='Linux':
         os.system('./ui_combineall flatA.txt')
-
+    
+    print('Loading the solution txt file')
     # #%%
     # Load the 'jagged' csv file 
     output_file = 'combineall_solutions.csv'
@@ -227,83 +238,123 @@ if __name__ == '__main__':
         for lines in csvfile:
             fmted_lines = [int(each) for each in lines if not each=='']
             comp_cfls.append(fmted_lines)
-    #%% Solve CCG to get compatible cFL graphs
-    # print(f'...solving the CCG ')
-    # start = time.perf_counter_ns()
-    # qq_combined = combine_all(smaller_ccg, set(range(len(smaller_ccg))), set([]), set([]))    
-#     # durn = time.perf_counter_ns()-start
-    # print(f'...done solving the CCG. time taken: {durn/1e9}')
-    # comp_cfls = format_combineall(qq_combined)
-    # #%%
-    # # %lprun -f combine_all combine_all(smaller_ccg, set(range(len(smaller_ccg))), set([]), set([])) 
-    # #%% Join compatible graphs and localise candidate sources
-    import tqdm
-    unique_positions = []
-    tdoa_error = []
-    only_one_cfl = 0
-    less_than_5ch = 0
-    leq_4ch_sources = {}
-    for i, compat_cfls in enumerate(tqdm.tqdm(comp_cfls)):
-        if not len(compat_cfls) <2:
-            source_cfls = [smaller_cflset[each] for each in compat_cfls]
-            s1_composed = combine_compatible_triples(source_cfls)
-            s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
-            channels = list(s1_composed.nodes)
-            if len(channels) >=5:
-                localised_source = spiesberger_wahlberg_solution(array_geom[channels,:],s1c_tde[1:,0]*343)
-                if not np.sum(np.isnan(localised_source))>0:
+    print('...loading done...')
+    #%% Parallelise the localisation code. 
+    def localise_sounds(compatible_solutions, all_cfls, **kwargs):
+        localised_out = pd.DataFrame(index=range(len(compatible_solutions)), 
+                                     data=[], columns=['x','y','z','tdoa_resid_s'])
+        for i, compat_cfl in enumerate(compatible_solutions):
+            if len(compat_cfl)>=2:
+                source_graph = combine_compatible_triples([all_cfls[j] for j in compat_cfl])
+                source_tde = nx.to_numpy_array(source_graph, weight='tde')
+                d = source_tde[1:,0]*kwargs['vsound']
+                channels = list(source_graph.nodes)
+                if len(channels)>4:
+                    source_xyz = spiesberger_wahlberg_solution(kwargs['array_geom'][channels,:],
+                                                               d)
                     
-                    if list(localised_source) in unique_positions:
-                        pass
-                    else:
-                        # print(localised_source)
-                        unique_positions.append(list(localised_source))
-                        error = residual_tdoa_error(s1_composed, localised_source, array_geom[channels,:])
-                        tdoa_error.append(error)
-                        #print('TDOA error', error)
+                # elif len(channels)==4:
+                #     source_xyz  = mellen_pachter_raquet_2003(array_geom[channels,:], d)
+                    
+                if not np.sum(np.isnan(source_xyz))>0:
+                    localised_out.loc[i,'x':'z'] = source_xyz
+                    localised_out.loc[i,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
+                                                                        source_xyz,
+                                                                        array_geom[channels,:])
             else:
-                less_than_5ch += 1 
-                try:
-                    localised_source = mellen_pachter_raquet_2003(array_geom[channels,:], s1c_tde[1:,0]*343)
-                    if localised_source.size >0 :
-                        leq_4ch_sources[i] = localised_source
-                except ValueError:
-                    pass
-        else:
-            only_one_cfl += 1
+                pass
+        return localised_out
+    #%% 
+    print('localising solutions...')
+    import tqdm
+    parts = joblib.cpu_count()
+    split_solns = [comp_cfls[i::parts] for i in range(parts)]
+    out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
+    print('...Done localising solutions...')
     #%%
-    import scipy.spatial as spl
-    localised = pd.DataFrame(unique_positions, columns=['x','y','z'])
-    # best fit for each of the sources
-    for source in sources:
-        error = localised.apply(lambda X: spl.distance.euclidean(X,source),1)
-        best_row = np.argmin(error)
-        print(f'best fix for {source} is {np.round(localised.loc[best_row,:],2).tolist()}, with: {error[best_row]}')
-        print(f'TDOA residual error is: {tdoa_error[best_row]}')
-    #%% also format the <5 channel results
-    leq_4ch = []
-    for idx, loc_source in leq_4ch_sources.items():
-        if np.logical_or(loc_source.shape[0]==1,loc_source.shape[0]==3) :
-            leq_4ch.append(loc_source.tolist())
-        elif loc_source.shape[0]==2:
-            [leq_4ch.append(loc_source[i,:].tolist()) for i in range(2)]
-        else:
-            raise ValueError
-    #%%
-    fourch_localised = []
-    for key, localised in leq_4ch_sources.items():
-        if localised.shape == (3,):
-            fourch_localised.append(localised.tolist())
-        else:
-            for i in range(localised.shape[0]):
-                fourch_localised.append(localised[i,:].tolist())
-    #%%
-    leq_4ch_df = pd.DataFrame(data=fourch_localised)
-    # best fit for each of the sources
-    for i,source in enumerate(sources):
-        error = leq_4ch_df.apply(lambda X: spl.distance.euclidean(X,source),1)
-        best_row = np.argmin(error)
-        print(f'best fix for {source} is {np.round(leq_4ch_df.loc[best_row,:],2).tolist()}, with: {error[best_row]}')
-        #print(f'TDOA residual error is: {tdoa_error[best_row]}')
+    print('...subsetting sensible localisations')
+    all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
+    good_locs = all_locs[all_locs['tdoa_resid_s']<1e-3].reset_index(drop=True)
+    valid_rows = np.logical_and(np.abs(good_locs['x'])<10, np.abs(good_locs['y'])<10,
+                                np.abs(good_locs['z'])<10)
+    sensible_locs = good_locs[valid_rows].reset_index(drop=True)
+    print('...calculating error to known sounds')
+    from scipy import spatial
+    for i, ss in tqdm.tqdm(enumerate(sources)):
+        sensible_locs.loc[:,f's_{i}'] = sensible_locs.apply(lambda X: spatial.distance.euclidean(X['x':'z'], ss),1)
+    #%% Are the best candidates in here? 
+    for k in range(4):
+        idx = sensible_locs.loc[:,f's_{k}'].argmin()
+        print(sources[k], np.around(sensible_locs.loc[idx,'x':'z'].tolist(),2), sensible_locs.loc[idx,f's_{k}'])
+    print('Done')
+    # #%%
+    # import tqdm
+    # unique_positions = []
+    # tdoa_error = []
+    # only_one_cfl = 0
+    # less_than_5ch = 0
+    # leq_4ch_sources = {}
+    # for i, compat_cfls in enumerate(tqdm.tqdm(comp_cfls)):
+    #     if not len(compat_cfls) <2:
+    #         source_cfls = [smaller_cflset[each] for each in compat_cfls]
+    #         s1_composed = combine_compatible_triples(source_cfls)
+    #         s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
+    #         channels = list(s1_composed.nodes)
+    #         if len(channels) >=5:
+    #             localised_source = spiesberger_wahlberg_solution(array_geom[channels,:],s1c_tde[1:,0]*343)
+    #             if not np.sum(np.isnan(localised_source))>0:
+                    
+    #                 if list(localised_source) in unique_positions:
+    #                     pass
+    #                 else:
+    #                     # print(localised_source)
+    #                     unique_positions.append(list(localised_source))
+    #                     error = residual_tdoa_error(s1_composed, localised_source, array_geom[channels,:])
+    #                     tdoa_error.append(error)
+    #                     #print('TDOA error', error)
+    #         else:
+    #             less_than_5ch += 1 
+    #             try:
+    #                 localised_source = mellen_pachter_raquet_2003(array_geom[channels,:], s1c_tde[1:,0]*343)
+    #                 if localised_source.size >0 :
+    #                     leq_4ch_sources[i] = localised_source
+    #             except ValueError:
+    #                 pass
+    #     else:
+    #         only_one_cfl += 1
+    # #%%
+    # import scipy.spatial as spl
+    # localised = pd.DataFrame(unique_positions, columns=['x','y','z'])
+    # # best fit for each of the sources
+    # for source in sources:
+    #     error = localised.apply(lambda X: spl.distance.euclidean(X,source),1)
+    #     best_row = np.argmin(error)
+    #     print(f'best fix for {source} is {np.round(localised.loc[best_row,:],2).tolist()}, with: {error[best_row]}')
+    #     print(f'TDOA residual error is: {tdoa_error[best_row]}')
+    # #%% also format the <5 channel results
+    # leq_4ch = []
+    # for idx, loc_source in leq_4ch_sources.items():
+    #     if np.logical_or(loc_source.shape[0]==1,loc_source.shape[0]==3) :
+    #         leq_4ch.append(loc_source.tolist())
+    #     elif loc_source.shape[0]==2:
+    #         [leq_4ch.append(loc_source[i,:].tolist()) for i in range(2)]
+    #     else:
+    #         raise ValueError
+    # #%%
+    # fourch_localised = []
+    # for key, localised in leq_4ch_sources.items():
+    #     if localised.shape == (3,):
+    #         fourch_localised.append(localised.tolist())
+    #     else:
+    #         for i in range(localised.shape[0]):
+    #             fourch_localised.append(localised[i,:].tolist())
+    # #%%
+    # leq_4ch_df = pd.DataFrame(data=fourch_localised)
+    # # best fit for each of the sources
+    # for i,source in enumerate(sources):
+    #     error = leq_4ch_df.apply(lambda X: spl.distance.euclidean(X,source),1)
+    #     best_row = np.argmin(error)
+    #     print(f'best fix for {source} is {np.round(leq_4ch_df.loc[best_row,:],2).tolist()}, with: {error[best_row]}')
+    #     #print(f'TDOA residual error is: {tdoa_error[best_row]}')
                             
                 

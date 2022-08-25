@@ -25,7 +25,7 @@ from itertools import combinations
 from gccestimating import GCC
 
 
-def max_interch_delay(array_geom, chBA, vsound=343):
+def max_interch_delay(chBA, array_geom, vsound=343):
     chB, chA = chBA
     interch_dist = spatial.distance.euclidean(array_geom[chB,:],
                                               array_geom[chA,:])/vsound
@@ -148,9 +148,11 @@ def get_multich_aa_tdes(multich_aa, **kwargs):
     Parameters
     ----------
     multich_aa : dict
-    
     fs : int
-
+    
+    Keyword Arguments
+    -----------------
+    min_peak_diff, min_height, pctile_thresh
     
     Returns
     -------
@@ -170,7 +172,9 @@ def get_multich_aa_tdes(multich_aa, **kwargs):
     Ref the Notes there.
     '''
     multich_aapeaks = {}
-    for channel, aa in multich_aa.items():
+    abs_thresh = kwargs.get('abs_thresh', False)
+
+    for channel, aa in multich_aa.items():      
         peaks_raw = get_peaks(aa, **kwargs)
         peaks_sec = np.array(peaks_raw-int(aa.size/2.0), dtype=np.float64)
         peaks_sec /= np.float64(kwargs['fs'])
@@ -182,7 +186,6 @@ def get_multich_aa_tdes(multich_aa, **kwargs):
             multich_aapeaks[channel].append(peak_tuple)
     
     positive_multich_aapeaks = get_positive_aa_peaks(multich_aapeaks)
-    
     return positive_multich_aapeaks
 
 def get_multich_tdoas(multich_cc, **kwargs):
@@ -193,11 +196,16 @@ def get_multich_tdoas(multich_cc, **kwargs):
     multich_cc : dict
         Dictionary with channel pair keys (tuples) and pairwise cross-correlation (np.array)
         entries
+    Keyword Arguments
+    -----------------
     fs : int
         Frequency of sampling in Hz
-    
-    **kwargs : 
-        min_height, min_peak_diff
+    min_height
+    pctile_thresh
+    min_peak_diff
+    array_geom
+    vsound : optional 
+        Defaults to 343 m/s
 
     Returns
     -------
@@ -230,7 +238,15 @@ def get_multich_tdoas(multich_cc, **kwargs):
     '''
     multich_tdoas = {}
     for ch_pair, crosscor in multich_cc.items():
-        peaks_raw = np.array(get_peaks(crosscor, **kwargs))
+        
+        max_delay_s = max_interch_delay(ch_pair, kwargs['array_geom'],
+                                        kwargs.get('vsound',343))
+        max_delay_samples = int(kwargs['fs']*max_delay_s)
+        midpoint = int(crosscor.size*0.5)
+        start, stop = midpoint-max_delay_samples, midpoint + max_delay_samples
+        relevant_cc = crosscor[start:stop]
+        peaks_raw = np.array(get_peaks(relevant_cc, **kwargs))
+        peaks_raw += start
         cc_delay_sec = np.array( peaks_raw - int(crosscor.size/2.0),
                                                               dtype=np.float64)
         cc_delay_sec /= np.float64(kwargs['fs']) # divide sample delay by sampling rate
@@ -250,24 +266,42 @@ def get_peaks(X,  **kwargs):
     ----------
     X : np.array
         1D signal 
-    fs : int, optional
-        DESCRIPTION. The default is 192000.
-    
+    fs : int
+        Sampling rate in Hz. The default is 192000.
+    min_height : float, optional
+        Sets threshold to the value given in min_height
+    pctile_thresh : 0<float<100, optional
+        Sets threshold according to the percentile of the signal X. 
+
     Keyword Arguments
     -----------------
-    min_peak_diff
-    min_height : float>0 or list with 2 entris
-        Either just the minimum or (minimum, maximum) height
+    min_peak_diff : float>0
+        Distance between peaks in seconds. 
+    min_height : float>0, optional 
+        The absolute minimum height a peak needs to be. This sets the absolute
+        threshold for peak detection. 
+    pctile_thresh : 0<float<100, optional 
+        The percentile of input signal X that is used to set the threshold.
 
     Returns
     -------
-    TYPE
-        DESCRIPTION.
-
+    np.array
+        Array with sample indices of peaks.
+    Notes
+    -----
+    Only one of ```min_height``` or ```pctile_thresh``` should be used - both
+    can't be used in the same function call.
     '''
-    min_peak_diff = kwargs.get('min_peak_diff', 1e-4)
-    min_height = kwargs.get('min_height', 0.11)
+    abs_and_relative_thresh = [each in kwargs.keys() for each in ['min_height','pctile_thresh']]
+    if np.sum(abs_and_relative_thresh)==2:
+        raise ValueError('Both absolute and percentile thresholds given!')
+    min_peak_diff = kwargs['min_peak_diff']
+    if abs_and_relative_thresh[0]:
+        min_height = kwargs['min_height']        
+    elif abs_and_relative_thresh[1]:
+        min_height = np.percentile(X, kwargs['pctile_thresh'])
     return signal.find_peaks(X, min_height, distance=int(kwargs['fs']*min_peak_diff))[0] 
+      
 
 def get_percentile_peaks(X, **kwargs):
     '''
@@ -324,7 +358,7 @@ def geometrically_valid(multich_tdoas:dict, **kwargs):
     distmat = spatial.distance_matrix(kwargs['array_geom'], kwargs['array_geom'])
     delaymat = distmat/v_sound
     geom_valid_tdoas = {}
-    
+
     for ch_pair, pair_tdoas in multich_tdoas.items():
         m1, m2 = ch_pair
         mic2mic_delay = delaymat[m1,m2]
@@ -338,7 +372,6 @@ def geometrically_valid(multich_tdoas:dict, **kwargs):
             if abs(peak_delay)<=mic2mic_delay:
                 geom_valid_tdoas[ch_pair].append(peak_details)
     return geom_valid_tdoas
-
 
 def get_positive_aa_peaks(multich_aa):
     pos_multich_aa = {}
