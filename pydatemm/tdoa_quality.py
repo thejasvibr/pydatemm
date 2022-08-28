@@ -14,7 +14,20 @@ from itertools import combinations
 import numpy as np
 import networkx as nx
 from scipy.spatial import distance
+import networkx as nx
+
 euclidean = distance.euclidean
+
+def make_fundamental_loops(nchannels):
+    G = nx.complete_graph(nchannels)
+    minspan_G = nx.minimum_spanning_tree(G)
+    main_node = [0]
+    co_tree = nx.complement(minspan_G)
+    fundamental_loops = []
+    for edge in co_tree.edges():
+        fl_nodes = tuple(set(main_node + list(edge)))
+        fundamental_loops.append(fl_nodes)
+    return fundamental_loops
 
 def nan_euclidean(u,v):
     nan_indices = [int(np.argwhere(np.isnan(each))) for each in [u,v]]
@@ -104,6 +117,40 @@ def graph_connectivity_w(tdoa_object, **kwargs):
         gamma_tftm_scores.append(tftm_score)
     w = np.sum(gamma_tftm_scores)
     return w
+
+def graph_connectivity_w_nx(nx_graph, **kwargs):
+    '''The NetworkX version of 'w' in Scheuing Yang 2008.
+    '''
+    graph_nodes = list(nx_graph)
+    # make FLs from the given graph and 
+    FLs = make_fundamental_loops(len(nx_graph.nodes))
+    node_fls = [] # node-specific FLs
+    for (a,b,c) in FLs:
+        node_fls.append((graph_nodes[a], graph_nodes[b], graph_nodes[c]))
+    w = 0;
+    for i, fl in enumerate(node_fls):
+        try:
+            sub_graph = nx_graph.subgraph(fl)
+            a,b,c = list(sub_graph)
+            ab, bc, ca = [sub_graph.get_edge_data(e1,e2)['tde'] for (e1,e2) in [(a,b), (b,c), (c,a)]]
+            print(gamma_tftm(ab,-bc,ca, **kwargs))
+        except:
+            pass
+        i += 1
+
+def plot_graph(G):
+    labels = {e: np.around(G.edges[e]['tde'],3) for e in G.edges}
+    pos = nx.circular_layout(G)
+    nx.draw_circular(G, with_labels=True)
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
+    
+        
+    
+    
+    
+    
+    
+    
 
 def residual_position_error(true_pos, obtained_pos):
     '''

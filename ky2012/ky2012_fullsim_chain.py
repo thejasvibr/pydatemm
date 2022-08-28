@@ -29,7 +29,7 @@ array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv'
 # from the pra docs
 room_dim = [9, 7.5, 3.5]  # meters
 fs = 192000
-ref_order = 1
+ref_order = 0
 
 reflection_max_order = ref_order
 # room = pra.ShoeBox(
@@ -42,7 +42,7 @@ e_absorption, max_order = pra.inverse_sabine(rt60_tgt, room_dim)
 room = pra.ShoeBox(
     room_dim, fs=fs, materials=pra.Material(e_absorption),
     max_order=ref_order,
-    ray_tracing=True,
+    ray_tracing=False,
     air_absorption=True)
 
 call_durn = 5e-3
@@ -50,10 +50,10 @@ t_call = np.linspace(call_durn, int(fs*call_durn))
 batcall = signal.chirp(t_call, 9000, t_call[-1], 85000,'linear')
 batcall *= signal.hamming(batcall.size)
 batcall *= 0.6
-sources = [[2.5, 5, 2.5],
-           [4, 3, 1.5],
-           [1, 4, 1.0],
-           [2,4,2]]
+sources = [[2.5, 5, 2.5]]
+           #[4, 3, 1.5],
+           #[1, 4, 1.0],
+          # [2,4,2]]
 
 delay = np.linspace(0,0.050,len(sources))
 for each, emission_delay in zip(sources, delay):
@@ -109,7 +109,7 @@ valid_tdoas = multichannel_raster_matcher(cc_peaks, multiaa,
 # valid_tdoas = geometrically_valid(cc_peaks, array_geom=array_geom, vsound=343)
 #%%
 # choose only K=5 (top 5)
-K = 10
+K = 5
 top_K_tdes = {}
 for ch_pair, tdes in valid_tdoas.items():
     descending_quality = sorted(tdes, key=lambda X: X[2], reverse=True)
@@ -161,8 +161,9 @@ def make_consistent_fls(multich_tdes, nchannels, **kwargs):
         ca_tdes = multich_tdes[(c,a)]
         cb_tdes = multich_tdes[(c,b)]
         abc_combinations = product(ba_tdes, ca_tdes, cb_tdes)
-        for (tde1, tde2, tde3)in abc_combinations:
+        for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
             if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
+                print('hey', i)
                 this_cfl = nx.ordered.Graph()
                 for e, tde in zip(edges, [tde1, tde2, tde3]):
                     #print(e, tde)
@@ -241,36 +242,86 @@ if __name__ == '__main__':
     print('...loading done...')
     #%% Parallelise the localisation code. 
     def localise_sounds(compatible_solutions, all_cfls, **kwargs):
-        localised_out = pd.DataFrame(index=range(len(compatible_solutions)), 
+        localised_geq4_out = pd.DataFrame(index=range(len(compatible_solutions)), 
                                      data=[], columns=['x','y','z','tdoa_resid_s'])
+        localised_4ch_out = pd.DataFrame(index=range(len(compatible_solutions)), 
+                                     data=[], columns=['x','y','z','tdoa_resid_s'])
+        ii = 0
         for i, compat_cfl in enumerate(compatible_solutions):
             if len(compat_cfl)>=2:
                 source_graph = combine_compatible_triples([all_cfls[j] for j in compat_cfl])
                 source_tde = nx.to_numpy_array(source_graph, weight='tde')
                 d = source_tde[1:,0]*kwargs['vsound']
                 channels = list(source_graph.nodes)
+                source_xyz = np.array([np.nan])
                 if len(channels)>4:
                     source_xyz = spiesberger_wahlberg_solution(kwargs['array_geom'][channels,:],
                                                                d)
+                    if not np.sum(np.isnan(source_xyz))>0:
+                        localised_geq4_out.loc[i,'x':'z'] = source_xyz
+                        localised_geq4_out.loc[i,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
+                                                                            source_xyz,
+                                                                            array_geom[channels,:])
                     
-                # elif len(channels)==4:
-                #     source_xyz  = mellen_pachter_raquet_2003(array_geom[channels,:], d)
-                    
-                if not np.sum(np.isnan(source_xyz))>0:
-                    localised_out.loc[i,'x':'z'] = source_xyz
-                    localised_out.loc[i,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
-                                                                        source_xyz,
-                                                                        array_geom[channels,:])
+                elif len(channels)==4:
+                    source_xyz  = mellen_pachter_raquet_2003(array_geom[channels,:], d)
+                    if not np.sum(np.isnan(source_xyz))>0:
+                        if np.logical_or(source_xyz.shape[0]==1,source_xyz.shape[0]==3):
+                            localised_4ch_out.loc[ii,'x':'z'] = source_xyz
+                            localised_4ch_out.loc[ii,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
+                                                                                source_xyz,
+                                                                                array_geom[channels,:])
+                            ii += 1
+
+                        elif source_xyz.shape[0]==2:
+                            for ss in range(2):
+                                localised_4ch_out.loc[ii,'x':'z'] = source_xyz[ss,:]
+                                localised_4ch_out.loc[ii,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
+                                                                                    source_xyz[ss,:],
+                                                                                    array_geom[channels,:])
+                                ii += 1                    
             else:
                 pass
-        return localised_out
+        localised_combined = pd.concat([localised_geq4_out, localised_4ch_out]).reset_index(drop=True).dropna()
+        return localised_combined
     #%% 
     print('localising solutions...')
     import tqdm
+    print(f'...length of all solutions...{len(comp_cfls)}')
     parts = joblib.cpu_count()
     split_solns = [comp_cfls[i::parts] for i in range(parts)]
     out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
     print('...Done localising solutions...')
+    #%%
+    split1 = split_solns[8][::3]
+    actual_graphs = []
+    for each in split1:
+        compat_fls =    combine_compatible_triples([cfls_from_tdes[every] for every in each])
+        actual_graphs.append(compat_fls)
+    # check how many of them are complete
+    complete_i = []
+    incomplete_pctage = []
+    goodish_graph = []
+    i = 0
+    for each in actual_graphs:
+        n_nodes = len(each.nodes)
+        exp_edges = int(n_nodes*(n_nodes-1)/2)
+        if each.number_of_edges()==exp_edges:
+            i += 1
+            complete_i.append(each)
+        else:
+            incomplete_pctage.append(each.number_of_edges()/exp_edges)
+            if each.number_of_edges()/exp_edges > 0.7:
+                goodish_graph.append(each)
+
+    #%% Localise the complete ones only
+    for ii in complete_i:
+        source_tde = nx.to_numpy_array(ii, weight='tde')
+        d = source_tde[1:,0]*kwargs['vsound']
+        channels = list(ii.nodes)
+        source_xyz  = mellen_pachter_raquet_2003(array_geom[channels,:], d)
+        print(source_xyz)
+
     #%%
     print('...subsetting sensible localisations')
     all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
