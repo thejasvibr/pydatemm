@@ -15,13 +15,13 @@ from pydatemm.timediffestim import geometrically_valid, get_multich_tdoas
 from pydatemm.timediffestim import get_multich_aa_tdes
 from pydatemm.raster_matching import multichannel_raster_matcher
 import matplotlib.pyplot as plt
-import joblib
-from joblib import Parallel, delayed
+import numpy as np
 import pandas as pd
 import pyroomacoustics as pra
 import scipy.signal as signal 
 import time 
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
+from investigating_peakdetection_gccflavours import multich_expected_peaks
 from copy import deepcopy
 # %load_ext line_profiler
 #%% Generate simulated audio
@@ -29,12 +29,9 @@ array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv'
 # from the pra docs
 room_dim = [9, 7.5, 3.5]  # meters
 fs = 192000
-ref_order = 0
+ref_order = 1
 
 reflection_max_order = ref_order
-# room = pra.ShoeBox(
-#     room_dim, fs=fs, max_order=reflection_max_order
-# )
 
 rt60_tgt = 0.3  # seconds
 e_absorption, max_order = pra.inverse_sabine(rt60_tgt, room_dim)
@@ -45,15 +42,30 @@ room = pra.ShoeBox(
     ray_tracing=False,
     air_absorption=True)
 
-call_durn = 5e-3
+call_durn = 7e-3
 t_call = np.linspace(call_durn, int(fs*call_durn))
-batcall = signal.chirp(t_call, 9000, t_call[-1], 85000,'linear')
+batcall = signal.chirp(t_call, 85000, t_call[-1], 9000,'linear')
 batcall *= signal.hamming(batcall.size)
-batcall *= 0.6
-sources = [[2.5, 5, 2.5]]
-           #[4, 3, 1.5],
-           #[1, 4, 1.0],
-          # [2,4,2]]
+batcall *= 0.7
+
+num_sources = 3 # or overruled by the lines below.
+
+not_random = True
+
+
+xyzrange = [np.arange(0,dimension, 0.01) for dimension in room_dim]
+if not_random:
+    sources = [[2.5, 1, 2.5],
+               [4, 3, 1.5],
+               [1, 4, 1.0],
+               [8,7,0.5],
+               ]
+    num_sources = len(sources)
+else:
+    sources = []
+    for each in range(num_sources):
+        each_source = [float(np.random.choice(each,1)) for each in xyzrange]
+        sources.append(each_source)
 
 delay = np.linspace(0,0.050,len(sources))
 for each, emission_delay in zip(sources, delay):
@@ -81,18 +93,18 @@ for i,j in product(range(nchannels), range(nchannels)):
         each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
         each[i,j] /= vsound
 
-
-paper_twrm = 32/fs
-paper_twtm = 32/fs
+#%%
+paper_twrm = 16/fs
+paper_twtm = 16/fs
 kwargs = {'twrm': paper_twrm,
           'twtm': paper_twtm,
           'nchannels':nchannels,
           'fs':fs,
           'array_geom':array_geom,
-          'pctile_thresh': 95,
+          'pctile_thresh': 90,
           'use_gcc':True,
           'gcc_variant':'phat', 
-          'min_peak_diff':1e-4, 
+          'min_peak_diff':0.5e-4, 
           'vsound' : 343.0}
 #%%
 # Estimate inter-channel TDES
@@ -102,103 +114,52 @@ multich_ac = generate_multich_autocorr(sim_audio, **kwargs)
 #%%
 multiaa = get_multich_aa_tdes(multich_ac, **kwargs) 
 cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
-valid_tdoas = multichannel_raster_matcher(cc_peaks, multiaa,
-                                       **kwargs)
-
-# remove impossible pairwise TDOAs based on array geometry
-# valid_tdoas = geometrically_valid(cc_peaks, array_geom=array_geom, vsound=343)
+# valid_tdoas = multichannel_raster_matcher(cc_peaks, multiaa,
+#                                        **kwargs)
+valid_tdoas = deepcopy(cc_peaks)
 #%%
 # choose only K=5 (top 5)
-K = 5
+K = 30
 top_K_tdes = {}
 for ch_pair, tdes in valid_tdoas.items():
-    descending_quality = sorted(tdes, key=lambda X: X[2], reverse=True)
+    descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
     top_K_tdes[ch_pair] = []
     for i in range(K):
         try:
             top_K_tdes[ch_pair].append(descending_quality[i])
         except:
             pass
-# ch_pait = (7,0)
-# plt.figure()
-# plt.plot(multich_cc[ch_pait])
-# for i, tde in enumerate(top_K_tdes[ch_pait]):
-#     plt.plot(tde[0], tde[2], '*')
-#     plt.text(tde[0], tde[2]+0.001, str(i))
-# for possible in valid_tdoas[ch_pait]:
-#     plt.plot(possible[0], possible[2],'o')
 
-# #%%
-# cc_ch = multich_cc[(1,0)]
-# t_cc = np.linspace(-0.5*cc_ch.size/fs,0.5*cc_ch.size/fs,cc_ch.size)
-# plt.figure()
-# plt.plot(t_cc, cc_ch)
+#%% Here let's check what the expected TDEs are for a given source and array_geom
+
+
+# and check what the max error is across channels:
+edges = map(lambda X: sorted(X, reverse=True), combinations(range(sim_audio.shape[1]),2))
+edges = list(map(lambda X: str(tuple(X)), edges))
+residual_chpairs = pd.DataFrame(data=[], index=range(len(sources)), columns=['source_no']+edges)
+
+
+for i,s in enumerate(sources):
+    exp_tdes_multich = multich_expected_peaks(sim_audio, [s], array_geom, fs=192000)
+    residual_chpairs.loc[i,'source_no'] = i
+    for ch_pair, predicted_tde in exp_tdes_multich.items():
+        samples = list(map(lambda X: X[0], top_K_tdes[ch_pair]))
+        # residual
+        residual = np.min(np.abs(np.array(samples)-predicted_tde))
+        residual_chpairs.loc[i,str(ch_pair)] = residual
+
+# generate an overall report of fit - look at the mean residual:
+residual_chpairs['mean_resid'] = residual_chpairs.loc[:,'(1, 0)':].apply(np.max,1)
+print(residual_chpairs['mean_resid'])
+
 #%% create cFLs from TDES
 # First get all Fundamental Loops
-def make_consistent_fls(multich_tdes, nchannels, **kwargs):
-    '''
-
-    Parameters
-    ----------
-    multich_tdes : TYPE
-        DESCRIPTION.
-    nchannels : int>0
-    max_loop_residual : float>0, optional 
-        Defaults to 1e-6
-
-    Returns
-    -------
-    cFLs : list
-        List with nx.DiGraphs of all consistent FLs
-    '''
-    max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
-    all_edges_fls = make_edges_for_fundamental_loops(nchannels)
-    all_cfls = []
-    for fundaloop, edges in all_edges_fls.items():
-        #print(fundaloop)
-        a,b,c = fundaloop
-        ba_tdes = multich_tdes[(b,a)]
-        ca_tdes = multich_tdes[(c,a)]
-        cb_tdes = multich_tdes[(c,b)]
-        abc_combinations = product(ba_tdes, ca_tdes, cb_tdes)
-        for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
-            if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
-                print('hey', i)
-                this_cfl = nx.ordered.Graph()
-                for e, tde in zip(edges, [tde1, tde2, tde3]):
-                    #print(e, tde)
-                    this_cfl.add_edge(e[0], e[1], tde=tde[1])
-                    all_cfls.append(this_cfl)
-    return all_cfls
-
-
-def get_compatibility(cfls, ij_combis):
-    output = []
-    for (i,j) in ij_combis:
-        trip1, trip2  = cfls[i], cfls[j]
-        cc_out = ccg_definer(trip1, trip2)
-        output.append(cc_out)
-    return output
-
-def make_ccg_pll(cfls, **kwargs):
-    '''Parallel version of make_ccg_matrix'''
-    num_cores = kwargs.get('num_cores', joblib.cpu_count())
-    num_cfls = len(cfls)
-    cfl_ij_parts = [list(combinations(range(num_cfls), 2))[i::num_cores] for i in range(num_cores)]
-    compatibility = Parallel(n_jobs=num_cores)(delayed(get_compatibility)(cfls, ij_parts)for ij_parts in cfl_ij_parts)
-    ccg = np.zeros((num_cfls, num_cfls))
-    for (ij_parts, compat_ijparts) in zip(cfl_ij_parts, compatibility):
-        for (i,j), (comp_val) in zip(ij_parts, compat_ijparts):
-            ccg[i,j] = comp_val
-    # make symmetric
-    ccg += ccg.T
-    return ccg
 
 if __name__ == '__main__':
 
     print('making the cfls...')
     cfls_from_tdes = make_consistent_fls(top_K_tdes, nchannels,
-                                         max_loop_residual=1e-4)
+                                         max_loop_residual=0.2e-4)
     cfls_from_tdes = list(set(cfls_from_tdes))
     output = cfls_from_tdes[::]
     print(f'# of cfls in list: {len(output)}')
@@ -243,9 +204,9 @@ if __name__ == '__main__':
     #%% Parallelise the localisation code. 
     def localise_sounds(compatible_solutions, all_cfls, **kwargs):
         localised_geq4_out = pd.DataFrame(index=range(len(compatible_solutions)), 
-                                     data=[], columns=['x','y','z','tdoa_resid_s'])
+                                     data=[], columns=['x','y','z','tdoa_resid_s','cfl_inds'])
         localised_4ch_out = pd.DataFrame(index=range(len(compatible_solutions)), 
-                                     data=[], columns=['x','y','z','tdoa_resid_s'])
+                                     data=[], columns=['x','y','z','tdoa_resid_s','cfl_inds'])
         ii = 0
         for i, compat_cfl in enumerate(compatible_solutions):
             if len(compat_cfl)>=2:
@@ -262,6 +223,7 @@ if __name__ == '__main__':
                         localised_geq4_out.loc[i,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
                                                                             source_xyz,
                                                                             array_geom[channels,:])
+                        localised_geq4_out.loc[i,'cfl_inds'] = str(compat_cfl)
                     
                 elif len(channels)==4:
                     source_xyz  = mellen_pachter_raquet_2003(array_geom[channels,:], d)
@@ -280,6 +242,7 @@ if __name__ == '__main__':
                                                                                     source_xyz[ss,:],
                                                                                     array_geom[channels,:])
                                 ii += 1                    
+                        localised_4ch_out.loc[ii,'cfl_inds'] = str(compat_cfl)
             else:
                 pass
         localised_combined = pd.concat([localised_geq4_out, localised_4ch_out]).reset_index(drop=True).dropna()
@@ -292,40 +255,11 @@ if __name__ == '__main__':
     split_solns = [comp_cfls[i::parts] for i in range(parts)]
     out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
     print('...Done localising solutions...')
-    #%%
-    split1 = split_solns[8][::3]
-    actual_graphs = []
-    for each in split1:
-        compat_fls =    combine_compatible_triples([cfls_from_tdes[every] for every in each])
-        actual_graphs.append(compat_fls)
-    # check how many of them are complete
-    complete_i = []
-    incomplete_pctage = []
-    goodish_graph = []
-    i = 0
-    for each in actual_graphs:
-        n_nodes = len(each.nodes)
-        exp_edges = int(n_nodes*(n_nodes-1)/2)
-        if each.number_of_edges()==exp_edges:
-            i += 1
-            complete_i.append(each)
-        else:
-            incomplete_pctage.append(each.number_of_edges()/exp_edges)
-            if each.number_of_edges()/exp_edges > 0.7:
-                goodish_graph.append(each)
-
-    #%% Localise the complete ones only
-    for ii in complete_i:
-        source_tde = nx.to_numpy_array(ii, weight='tde')
-        d = source_tde[1:,0]*kwargs['vsound']
-        channels = list(ii.nodes)
-        source_xyz  = mellen_pachter_raquet_2003(array_geom[channels,:], d)
-        print(source_xyz)
 
     #%%
     print('...subsetting sensible localisations')
     all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
-    good_locs = all_locs[all_locs['tdoa_resid_s']<1e-3].reset_index(drop=True)
+    good_locs = all_locs[all_locs['tdoa_resid_s']<1e-4].reset_index(drop=True)
     valid_rows = np.logical_and(np.abs(good_locs['x'])<10, np.abs(good_locs['y'])<10,
                                 np.abs(good_locs['z'])<10)
     sensible_locs = good_locs[valid_rows].reset_index(drop=True)
@@ -334,78 +268,52 @@ if __name__ == '__main__':
     for i, ss in tqdm.tqdm(enumerate(sources)):
         sensible_locs.loc[:,f's_{i}'] = sensible_locs.apply(lambda X: spatial.distance.euclidean(X['x':'z'], ss),1)
     #%% Are the best candidates in here? 
-    for k in range(4):
+    for k in range(len(sources)):
         idx = sensible_locs.loc[:,f's_{k}'].argmin()
-        print(sources[k], np.around(sensible_locs.loc[idx,'x':'z'].tolist(),2), sensible_locs.loc[idx,f's_{k}'])
+        print('\n',np.around(sources[k],2), np.around(sensible_locs.loc[idx,'x':'z'].tolist(),2),
+              np.around(sensible_locs.loc[idx,f's_{k}'],3), sensible_locs.loc[idx,'cfl_inds'])
     print('Done')
-    # #%%
-    # import tqdm
-    # unique_positions = []
-    # tdoa_error = []
-    # only_one_cfl = 0
-    # less_than_5ch = 0
-    # leq_4ch_sources = {}
-    # for i, compat_cfls in enumerate(tqdm.tqdm(comp_cfls)):
-    #     if not len(compat_cfls) <2:
-    #         source_cfls = [smaller_cflset[each] for each in compat_cfls]
-    #         s1_composed = combine_compatible_triples(source_cfls)
-    #         s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
-    #         channels = list(s1_composed.nodes)
-    #         if len(channels) >=5:
-    #             localised_source = spiesberger_wahlberg_solution(array_geom[channels,:],s1c_tde[1:,0]*343)
-    #             if not np.sum(np.isnan(localised_source))>0:
-                    
-    #                 if list(localised_source) in unique_positions:
-    #                     pass
-    #                 else:
-    #                     # print(localised_source)
-    #                     unique_positions.append(list(localised_source))
-    #                     error = residual_tdoa_error(s1_composed, localised_source, array_geom[channels,:])
-    #                     tdoa_error.append(error)
-    #                     #print('TDOA error', error)
-    #         else:
-    #             less_than_5ch += 1 
-    #             try:
-    #                 localised_source = mellen_pachter_raquet_2003(array_geom[channels,:], s1c_tde[1:,0]*343)
-    #                 if localised_source.size >0 :
-    #                     leq_4ch_sources[i] = localised_source
-    #             except ValueError:
-    #                 pass
-    #     else:
-    #         only_one_cfl += 1
-    # #%%
-    # import scipy.spatial as spl
-    # localised = pd.DataFrame(unique_positions, columns=['x','y','z'])
-    # # best fit for each of the sources
-    # for source in sources:
-    #     error = localised.apply(lambda X: spl.distance.euclidean(X,source),1)
-    #     best_row = np.argmin(error)
-    #     print(f'best fix for {source} is {np.round(localised.loc[best_row,:],2).tolist()}, with: {error[best_row]}')
-    #     print(f'TDOA residual error is: {tdoa_error[best_row]}')
-    # #%% also format the <5 channel results
-    # leq_4ch = []
-    # for idx, loc_source in leq_4ch_sources.items():
-    #     if np.logical_or(loc_source.shape[0]==1,loc_source.shape[0]==3) :
-    #         leq_4ch.append(loc_source.tolist())
-    #     elif loc_source.shape[0]==2:
-    #         [leq_4ch.append(loc_source[i,:].tolist()) for i in range(2)]
-    #     else:
-    #         raise ValueError
-    # #%%
-    # fourch_localised = []
-    # for key, localised in leq_4ch_sources.items():
-    #     if localised.shape == (3,):
-    #         fourch_localised.append(localised.tolist())
-    #     else:
-    #         for i in range(localised.shape[0]):
-    #             fourch_localised.append(localised[i,:].tolist())
-    # #%%
-    # leq_4ch_df = pd.DataFrame(data=fourch_localised)
-    # # best fit for each of the sources
-    # for i,source in enumerate(sources):
-    #     error = leq_4ch_df.apply(lambda X: spl.distance.euclidean(X,source),1)
-    #     best_row = np.argmin(error)
-    #     print(f'best fix for {source} is {np.round(leq_4ch_df.loc[best_row,:],2).tolist()}, with: {error[best_row]}')
-    #     #print(f'TDOA residual error is: {tdoa_error[best_row]}')
-                            
-                
+
+    #%% 
+    # gr = combine_compatible_triples([cfls_from_tdes[each] for each in [62,136,511]])
+    # plt.figure()
+    # plot_graph_w_labels(gr, plt.gca())
+    from pydatemm.timediffestim import max_interch_delay as maxintch
+    exp_tdes_multich = multich_expected_peaks(sim_audio, [sources[-1]], array_geom, fs=192000)
+    edges = map(lambda X: sorted(X, reverse=True), combinations(range(sim_audio.shape[1]),2))
+    pk_lim = 20
+    plt.figure()
+    a0 = plt.subplot(111)
+    for chpair in edges:
+        chpair = tuple(chpair)
+        exp_peak = exp_tdes_multich[chpair]
+        plt.cla()
+        a0.plot(multich_cc[chpair])
+        
+        for pk in cc_peaks[chpair]:
+            plt.plot(pk[0], pk[2],'*')
+        a0.scatter(exp_peak, multich_cc[chpair][int(exp_peak)], color='r', s=80)
+        max_delay = int(maxintch(chpair, kwargs['array_geom'])*fs)
+        minmaxsample =  np.int64(sim_audio.shape[0] + np.array([-max_delay, max_delay]))
+        plt.xlim(exp_peak-pk_lim, exp_peak+pk_lim)
+        plt.vlines(minmaxsample, 0, np.max(multich_cc[chpair]), 'r')
+        plt.title(f' Channel pair: {chpair}')
+        plt.pause(5)
+    #%% 
+    from pydatemm.timediffestim import get_peaks
+    # Raw signal 
+    rawsig = multich_cc[chpair]
+    # replace all -ve values by np.nan
+    no_neg = rawsig.copy()
+    no_neg[no_neg<=0] = 0
+    det_peaks = get_peaks(no_neg[minmaxsample[0]:minmaxsample[1]],
+                          pctile_thresh=50, min_peak_diff=0.5e-4 , fs=fs)
+    thresh = np.percentile(no_neg[minmaxsample[0]:minmaxsample[1]], 50)
+    plt.figure()
+    plt.plot(no_neg)
+    for each in det_peaks:
+        plt.plot(each+minmaxsample[0], no_neg[each+minmaxsample[0]],'*')
+    plt.scatter(exp_peak, 0, color='r', s=50)
+    plt.xlim(minmaxsample[0], minmaxsample[1])
+    #plt.xlim(exp_peak-pk_lim, exp_peak+pk_lim)
+    plt.hlines(thresh, minmaxsample[0], minmaxsample[1], color='k', linestyles='--')

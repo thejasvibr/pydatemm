@@ -12,6 +12,8 @@ reflections.
 from pydatemm.localisation import spiesberger_wahlberg_solution
 from pydatemm.triple_generation import make_channel_pairs_from_triple
 from itertools import combinations, product, chain
+import joblib
+from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np 
@@ -20,7 +22,7 @@ from scipy.spatial import distance_matrix
 from combineall import combine_all
 from joblib import Parallel, delayed
 seednum = 78464 # 8221, 82319, 78464
-np.random.seed(seednum) # what works np.random.seed(82310)
+#np.random.seed(seednum) # what works np.random.seed(82310)
 vsound = 343
 #%%
 def plot_graph_w_labels(graph, curr_ax):
@@ -217,6 +219,76 @@ def mic2source(sourcexyz, arraygeom):
     mic_source= distance_matrix(np.vstack((sourcexyz, arraygeom)),
                                  np.vstack((sourcexyz, arraygeom)))[1:,0]
     return mic_source
+
+
+
+def make_consistent_fls(multich_tdes, nchannels, **kwargs):
+    '''
+
+    Parameters
+    ----------
+    multich_tdes : TYPE
+        DESCRIPTION.
+    nchannels : int>0
+    max_loop_residual : float>0, optional 
+        Defaults to 1e-6
+
+    Returns
+    -------
+    cFLs : list
+        List with nx.DiGraphs of all consistent FLs
+    '''
+    max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
+    all_edges_fls = make_edges_for_fundamental_loops(nchannels)
+    all_cfls = []
+    for fundaloop, edges in all_edges_fls.items():
+        #print(fundaloop)
+        a,b,c = fundaloop
+        ba_tdes = multich_tdes[(b,a)]
+        ca_tdes = multich_tdes[(c,a)]
+        cb_tdes = multich_tdes[(c,b)]
+        abc_combinations = product(ba_tdes, ca_tdes, cb_tdes)
+        for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
+            if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
+                print('hey', i)
+                this_cfl = nx.ordered.Graph()
+                for e, tde in zip(edges, [tde1, tde2, tde3]):
+                    #print(e, tde)
+                    this_cfl.add_edge(e[0], e[1], tde=tde[1])
+                    all_cfls.append(this_cfl)
+    return all_cfls
+
+
+def get_compatibility(cfls, ij_combis):
+    output = []
+    for (i,j) in ij_combis:
+        trip1, trip2  = cfls[i], cfls[j]
+        cc_out = ccg_definer(trip1, trip2)
+        output.append(cc_out)
+    return output
+
+def make_ccg_pll(cfls, **kwargs):
+    '''Parallel version of make_ccg_matrix'''
+    num_cores = kwargs.get('num_cores', joblib.cpu_count())
+    num_cfls = len(cfls)
+    cfl_ij_parts = [list(combinations(range(num_cfls), 2))[i::num_cores] for i in range(num_cores)]
+    compatibility = Parallel(n_jobs=num_cores)(delayed(get_compatibility)(cfls, ij_parts)for ij_parts in cfl_ij_parts)
+    ccg = np.zeros((num_cfls, num_cfls))
+    for (ij_parts, compat_ijparts) in zip(cfl_ij_parts, compatibility):
+        for (i,j), (comp_val) in zip(ij_parts, compat_ijparts):
+            ccg[i,j] = comp_val
+    # make symmetric
+    ccg += ccg.T
+    return ccg
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
     #array_geom = array_geom[:,:]
