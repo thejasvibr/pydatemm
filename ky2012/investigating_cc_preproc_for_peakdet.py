@@ -100,7 +100,7 @@ nchannels = array_geom.shape[0]
 kwargs = {'nchannels':nchannels,
           'fs':fs,
           'array_geom':array_geom,
-          'pctile_thresh': 95,
+          'pctile_thresh': 75,
           'use_gcc':True,
           'gcc_variant':'phat', 
           'min_peak_diff':0.5e-4, 
@@ -151,5 +151,22 @@ for i,s in enumerate(sources):
                 peak_detn_data.loc[i+num_sources,'source_no'] = i
 
 peak_detn_data['sum_resid'] = peak_detn_data.loc[:,'(1, 0)':'(7, 6)'].apply(np.sum, 1)
+peak_detn_data['max_resid'] = peak_detn_data.loc[:,'(1, 0)':'(7, 6)'].apply(np.max, 1)
+print(peak_detn_data)
 
 qq = peak_detn_data.boxplot(column='sum_resid', by='no_neg')
+
+# #%%
+# from scipy.ndimage import convolve 
+
+chpair = (3,2)
+pk_pos = exp_tdes_multich[chpair]
+max_sample = int(maxintch(chpair, kwargs['array_geom'])*fs)
+minmaxsample =  np.int64(sim_audio.shape[0] + np.array([-max_sample, max_sample]))
+plt.figure()
+#plt.subplot(212, sharex=a0)
+plt.plot(multich_cc[chpair])
+plt.scatter(pk_pos, multich_cc[chpair][pk_pos], color='r', s=50)
+for each in std_multich_peaks[chpair]:
+    plt.plot(each, multich_cc[chpair][each], '^')
+plt.xlim(minmaxsample[0], minmaxsample[1])

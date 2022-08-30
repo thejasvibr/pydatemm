@@ -22,6 +22,7 @@ import time
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from investigating_peakdetection_gccflavours import multich_expected_peaks
 from copy import deepcopy
+np.random.seed(82319)
 # %load_ext line_profiler
 #%% Generate simulated audio
 array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
@@ -45,9 +46,9 @@ call_durn = 7e-3
 t_call = np.linspace(call_durn, int(fs*call_durn))
 batcall = signal.chirp(t_call, 85000, t_call[-1], 9000,'linear')
 batcall *= signal.hamming(batcall.size)
-batcall *= 0.7
+batcall *= 0.5
 
-num_sources = int(np.random.choice(range(3,7),1)) # or overruled by the lines below.
+num_sources = int(np.random.choice(range(5,7),1)) # or overruled by the lines below.
 random = True
 
 xyzrange = [np.arange(0,dimension, 0.01) for dimension in room_dim]
@@ -246,7 +247,13 @@ if __name__ == '__main__':
                 pass
         localised_combined = pd.concat([localised_geq4_out, localised_4ch_out]).reset_index(drop=True).dropna()
         return localised_combined
+    #%%
+    # %load_ext line_profiler
+    # from pydatemm.localisation import choose_SW_valid_solution, make_rangediff_mat
+    # %lprun -f make_rangediff_mat localise_sounds(split_solns[0][::5], cfls_from_tdes, **kwargs)
     #%% 
+    import warnings
+    warnings.filterwarnings('ignore')
     print('localising solutions...')
     import tqdm
     print(f'...length of all solutions...{len(comp_cfls)}')
@@ -278,9 +285,9 @@ if __name__ == '__main__':
     # plt.figure()
     # plot_graph_w_labels(gr, plt.gca())
     from pydatemm.timediffestim import max_interch_delay as maxintch
-    exp_tdes_multich = multich_expected_peaks(sim_audio, [sources[-1]], array_geom, fs=192000)
+    exp_tdes_multich = multich_expected_peaks(sim_audio, [sources[3]], array_geom, fs=192000)
     edges = map(lambda X: sorted(X, reverse=True), combinations(range(sim_audio.shape[1]),2))
-    pk_lim = 20
+    pk_lim = 30
     plt.figure()
     a0 = plt.subplot(111)
     for chpair in edges:

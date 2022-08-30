@@ -302,7 +302,7 @@ def get_peaks(X,  **kwargs):
         raise ValueError('Both absolute and percentile thresholds given!')
     min_peak_diff = kwargs['min_peak_diff']
     if kwargs['no_neg']:
-        Y[Y<=0] = np.nan
+        Y[Y<=0] = np.mean(Y)
     if abs_and_relative_thresh[1]:
         min_height = np.nanpercentile(Y, kwargs['pctile_thresh'])
     elif abs_and_relative_thresh[0]:
