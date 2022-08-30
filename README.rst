@@ -2,6 +2,8 @@
 pydatemm
 ========
 
+`Warning: still under construction.`
+
 
 .. image:: https://img.shields.io/pypi/v/pydatemm.svg
         :target: https://pypi.python.org/pypi/pydatemm
@@ -16,7 +18,12 @@ pydatemm
 
 
 
-DATEMM implementation to localise multi-source sounds with reverberation
+DATEMM and CombineALL implementation to localise multi-source sounds with reverberation
+
+References
+----------
+* Scheuing, J., & Yang, B. (2008). Disambiguation of TDOA estimation for multiple sources in reverberant environments. IEEE transactions on audio, speech, and language processing, 16(8), 1479-1489.
+* Kreißig, M., & Yang, B. (2013, May). Fast and reliable TDOA assignment in multi-source reverberant environments. In 2013 IEEE International Conference on Acoustics, Speech and Signal Processing (pp. 355-359). IEEE.
 
 
 * Free software: MIT license
