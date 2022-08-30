@@ -268,10 +268,14 @@ def get_peaks(X,  **kwargs):
         1D signal 
     fs : int
         Sampling rate in Hz. The default is 192000.
-    min_height : float, optional
-        Sets threshold to the value given in min_height
+    no_neg : bool
+        If set to true then all cross-corr values that are < 0 are set to
+        0. This helps increase the 'clarity' of the signal by removing 
+        spurious fluctuations in the cross-corr signal.
     pctile_thresh : 0<float<100, optional
         Sets threshold according to the percentile of the signal X. 
+    min_height : float, optional
+        Sets threshold to the value given in min_height
 
     Keyword Arguments
     -----------------
@@ -292,15 +296,18 @@ def get_peaks(X,  **kwargs):
     Only one of ```min_height``` or ```pctile_thresh``` should be used - both
     can't be used in the same function call.
     '''
+    Y = X.copy()
     abs_and_relative_thresh = [each in kwargs.keys() for each in ['min_height','pctile_thresh']]
     if np.sum(abs_and_relative_thresh)==2:
         raise ValueError('Both absolute and percentile thresholds given!')
     min_peak_diff = kwargs['min_peak_diff']
-    if abs_and_relative_thresh[0]:
+    if kwargs['no_neg']:
+        Y[Y<=0] = np.nan
+    if abs_and_relative_thresh[1]:
+        min_height = np.nanpercentile(Y, kwargs['pctile_thresh'])
+    elif abs_and_relative_thresh[0]:
         min_height = kwargs['min_height']        
-    elif abs_and_relative_thresh[1]:
-        min_height = np.percentile(X, kwargs['pctile_thresh'])
-    return signal.find_peaks(X, min_height, distance=int(kwargs['fs']*min_peak_diff))[0] 
+    return signal.find_peaks(Y, min_height, distance=int(kwargs['fs']*min_peak_diff))[0] 
       
 
 def get_percentile_peaks(X, **kwargs):

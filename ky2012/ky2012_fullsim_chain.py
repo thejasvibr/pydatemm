@@ -7,7 +7,6 @@ Created on Wed Aug  3 10:28:28 2022
 
 @author: theja
 """
-
 from synthetic_data_generation import * 
 from pydatemm.tdoa_quality import residual_tdoa_error
 from pydatemm.timediffestim import generate_multich_autocorr, generate_multich_crosscorr
@@ -48,13 +47,11 @@ batcall = signal.chirp(t_call, 85000, t_call[-1], 9000,'linear')
 batcall *= signal.hamming(batcall.size)
 batcall *= 0.7
 
-num_sources = 3 # or overruled by the lines below.
-
-not_random = True
-
+num_sources = int(np.random.choice(range(3,7),1)) # or overruled by the lines below.
+random = True
 
 xyzrange = [np.arange(0,dimension, 0.01) for dimension in room_dim]
-if not_random:
+if not random:
     sources = [[2.5, 1, 2.5],
                [4, 3, 1.5],
                [1, 4, 1.0],
@@ -101,18 +98,19 @@ kwargs = {'twrm': paper_twrm,
           'nchannels':nchannels,
           'fs':fs,
           'array_geom':array_geom,
-          'pctile_thresh': 90,
+          'pctile_thresh': 95,
           'use_gcc':True,
           'gcc_variant':'phat', 
           'min_peak_diff':0.5e-4, 
-          'vsound' : 343.0}
+          'vsound' : 343.0, 
+          'no_neg':False}
 #%%
 # Estimate inter-channel TDES
 multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
-kwargs['use_gcc'] = False
-multich_ac = generate_multich_autocorr(sim_audio, **kwargs)
+#kwargs['use_gcc'] = False
+#multich_ac = generate_multich_autocorr(sim_audio, **kwargs)
 #%%
-multiaa = get_multich_aa_tdes(multich_ac, **kwargs) 
+#multiaa = get_multich_aa_tdes(multich_ac, **kwargs) 
 cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
 # valid_tdoas = multichannel_raster_matcher(cc_peaks, multiaa,
 #                                        **kwargs)
@@ -149,8 +147,9 @@ for i,s in enumerate(sources):
         residual_chpairs.loc[i,str(ch_pair)] = residual
 
 # generate an overall report of fit - look at the mean residual:
-residual_chpairs['mean_resid'] = residual_chpairs.loc[:,'(1, 0)':].apply(np.max,1)
-print(residual_chpairs['mean_resid'])
+residual_chpairs['max_resid'] = residual_chpairs.loc[:,'(1, 0)':'(7, 6)'].apply(np.max,1)
+residual_chpairs['sum_resid'] = residual_chpairs.loc[:,'(1, 0)':'(7, 6)'].apply(np.sum,1)
+print(residual_chpairs['max_resid'])
 
 #%% create cFLs from TDES
 # First get all Fundamental Loops
