@@ -49,7 +49,7 @@ batcall *= signal.hamming(batcall.size)
 batcall *= 0.5
 
 num_sources = int(np.random.choice(range(5,7),1)) # or overruled by the lines below.
-random = True
+random = False
 
 xyzrange = [np.arange(0,dimension, 0.01) for dimension in room_dim]
 if not random:
@@ -118,7 +118,7 @@ cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
 valid_tdoas = deepcopy(cc_peaks)
 #%%
 # choose only K=5 (top 5)
-K = 50
+K = 30
 top_K_tdes = {}
 for ch_pair, tdes in valid_tdoas.items():
     descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
     print('making the cfls...')
     cfls_from_tdes = make_consistent_fls(top_K_tdes, nchannels,
-                                         max_loop_residual=0.5e-4)
+                                         max_loop_residual=0.15e-4)
     cfls_from_tdes = list(set(cfls_from_tdes))
     all_fls = make_fundamental_loops(nchannels)
     cfls_by_fl = {}
@@ -222,15 +222,20 @@ if __name__ == '__main__':
                                      data=[], columns=['x','y','z','tdoa_resid_s','cfl_inds'])
         ii = 0
         for i, compat_cfl in enumerate(compatible_solutions):
+            #print(f'i: {i}')
             if len(compat_cfl)>=2:
                 source_graph = combine_compatible_triples([all_cfls[j] for j in compat_cfl])
                 source_tde = nx.to_numpy_array(source_graph, weight='tde')
                 d = source_tde[1:,0]*kwargs['vsound']
                 channels = list(source_graph.nodes)
+                #print('channels', channels)
                 source_xyz = np.array([np.nan])
                 if len(channels)>4:
-                    source_xyz = spiesberger_wahlberg_solution(kwargs['array_geom'][channels,:],
+                    try:
+                        source_xyz = spiesberger_wahlberg_solution(kwargs['array_geom'][channels,:],
                                                                d)
+                    except:
+                        pass
                     if not np.sum(np.isnan(source_xyz))>0:
                         localised_geq4_out.loc[i,'x':'z'] = source_xyz
                         localised_geq4_out.loc[i,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
@@ -274,7 +279,8 @@ if __name__ == '__main__':
     split_solns = [comp_cfls[i::parts] for i in range(parts)]
     out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
     print('...Done localising solutions...')
-
+    #%%
+    # localise_sounds(split_solns[0], cfls_from_tdes, **kwargs)
     #%%
     print('...subsetting sensible localisations')
     all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()

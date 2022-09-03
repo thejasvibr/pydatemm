@@ -68,23 +68,23 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
 
     # the receiver matrix- excluding the first channel.
     R = array_geometry[1:,:]
-    tau = d.copy()/c # to keep symbol conventions the same
+    tau = d/c # to keep symbol conventions the same
     
     try:
         R_inv = np.linalg.inv(R)
     except:
         R_inv = np.linalg.pinv(R)
     
+    
     Nrec_minus1 = R.shape[0]
     b = np.zeros(Nrec_minus1)
     f = np.zeros(Nrec_minus1)
     g = np.zeros(Nrec_minus1)
-    #print(R, tau)
+
     for i in range(Nrec_minus1):
         b[i] = np.linalg.norm(R[i,:])**2 - (c*tau[i])**2
         f[i] = (c**2)*tau[i]
         g[i] = 0.5*(c**2-c**2)
-    
     
     a1 = matmul(matmul(R_inv, b).T, matmul(R_inv,b))
     a2 = matmul(matmul(R_inv, b).T, matmul(R_inv,f))
@@ -102,13 +102,14 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     t_solution2 = (-b_quad - np.sqrt(b_quad**2 - 4*a_quad*c_quad))/(2*a_quad)
     t1 = (t_solution1 , t_solution2)
 
+
     s = [matmul(R_inv,b*0.5) - matmul(R_inv,f)*t1[0],
          matmul(R_inv,b*0.5) - matmul(R_inv,f)*t1[1]]
 
     if mic1_notorigin:
         for each in s:
             each += mic1
-    print(s)
+
     valid_solution = choose_SW_valid_solution_tau51(s, array_geometry+mic1, d,
                                                                       **kwargs)
     return valid_solution
