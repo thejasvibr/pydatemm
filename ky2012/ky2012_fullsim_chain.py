@@ -22,7 +22,7 @@ import time
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from investigating_peakdetection_gccflavours import multich_expected_peaks
 from copy import deepcopy
-np.random.seed(82319)
+#np.random.seed(82319)
 # %load_ext line_profiler
 #%% Generate simulated audio
 array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
@@ -102,7 +102,7 @@ kwargs = {'twrm': paper_twrm,
           'pctile_thresh': 95,
           'use_gcc':True,
           'gcc_variant':'phat', 
-          'min_peak_diff':0.5e-4, 
+          'min_peak_diff':0.35e-4, 
           'vsound' : 343.0, 
           'no_neg':False}
 #%%
@@ -118,7 +118,7 @@ cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
 valid_tdoas = deepcopy(cc_peaks)
 #%%
 # choose only K=5 (top 5)
-K = 30
+K = 50
 top_K_tdes = {}
 for ch_pair, tdes in valid_tdoas.items():
     descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
@@ -159,10 +159,23 @@ if __name__ == '__main__':
 
     print('making the cfls...')
     cfls_from_tdes = make_consistent_fls(top_K_tdes, nchannels,
-                                         max_loop_residual=0.2e-4)
+                                         max_loop_residual=0.5e-4)
     cfls_from_tdes = list(set(cfls_from_tdes))
-    output = cfls_from_tdes[::]
-    print(f'# of cfls in list: {len(output)}')
+    all_fls = make_fundamental_loops(nchannels)
+    cfls_by_fl = {}
+    for fl in all_fls:
+        cfls_by_fl[fl] = []
+    for i,each in enumerate(cfls_from_tdes):
+        for fl in all_fls:
+            if set(each.nodes) == set(fl):
+                cfls_by_fl[fl].append(i)
+    # output = []
+    # for fl, cfl_idxs in cfls_by_fl.items():
+    #     idx = cfl_idxs[21]
+    #     output.append(cfls_from_tdes[idx])
+    #%%
+    output = cfls_from_tdes[:]
+    print(f'# of cfls in list: {len(output)}, starting to make CCG')
     start = time.perf_counter()
     if len(output) < 500:
         ccg_pll = make_ccg_matrix(output)
@@ -248,9 +261,9 @@ if __name__ == '__main__':
         localised_combined = pd.concat([localised_geq4_out, localised_4ch_out]).reset_index(drop=True).dropna()
         return localised_combined
     #%%
-    # %load_ext line_profiler
-    # from pydatemm.localisation import choose_SW_valid_solution, make_rangediff_mat
-    # %lprun -f make_rangediff_mat localise_sounds(split_solns[0][::5], cfls_from_tdes, **kwargs)
+    #%load_ext line_profiler
+    #from pydatemm.localisation import choose_SW_valid_solution, make_rangediff_mat
+    #%lprun -f localise_sounds localise_sounds(split_solns[0][::100], cfls_from_tdes, **kwargs)
     #%% 
     import warnings
     warnings.filterwarnings('ignore')
@@ -286,8 +299,8 @@ if __name__ == '__main__':
     # plot_graph_w_labels(gr, plt.gca())
     from pydatemm.timediffestim import max_interch_delay as maxintch
     exp_tdes_multich = multich_expected_peaks(sim_audio, [sources[3]], array_geom, fs=192000)
-    edges = map(lambda X: sorted(X, reverse=True), combinations(range(sim_audio.shape[1]),2))
-    pk_lim = 30
+    edges = list(map(lambda X: sorted(X, reverse=True), combinations(range(sim_audio.shape[1]),2)))
+    pk_lim = 20
     plt.figure()
     a0 = plt.subplot(111)
     for chpair in edges:
@@ -296,7 +309,7 @@ if __name__ == '__main__':
         plt.cla()
         a0.plot(multich_cc[chpair])
         
-        for pk in cc_peaks[chpair]:
+        for pk in top_K_tdes[chpair]:
             plt.plot(pk[0], pk[2],'*')
         a0.scatter(exp_peak, multich_cc[chpair][int(exp_peak)], color='r', s=80)
         max_delay = int(maxintch(chpair, kwargs['array_geom'])*fs)
@@ -306,20 +319,20 @@ if __name__ == '__main__':
         plt.title(f' Channel pair: {chpair}')
         plt.pause(5)
     #%% 
-    from pydatemm.timediffestim import get_peaks
-    # Raw signal 
-    rawsig = multich_cc[chpair]
-    # replace all -ve values by np.nan
-    no_neg = rawsig.copy()
-    no_neg[no_neg<=0] = 0
-    det_peaks = get_peaks(no_neg[minmaxsample[0]:minmaxsample[1]],
-                          pctile_thresh=50, min_peak_diff=0.5e-4 , fs=fs)
-    thresh = np.percentile(no_neg[minmaxsample[0]:minmaxsample[1]], 50)
-    plt.figure()
-    plt.plot(no_neg)
-    for each in det_peaks:
-        plt.plot(each+minmaxsample[0], no_neg[each+minmaxsample[0]],'*')
-    plt.scatter(exp_peak, 0, color='r', s=50)
-    plt.xlim(minmaxsample[0], minmaxsample[1])
-    #plt.xlim(exp_peak-pk_lim, exp_peak+pk_lim)
-    plt.hlines(thresh, minmaxsample[0], minmaxsample[1], color='k', linestyles='--')
+    # Source 3 is the problem fix. Is this caused by erroneous TDEs or something else? 
+    def index_tde_to_sec(X, audio, fs):
+        return (X - audio.shape[0])/fs
+    exp_tde_s = {}
+    for chpair, tde_inds in exp_tdes_multich.items():
+        exp_tde_s[chpair] = index_tde_to_sec(tde_inds, sim_audio, fs)
+    
+    k = 3
+    idx = sensible_locs.loc[:,f's_{k}'].argmin()
+    compat_inds = sensible_locs.loc[idx,'cfl_inds']
+    compat_inds_int = [int(each) for each in compat_inds[1:-1].split(',')]
+    combined_graph = combine_compatible_triples([cfls_from_tdes[each] for each in compat_inds_int])
+    mic_nodes = combined_graph.nodes
+    mic_array = array_geom[mic_nodes,:]   
+    tdemat = nx.to_numpy_array(combined_graph, weight='tde')
+    tdemat[:,0]
+    

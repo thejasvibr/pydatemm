@@ -8,6 +8,8 @@ built from graph synthesis.
 
 import numpy as np 
 import scipy.spatial as spatial
+from scipy.spatial import distance
+euclid = distance.euclidean
 matmul = np.matmul
 
 def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
@@ -106,8 +108,8 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
     if mic1_notorigin:
         for each in s:
             each += mic1
-
-    valid_solution = choose_SW_valid_solution(s, array_geometry+mic1, d,
+    print(s)
+    valid_solution = choose_SW_valid_solution_tau51(s, array_geometry+mic1, d,
                                                                       **kwargs)
     return valid_solution
 
@@ -119,7 +121,7 @@ def euclid_dist(X,Y):
     return dist
         
 
-def choose_SW_valid_solution(sources, array_geom, rangediffs, **kwargs):
+def choose_SW_valid_solution_tau51(sources, array_geom, rangediffs, **kwargs):
     '''
     The Spiesberger-Wahlberg 2002 method always provides 2 potential solutions.
     The authors themselves suggest comparing the observed channel 5 and 1
@@ -130,23 +132,27 @@ def choose_SW_valid_solution(sources, array_geom, rangediffs, **kwargs):
     ----------
     sources : list
         List with 2 sources. Each source is a (3,)/(3,1) np.array
-    array_geom
-    rangediffs : np.array
-        Range differences to reference microphone. The ref. microphone
-        is assumed to be the first row of the array_geom.
-    
+    array_geom : (Nmics, M) np.array
+    rangediffs : (N-1,) np.array
+        Range differences to reference microphone. 
+
     Returns
     -------
     valid_solution : (3)/(3,1) np.array
         The correct solution of the two potential solutions.
     '''
-    source_rangediffs =  [ make_rangediff_mat(each, array_geom) for each in sources]
-    tau_ch1_sources = [each[4,0] for each in source_rangediffs]
+    tau_ch1_sources = [rangediff_pair(each, 4, array_geom) for each in sources]
     residuals = [rangediffs[3]-tauch1 for tauch1 in tau_ch1_sources]
+    
     # choose the source with lower rangediff residuals
     lower_error_source = np.argmin(np.abs(residuals))
     valid_solution = sources[lower_error_source]
     return valid_solution
+
+def rangediff_pair(source, chX, array_geom):
+    ch0_dist = euclid(source, array_geom[0,:])
+    chX_dist = euclid(source, array_geom[chX,:])
+    return chX_dist - ch0_dist
 
 def make_rangediff_mat(source, array_geom):
     distmat = np.apply_along_axis(euclid_dist, 1, array_geom, source)
@@ -154,19 +160,30 @@ def make_rangediff_mat(source, array_geom):
     for i in range(rangediff.shape[0]):
         for j in range(rangediff.shape[1]):
             rangediff[i,j] = distmat[i]-distmat[j]
+    #rangediff += -rangediff.T
     return rangediff
 
 #%%
 
-# if __name__ == '__main__':
-#     from simdata import simulate_1source_and1reflector_general, simulate_1source_and_1reflector_3dtristar
-#     audio, distmat, array_geom, (source,ref)= simulate_1source_and1reflector_general(**{'nmics':5})
+if __name__ == '__main__':
+    from simdata import simulate_1source_and1reflector_general, simulate_1source_and_1reflector_3dtristar
+    audio, distmat, array_geom, (source,ref)= simulate_1source_and1reflector_general(**{'nmics':5})
     
-#     d = np.array([each-distmat[0,0] for each in distmat[0,1:]])
-#     source_pos = spiesberger_wahlberg_solution(array_geom,d, c=340)
-#     # get the expected tdoa match from each source 
-#     print(source_pos)
+    d = np.array([each-distmat[0,0] for each in distmat[0,1:]])
+    source_pos = spiesberger_wahlberg_solution(array_geom,d, c=340)
+    # get the expected tdoa match from each source 
+    #%%
+    print(source_pos)
+    ss = [np.array([2.77590096, -2.23021978,  3.60796014]),
+          np.array([3., 2., 1.])]
+    kwargs = {}
+    import time 
+    start = time.perf_counter_ns()
     
+    for i in range(1000):
+        choose_SW_valid_solution_tau51(ss, array_geom, d, **kwargs)
+    stop = time.perf_counter_ns()
+    print(f'{(stop-start)/1e6} mu-s for each run')
     
     #%%
    
