@@ -284,10 +284,16 @@ if __name__ == '__main__':
     #%%
     print('...subsetting sensible localisations')
     all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
-    good_locs = all_locs[all_locs['tdoa_resid_s']<1e-4].reset_index(drop=True)
-    valid_rows = np.logical_and(np.abs(good_locs['x'])<10, np.abs(good_locs['y'])<10,
-                                np.abs(good_locs['z'])<10)
-    sensible_locs = good_locs[valid_rows].reset_index(drop=True)
+    good_locs = all_locs[all_locs['tdoa_resid_s']<0.5e-4].reset_index(drop=True)
+    
+    # get rid of 'noisy' localisations. 
+    np_and = np.logical_and
+    valid_rows = np.logical_and(np_and(good_locs['x']<=room_dim[0], good_locs['x']>=0),
+                                np_and(good_locs['y']<=room_dim[1], good_locs['y']>=0)
+                                )
+    valid_rows_w_z = np_and(valid_rows, np_and(good_locs['z']<=room_dim[2], good_locs['z']>=0))
+    
+    sensible_locs = good_locs.loc[valid_rows_w_z,:].reset_index(drop=True)
     print('...calculating error to known sounds')
     from scipy import spatial
     for i, ss in tqdm.tqdm(enumerate(sources)):
@@ -300,11 +306,9 @@ if __name__ == '__main__':
     print('Done')
 
     #%% 
-    # gr = combine_compatible_triples([cfls_from_tdes[each] for each in [62,136,511]])
-    # plt.figure()
-    # plot_graph_w_labels(gr, plt.gca())
     from pydatemm.timediffestim import max_interch_delay as maxintch
-    exp_tdes_multich = multich_expected_peaks(sim_audio, [sources[3]], array_geom, fs=192000)
+    exp_tdes_multich = multich_expected_peaks(sim_audio, [sources[3]],
+                                              array_geom, fs=192000)
     edges = list(map(lambda X: sorted(X, reverse=True), combinations(range(sim_audio.shape[1]),2)))
     pk_lim = 20
     plt.figure()
@@ -332,7 +336,7 @@ if __name__ == '__main__':
     for chpair, tde_inds in exp_tdes_multich.items():
         exp_tde_s[chpair] = index_tde_to_sec(tde_inds, sim_audio, fs)
     
-    k = 3
+    k = 0
     idx = sensible_locs.loc[:,f's_{k}'].argmin()
     compat_inds = sensible_locs.loc[idx,'cfl_inds']
     compat_inds_int = [int(each) for each in compat_inds[1:-1].split(',')]
@@ -341,4 +345,26 @@ if __name__ == '__main__':
     mic_array = array_geom[mic_nodes,:]   
     tdemat = nx.to_numpy_array(combined_graph, weight='tde')
     tdemat[:,0]
+    #%%
+    from scipy.cluster import vq
+    from sklearn import cluster
+    pred_posns = sensible_locs.loc[:,'x':'z'].to_numpy(dtype='float64')
+    codebook, dt = vq.kmeans(pred_posns, k_or_guess=6, thresh=0.2)
+    
+    #%% 
+    output = cluster.DBSCAN(eps=0.5, algorithm='brute').fit(pred_posns)
+    uniq_labels = np.unique(output.labels_)
+    labels = output.labels_
+    #% get mean positions
+    cluster_locns = []
+    for each in uniq_labels:
+        idx = np.argwhere(each==labels)
+        sub_cluster = pred_posns[idx,:]
+        print(sub_cluster.shape[0])
+        cluster_locn = np.mean(sub_cluster,0)
+        cluster_varn = np.std(sub_cluster,0)
+        cluster_locns.append(np.concatenate((cluster_locn, cluster_varn)))
+
+        
+    
     
