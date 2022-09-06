@@ -186,7 +186,7 @@ def ccg_definer(X,Y):
 def make_ccg_matrix(cfls):
         
     num_cfls = len(cfls)
-    ccg = np.zeros((num_cfls, num_cfls))
+    ccg = np.zeros((num_cfls, num_cfls), dtype='int32')
     cfl_ij = combinations(range(num_cfls), 2)
     for (i,j) in cfl_ij:
         trip1, trip2  = cfls[i], cfls[j]
@@ -273,7 +273,7 @@ def make_ccg_pll(cfls, **kwargs):
     num_cfls = len(cfls)
     cfl_ij_parts = [list(combinations(range(num_cfls), 2))[i::num_cores] for i in range(num_cores)]
     compatibility = Parallel(n_jobs=num_cores)(delayed(get_compatibility)(cfls, ij_parts)for ij_parts in cfl_ij_parts)
-    ccg = np.zeros((num_cfls, num_cfls))
+    ccg = np.zeros((num_cfls, num_cfls), dtype='int32')
     for (ij_parts, compat_ijparts) in zip(cfl_ij_parts, compatibility):
         for (i,j), (comp_val) in zip(ij_parts, compat_ijparts):
             ccg[i,j] = comp_val
