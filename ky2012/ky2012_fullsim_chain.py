@@ -292,10 +292,10 @@ if __name__ == '__main__':
     kwargs['K'] = 5
     dd = 0.001 + np.max(distance_matrix(array_geom, array_geom))/343  
     dd_samples = int(kwargs['fs']*dd)
-    
-    start_samples = np.arange(0,sim_audio.shape[0], 480)
+
+    start_samples = np.arange(0,sim_audio.shape[0], 192)
     end_samples = start_samples+dd_samples
-    max_inds = 10    
+    max_inds = 50    
     all_candidates = []
     for (st, en) in zip(start_samples[:max_inds], end_samples[:max_inds]):
         candidates = generate_candidate_sources(sim_audio[st:en,:], **kwargs)
