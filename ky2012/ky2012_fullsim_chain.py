@@ -18,13 +18,17 @@ import numpy as np
 import pandas as pd
 import pyroomacoustics as pra
 import scipy.signal as signal 
+from sklearn import cluster
 import time 
+import tqdm
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from investigating_peakdetection_gccflavours import multich_expected_peaks
 from copy import deepcopy
 try:
     import cppyy 
     cppyy.include('./combineall_cpp/ui_combineall.cpp')
+    vector_cpp = cppyy.gbl.std.vector
+    set_cpp = cppyy.gbl.std.set
 except ImportError:
     vector_cpp = cppyy.gbl.std.vector
     set_cpp = cppyy.gbl.std.set
@@ -37,7 +41,7 @@ array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv'
 # from the pra docs
 room_dim = [9, 7.5, 3.5]  # meters
 fs = 192000
-ref_order = 2
+ref_order = 1
 
 reflection_max_order = ref_order
 
@@ -83,10 +87,10 @@ print('room simultation started...')
 room.simulate()
 print('room simultation ended...')
 # choose only the first X s
-durn = 0.03
+# durn = 0.03
 sim_audio = room.mic_array.signals.T
-if sim_audio.shape[0]>(int(fs*durn)):
-    sim_audio = sim_audio[:int(fs*durn),:]
+#if sim_audio.shape[0]>(int(fs*durn)):
+#    sim_audio = sim_audio[:int(fs*durn),:]
 nchannels = array_geom.shape[0]
 
 import soundfile as sf
@@ -116,50 +120,29 @@ kwargs = {'twrm': paper_twrm,
           'no_neg':False}
 #%%
 # Estimate inter-channel TDES
-multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
-#kwargs['use_gcc'] = False
-#multich_ac = generate_multich_autocorr(sim_audio, **kwargs)
-#%%
-#multiaa = get_multich_aa_tdes(multich_ac, **kwargs) 
-cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
-# valid_tdoas = multichannel_raster_matcher(cc_peaks, multiaa,
-#                                        **kwargs)
-valid_tdoas = deepcopy(cc_peaks)
-#%%
-# choose only K=5 (top 5)
-K = 5
-top_K_tdes = {}
-for ch_pair, tdes in valid_tdoas.items():
-    descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
-    top_K_tdes[ch_pair] = []
-    for i in range(K):
-        try:
-            top_K_tdes[ch_pair].append(descending_quality[i])
-        except:
-            pass
 
 #%% Here let's check what the expected TDEs are for a given source and array_geom
 
 
-# and check what the max error is across channels:
-edges = map(lambda X: sorted(X, reverse=True), combinations(range(sim_audio.shape[1]),2))
-edges = list(map(lambda X: str(tuple(X)), edges))
-residual_chpairs = pd.DataFrame(data=[], index=range(len(sources)), columns=['source_no']+edges)
+# # and check what the max error is across channels:
+# edges = map(lambda X: sorted(X, reverse=True), combinations(range(sim_audio.shape[1]),2))
+# edges = list(map(lambda X: str(tuple(X)), edges))
+# residual_chpairs = pd.DataFrame(data=[], index=range(len(sources)), columns=['source_no']+edges)
 
 
-for i,s in enumerate(sources):
-    exp_tdes_multich = multich_expected_peaks(sim_audio, [s], array_geom, fs=192000)
-    residual_chpairs.loc[i,'source_no'] = i
-    for ch_pair, predicted_tde in exp_tdes_multich.items():
-        samples = list(map(lambda X: X[0], top_K_tdes[ch_pair]))
-        # residual
-        residual = np.min(np.abs(np.array(samples)-predicted_tde))
-        residual_chpairs.loc[i,str(ch_pair)] = residual
+# for i,s in enumerate(sources):
+#     exp_tdes_multich = multich_expected_peaks(sim_audio, [s], array_geom, fs=192000)
+#     residual_chpairs.loc[i,'source_no'] = i
+#     for ch_pair, predicted_tde in exp_tdes_multich.items():
+#         samples = list(map(lambda X: X[0], top_K_tdes[ch_pair]))
+#         # residual
+#         residual = np.min(np.abs(np.array(samples)-predicted_tde))
+#         residual_chpairs.loc[i,str(ch_pair)] = residual
 
-# generate an overall report of fit - look at the mean residual:
-residual_chpairs['max_resid'] = residual_chpairs.loc[:,'(1, 0)':'(7, 6)'].apply(np.max,1)
-residual_chpairs['sum_resid'] = residual_chpairs.loc[:,'(1, 0)':'(7, 6)'].apply(np.sum,1)
-print(residual_chpairs['max_resid'])
+# # generate an overall report of fit - look at the mean residual:
+# residual_chpairs['max_resid'] = residual_chpairs.loc[:,'(1, 0)':'(7, 6)'].apply(np.max,1)
+# residual_chpairs['sum_resid'] = residual_chpairs.loc[:,'(1, 0)':'(7, 6)'].apply(np.sum,1)
+# print(residual_chpairs['max_resid'])
 
 #%% Parallelise the localisation code. 
 def localise_sounds(compatible_solutions, all_cfls, **kwargs):
@@ -214,11 +197,25 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     return localised_combined
 
 
-if __name__ == '__main__':
-
+def generate_candidate_sources(sim_audio, **kwargs):
+    multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
+    cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
+    valid_tdoas = deepcopy(cc_peaks)
+    
+    K = kwargs.get('K',5)
+    top_K_tdes = {}
+    for ch_pair, tdes in valid_tdoas.items():
+        descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
+        top_K_tdes[ch_pair] = []
+        for i in range(K):
+            try:
+                top_K_tdes[ch_pair].append(descending_quality[i])
+            except:
+                pass
     print('making the cfls...')
     cfls_from_tdes = make_consistent_fls(top_K_tdes, nchannels,
-                                         max_loop_residual=0.15e-4)
+                                         max_loop_residual=kwargs.get('max_loop_residual',
+                                                                      0.5e-4))
     cfls_from_tdes = list(set(cfls_from_tdes))
     all_fls = make_fundamental_loops(nchannels)
     cfls_by_fl = {}
@@ -228,7 +225,7 @@ if __name__ == '__main__':
         for fl in all_fls:
             if set(each.nodes) == set(fl):
                 cfls_by_fl[fl].append(i)
-    #%%
+    # 
     output = cfls_from_tdes[:]
     print(f'# of cfls in list: {len(output)}, starting to make CCG')
     start = time.perf_counter()
@@ -237,7 +234,7 @@ if __name__ == '__main__':
     else:
         ccg_pll = make_ccg_pll(output)
     print('done making the cfls...')
-    #%%
+    # 
     n_rows = ccg_pll.shape[0]
     ac_cpp = vector_cpp[vector_cpp[int]]([ccg_pll[i,:].tolist() for i in range(n_rows)])
     v_cpp = set_cpp[int](range(n_rows))
@@ -246,38 +243,76 @@ if __name__ == '__main__':
     print('Starting cppyy CombineAll run...')
     solns_cpp = cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
     print('Done with CombineAll run')
-    # make comp_cfls 
-    # np.savetxt('flatA.txt',ccg_pll.flatten(),delimiter=',',fmt='%i')#
-    print('..done making the ccg matrix')
     comp_cfls = list([]*len(solns_cpp))
     comp_cfls = [list(each) for each in solns_cpp]
-   
-    print('...loading done...')
-    #%% 
-    import warnings
-    warnings.filterwarnings('ignore')
+    # 
     print('localising solutions...')
-    import tqdm
     print(f'...length of all solutions...{len(comp_cfls)}')
     parts = joblib.cpu_count()
     split_solns = [comp_cfls[i::parts] for i in range(parts)]
     out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
     print('...Done localising solutions...')
-    #%%
-    # localise_sounds(split_solns[0], cfls_from_tdes, **kwargs)
-    #%%
-    print('...subsetting sensible localisations')
     all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
-    good_locs = all_locs[all_locs['tdoa_resid_s']<0.5e-4].reset_index(drop=True)
+    return all_locs
+
+def refine_candidates_to_room_dims(candidates, max_tdoa_res, room_dims):
+    good_locs = candidates[candidates['tdoa_resid_s']<max_tdoa_res].reset_index(drop=True)
     
     # get rid of 'noisy' localisations. 
     np_and = np.logical_and
-    valid_rows = np.logical_and(np_and(good_locs['x']<=room_dim[0], good_locs['x']>=0),
-                                np_and(good_locs['y']<=room_dim[1], good_locs['y']>=0)
+    valid_rows = np.logical_and(np_and(good_locs['x']<=room_dims[0], good_locs['x']>=0),
+                                np_and(good_locs['y']<=room_dims[1], good_locs['y']>=0)
                                 )
-    valid_rows_w_z = np_and(valid_rows, np_and(good_locs['z']<=room_dim[2], good_locs['z']>=0))
+    valid_rows_w_z = np_and(valid_rows, np_and(good_locs['z']<=room_dims[2], good_locs['z']>=0))
     
     sensible_locs = good_locs.loc[valid_rows_w_z,:].sort_values(['tdoa_resid_s']).reset_index(drop=True)
+    return sensible_locs
+
+def dbscan_cluster(candidates, dbscan_eps):
+    
+    pred_posns = candidates.loc[:,'x':'z'].to_numpy(dtype='float64')
+    output = cluster.DBSCAN(eps=dbscan_eps).fit(pred_posns)
+    uniq_labels = np.unique(output.labels_)
+    labels = output.labels_
+    #% get mean positions
+    cluster_locns = []
+    for each in uniq_labels:
+        idx = np.argwhere(each==labels)
+        sub_cluster = pred_posns[idx,:]
+        cluster_locn = np.mean(sub_cluster,0)
+        cluster_varn = np.std(sub_cluster,0)
+        cluster_locns.append(np.concatenate((cluster_locn, cluster_varn)))
+    #print(np.around(cluster_locns,2))
+    return cluster_locns
+
+
+
+if __name__ == '__main__':
+    kwargs['max_loop_residual'] = 0.25e-4
+    kwargs['K'] = 5
+    dd = 0.001 + np.max(distance_matrix(array_geom, array_geom))/343  
+    dd_samples = int(kwargs['fs']*dd)
+    
+    start_samples = np.arange(0,sim_audio.shape[0], 480)
+    end_samples = start_samples+dd_samples
+    max_inds = 10    
+    all_candidates = []
+    for (st, en) in zip(start_samples[:max_inds], end_samples[:max_inds]):
+        candidates = generate_candidate_sources(sim_audio[st:en,:], **kwargs)
+        refined = refine_candidates_to_room_dims(candidates, 0.5e-4, room_dim)
+        all_candidates.append(refined)
+
+    #%%
+    clustered_positions = []
+    for each in all_candidates:
+        try:
+            clustered_positions.append(dbscan_cluster(each, 0.5))
+        except ValueError:
+            clustered_positions.append([])
+    #%%
+    print('...subsetting sensible localisations')
+    
+    
     print('...calculating error to known sounds')
     from scipy import spatial
     for i, ss in tqdm.tqdm(enumerate(sources)):
@@ -310,56 +345,41 @@ if __name__ == '__main__':
     tdemat = nx.to_numpy_array(combined_graph, weight='tde')
     tdemat[:,0]
     #%%
-    from scipy.cluster import vq
-    from sklearn import cluster
-    pred_posns = sensible_locs.loc[:,'x':'z'].to_numpy(dtype='float64')
-    codebook, dt = vq.kmeans(pred_posns, k_or_guess=6, thresh=0.2)   
+    
     #%% 
-    output = cluster.DBSCAN(eps=0.3).fit(pred_posns)
-    uniq_labels = np.unique(output.labels_)
-    labels = output.labels_
-    #% get mean positions
-    cluster_locns = []
-    for each in uniq_labels:
-        idx = np.argwhere(each==labels)
-        sub_cluster = pred_posns[idx,:]
-        print(sub_cluster.shape[0])
-        cluster_locn = np.mean(sub_cluster,0)
-        cluster_varn = np.std(sub_cluster,0)
-        cluster_locns.append(np.concatenate((cluster_locn, cluster_varn)))
-
+    
         
     #%%
     
-    plt.figure()
-    plt.subplot(211)
-    plt.plot(pred_posns[:,0], pred_posns[:,1], '*', alpha=0.5)
-    for s in sources:
-        plt.scatter(s[0], s[1], color='r', s=100)
+    # plt.figure()
+    # plt.subplot(211)
+    # plt.plot(pred_posns[:,0], pred_posns[:,1], '*', alpha=0.5)
+    # for s in sources:
+    #     plt.scatter(s[0], s[1], color='r', s=100)
     
-    for each in cluster_locns:
-        every = each[0]
-        plt.plot(every[0], every[1],'g*')
-    plt.subplot(212)
-    plt.plot(pred_posns[:,1], pred_posns[:,2], '*')
-    for s in sources:
-        plt.plot(s[1], s[2], 'r*')
+    # for each in cluster_locns:
+    #     every = each[0]
+    #     plt.plot(every[0], every[1],'g*')
+    # plt.subplot(212)
+    # plt.plot(pred_posns[:,1], pred_posns[:,2], '*')
+    # for s in sources:
+    #     plt.plot(s[1], s[2], 'r*')
     
-    for each in cluster_locns:
-        every = each[0]
-        plt.plot(every[1], every[2],'g*')
-    #%% 
-    from mpl_toolkits import mplot3d
-    plt.figure()
-    a0 = plt.subplot(111, projection='3d')
-    st = 200
-    plt.plot(pred_posns[:st,0], pred_posns[:st,1], pred_posns[:st,2], '*')
-    for each in sources:
-        plt.plot(*[xx for xx in each], 'r*')
-    a0.set_xlim(0,room_dim[0])
-    a0.set_ylim(0,room_dim[1])
-    a0.set_zlim(0, room_dim[2])
-    # plot array
-    for every in array_geom:
-        plt.plot(*[yy for yy in every], 'g^')
+    # for each in cluster_locns:
+    #     every = each[0]
+    #     plt.plot(every[1], every[2],'g*')
+    # #%% 
+    # from mpl_toolkits import mplot3d
+    # plt.figure()
+    # a0 = plt.subplot(111, projection='3d')
+    # st = 200
+    # plt.plot(pred_posns[:st,0], pred_posns[:st,1], pred_posns[:st,2], '*')
+    # for each in sources:
+    #     plt.plot(*[xx for xx in each], 'r*')
+    # a0.set_xlim(0,room_dim[0])
+    # a0.set_ylim(0,room_dim[1])
+    # a0.set_zlim(0, room_dim[2])
+    # # plot array
+    # for every in array_geom:
+    #     plt.plot(*[yy for yy in every], 'g^')
     

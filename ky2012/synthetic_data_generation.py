@@ -250,7 +250,6 @@ def make_consistent_fls(multich_tdes, nchannels, **kwargs):
         abc_combinations = product(ba_tdes, ca_tdes, cb_tdes)
         for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
             if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
-                print('hey', i)
                 this_cfl = nx.ordered.Graph()
                 for e, tde in zip(edges, [tde1, tde2, tde3]):
                     #print(e, tde)
