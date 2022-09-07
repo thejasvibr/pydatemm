@@ -34,90 +34,6 @@ except ImportError:
     set_cpp = cppyy.gbl.std.set
     pass
 
-#np.random.seed(82319)
-# %load_ext line_profiler
-#%% Generate simulated audio
-array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
-# from the pra docs
-room_dim = [9, 7.5, 3.5]  # meters
-fs = 192000
-ref_order = 2
-
-reflection_max_order = ref_order
-
-rt60_tgt = 0.2  # seconds
-e_absorption, max_order = pra.inverse_sabine(rt60_tgt, room_dim)
-
-room = pra.ShoeBox(
-    room_dim, fs=fs, materials=pra.Material(e_absorption),
-    max_order=ref_order,
-    ray_tracing=False,
-    air_absorption=True)
-
-call_durn = 7e-3
-t_call = np.linspace(0,call_durn, int(fs*call_durn))
-batcall = signal.chirp(t_call, 85000, t_call[-1], 9000,'linear')
-batcall *= signal.hamming(batcall.size)
-batcall *= 0.5
-
-num_sources = int(np.random.choice(range(5,7),1)) # or overruled by the lines below.
-random = False
-
-xyzrange = [np.arange(0,dimension, 0.01) for dimension in room_dim]
-if not random:
-    sources = [[8, 6, 0.7],
-                [2.5, 1, 2.5],
-               [4, 3, 1.5],
-               [1, 4, 1.0],
-               ]
-    num_sources = len(sources)
-else:
-    sources = []
-    for each in range(num_sources):
-        each_source = [float(np.random.choice(each,1)) for each in xyzrange]
-        sources.append(each_source)
-
-delay = np.linspace(0,0.030,len(sources))
-for each, emission_delay in zip(sources, delay):
-    room.add_source(position=each, signal=batcall, delay=emission_delay)
-
-room.add_microphone_array(array_geom.T)
-room.compute_rir()
-print('room simultation started...')
-room.simulate()
-print('room simultation ended...')
-# choose only the first X s
-# durn = 0.03
-sim_audio = room.mic_array.signals.T
-#if sim_audio.shape[0]>(int(fs*durn)):
-#    sim_audio = sim_audio[:int(fs*durn),:]
-nchannels = array_geom.shape[0]
-
-import soundfile as sf
-sf.write(f'simaudio_reflection-order_{ref_order}.wav', sim_audio, samplerate=fs)
-
-mic2sources = [mic2source(each, array_geom) for each in sources]    
-delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
-
-for i,j in product(range(nchannels), range(nchannels)):
-    for source_num, each in enumerate(delta_tdes):
-        each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
-        each[i,j] /= vsound
-
-#%%
-paper_twrm = 16/fs
-paper_twtm = 16/fs
-kwargs = {'twrm': paper_twrm,
-          'twtm': paper_twtm,
-          'nchannels':nchannels,
-          'fs':fs,
-          'array_geom':array_geom,
-          'pctile_thresh': 95,
-          'use_gcc':True,
-          'gcc_variant':'phat', 
-          'min_peak_diff':0.35e-4, 
-          'vsound' : 343.0, 
-          'no_neg':False}
 #%%
 # Estimate inter-channel TDES
 
@@ -287,19 +203,96 @@ def dbscan_cluster(candidates, dbscan_eps, n_points):
     return cluster_locns_mean, cluster_locns_std
 
 if __name__ == '__main__':
+    
+    # Generate simulated audio
+    array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
+    # from the pra docs
+    room_dim = [9, 7.5, 3.5]  # meters
+    fs = 192000
+    ref_order = 1
+    reflection_max_order = ref_order
+    
+    rt60_tgt = 0.2  # seconds
+    e_absorption, max_order = pra.inverse_sabine(rt60_tgt, room_dim)
+    
+    room = pra.ShoeBox(
+        room_dim, fs=fs, materials=pra.Material(e_absorption),
+        max_order=ref_order,
+        ray_tracing=False,
+        air_absorption=True)
+    
+    call_durn = 7e-3
+    t_call = np.linspace(0,call_durn, int(fs*call_durn))
+    batcall = signal.chirp(t_call, 85000, t_call[-1], 9000,'linear')
+    batcall *= signal.hamming(batcall.size)
+    batcall *= 0.5
+    
+    num_sources = int(np.random.choice(range(5,7),1)) # or overruled by the lines below.
+    random = False
+    
+    xyzrange = [np.arange(0,dimension, 0.01) for dimension in room_dim]
+    if not random:
+        sources = [[8, 6, 0.7],
+                    [2.5, 1, 2.5],
+                   [4, 3, 1.5],
+                   [1, 4, 1.0],
+                   ]
+        num_sources = len(sources)
+    else:
+        sources = []
+        for each in range(num_sources):
+            each_source = [float(np.random.choice(each,1)) for each in xyzrange]
+            sources.append(each_source)
+    
+    delay = np.linspace(0,0.030,len(sources))
+    for each, emission_delay in zip(sources, delay):
+        room.add_source(position=each, signal=batcall, delay=emission_delay)
+    
+    room.add_microphone_array(array_geom.T)
+    room.compute_rir()
+    print('room simultation started...')
+    room.simulate()
+    print('room simultation ended...')
+    sim_audio = room.mic_array.signals.T
+    nchannels = array_geom.shape[0]
+    
+    import soundfile as sf
+    sf.write(f'simaudio_reflection-order_{ref_order}.wav', sim_audio, samplerate=fs)
+
+    mic2sources = [mic2source(each, array_geom) for each in sources]    
+    delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
+    
+    for i,j in product(range(nchannels), range(nchannels)):
+        for source_num, each in enumerate(delta_tdes):
+            each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
+            each[i,j] /= vsound
+    #%%
+    kwargs = {'nchannels':nchannels,
+              'fs':fs,
+              'array_geom':array_geom,
+              'pctile_thresh': 95,
+              'use_gcc':True,
+              'gcc_variant':'phat', 
+              'min_peak_diff':0.35e-4, 
+              'vsound' : 343.0, 
+              'no_neg':False}
     kwargs['max_loop_residual'] = 0.25e-4
-    kwargs['K'] = 3
+    kwargs['K'] = 7
     dd = 0.001 + np.max(distance_matrix(array_geom, array_geom))/343  
     dd_samples = int(kwargs['fs']*dd)
 
     start_samples = np.arange(0,sim_audio.shape[0], 192)
     end_samples = start_samples+dd_samples
     max_inds = 50
+    start = time.perf_counter_ns()
     all_candidates = []
     for (st, en) in zip(start_samples[:max_inds], end_samples[:max_inds]):
         candidates = generate_candidate_sources(sim_audio[st:en,:], **kwargs)
         refined = refine_candidates_to_room_dims(candidates, 0.5e-4, room_dim)
         all_candidates.append(refined)
+    stop = time.perf_counter_ns()
+    durn_s = (stop - start)/1e9
+    print(f'Time for {max_inds} ms of audio analysis: {durn_s} s')
     #%%
     clustered_positions = []
     clustered_pos_sd = []
