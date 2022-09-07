@@ -41,7 +41,7 @@ array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv'
 # from the pra docs
 room_dim = [9, 7.5, 3.5]  # meters
 fs = 192000
-ref_order = 1
+ref_order = 2
 
 reflection_max_order = ref_order
 
@@ -55,7 +55,7 @@ room = pra.ShoeBox(
     air_absorption=True)
 
 call_durn = 7e-3
-t_call = np.linspace(call_durn, int(fs*call_durn))
+t_call = np.linspace(0,call_durn, int(fs*call_durn))
 batcall = signal.chirp(t_call, 85000, t_call[-1], 9000,'linear')
 batcall *= signal.hamming(batcall.size)
 batcall *= 0.5
@@ -65,9 +65,9 @@ random = False
 
 xyzrange = [np.arange(0,dimension, 0.01) for dimension in room_dim]
 if not random:
-    sources = [[2.5, 1, 2.5],
+    sources = [[8, 6, 0.7],
+                [2.5, 1, 2.5],
                [4, 3, 1.5],
-               [8, 6, 0.7],
                [1, 4, 1.0],
                ]
     num_sources = len(sources)
@@ -77,7 +77,7 @@ else:
         each_source = [float(np.random.choice(each,1)) for each in xyzrange]
         sources.append(each_source)
 
-delay = np.linspace(0,0.050,len(sources))
+delay = np.linspace(0,0.030,len(sources))
 for each, emission_delay in zip(sources, delay):
     room.add_source(position=each, signal=batcall, delay=emission_delay)
 
@@ -268,87 +268,49 @@ def refine_candidates_to_room_dims(candidates, max_tdoa_res, room_dims):
     sensible_locs = good_locs.loc[valid_rows_w_z,:].sort_values(['tdoa_resid_s']).reset_index(drop=True)
     return sensible_locs
 
-def dbscan_cluster(candidates, dbscan_eps):
+def dbscan_cluster(candidates, dbscan_eps, n_points):
     
     pred_posns = candidates.loc[:,'x':'z'].to_numpy(dtype='float64')
-    output = cluster.DBSCAN(eps=dbscan_eps).fit(pred_posns)
+    output = cluster.DBSCAN(eps=dbscan_eps, min_samples=n_points).fit(pred_posns)
     uniq_labels = np.unique(output.labels_)
     labels = output.labels_
     #% get mean positions
-    cluster_locns = []
+    cluster_locns_mean = []
+    cluster_locns_std = []
     for each in uniq_labels:
         idx = np.argwhere(each==labels)
         sub_cluster = pred_posns[idx,:]
         cluster_locn = np.mean(sub_cluster,0)
         cluster_varn = np.std(sub_cluster,0)
-        cluster_locns.append(np.concatenate((cluster_locn, cluster_varn)))
-    #print(np.around(cluster_locns,2))
-    return cluster_locns
-
-
+        cluster_locns_mean.append(cluster_locn)
+        cluster_locns_std.append(cluster_varn)
+    return cluster_locns_mean, cluster_locns_std
 
 if __name__ == '__main__':
     kwargs['max_loop_residual'] = 0.25e-4
-    kwargs['K'] = 5
+    kwargs['K'] = 7
     dd = 0.001 + np.max(distance_matrix(array_geom, array_geom))/343  
     dd_samples = int(kwargs['fs']*dd)
 
     start_samples = np.arange(0,sim_audio.shape[0], 192)
     end_samples = start_samples+dd_samples
-    max_inds = 50    
+    max_inds = 50
     all_candidates = []
     for (st, en) in zip(start_samples[:max_inds], end_samples[:max_inds]):
         candidates = generate_candidate_sources(sim_audio[st:en,:], **kwargs)
         refined = refine_candidates_to_room_dims(candidates, 0.5e-4, room_dim)
         all_candidates.append(refined)
-
     #%%
     clustered_positions = []
+    clustered_pos_sd = []
     for each in all_candidates:
         try:
-            clustered_positions.append(dbscan_cluster(each, 0.5))
+            mean_cluster_posn, std_cluster_posn = dbscan_cluster(each, 0.5, 1)
+            clustered_positions.append(mean_cluster_posn)
+            clustered_pos_sd.append(std_cluster_posn)
         except ValueError:
             clustered_positions.append([])
-    #%%
-    print('...subsetting sensible localisations')
-    
-    
-    print('...calculating error to known sounds')
-    from scipy import spatial
-    for i, ss in tqdm.tqdm(enumerate(sources)):
-        sensible_locs.loc[:,f's_{i}'] = sensible_locs.apply(lambda X: spatial.distance.euclidean(X['x':'z'], ss),1)
-    #%% Are the best candidates in here? 
-    for k in range(len(sources)):
-        idx = sensible_locs.loc[:,f's_{k}'].argmin()
-        print('\n',np.around(sources[k],2), np.around(sensible_locs.loc[idx,'x':'z'].tolist(),2),
-              np.around(sensible_locs.loc[idx,f's_{k}'],3), sensible_locs.loc[idx,'cfl_inds'])
-    print('Done')
-    
-    #%% 
-    from pydatemm.timediffestim import max_interch_delay as maxintch
-    exp_tdes_multich = multich_expected_peaks(sim_audio, [sources[3]],
-                                              array_geom, fs=192000)
-    #%% 
-    # Source 3 is the problem fix. Is this caused by erroneous TDEs or something else? 
-    def index_tde_to_sec(X, audio, fs):
-        return (X - audio.shape[0])/fs
-    exp_tde_s = {}
-    for chpair, tde_inds in exp_tdes_multich.items():
-        exp_tde_s[chpair] = index_tde_to_sec(tde_inds, sim_audio, fs)
-    k = 0
-    idx = sensible_locs.loc[:,f's_{k}'].argmin()
-    compat_inds = sensible_locs.loc[idx,'cfl_inds']
-    compat_inds_int = [int(each) for each in compat_inds[1:-1].split(',')]
-    combined_graph = combine_compatible_triples([cfls_from_tdes[each] for each in compat_inds_int])
-    mic_nodes = combined_graph.nodes
-    mic_array = array_geom[mic_nodes,:]   
-    tdemat = nx.to_numpy_array(combined_graph, weight='tde')
-    tdemat[:,0]
-    #%%
-    
-    #%% 
-    
-        
+            clustered_pos_sd.append([])        
     #%%
     
     # plt.figure()
