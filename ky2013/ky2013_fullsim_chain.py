@@ -288,7 +288,7 @@ def dbscan_cluster(candidates, dbscan_eps, n_points):
 
 if __name__ == '__main__':
     kwargs['max_loop_residual'] = 0.25e-4
-    kwargs['K'] = 7
+    kwargs['K'] = 3
     dd = 0.001 + np.max(distance_matrix(array_geom, array_geom))/343  
     dd_samples = int(kwargs['fs']*dd)
 
@@ -306,8 +306,8 @@ if __name__ == '__main__':
     for each in all_candidates:
         try:
             mean_cluster_posn, std_cluster_posn = dbscan_cluster(each, 0.5, 1)
-            clustered_positions.append(mean_cluster_posn)
-            clustered_pos_sd.append(std_cluster_posn)
+            clustered_positions.append(np.array(mean_cluster_posn).reshape(-1,3))
+            clustered_pos_sd.append(np.array(std_cluster_posn).reshape(-1,3))
         except ValueError:
             clustered_positions.append([])
             clustered_pos_sd.append([])        
