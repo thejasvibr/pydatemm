@@ -209,7 +209,7 @@ if __name__ == '__main__':
     # from the pra docs
     room_dim = [9, 7.5, 3.5]  # meters
     fs = 192000
-    ref_order = 1
+    ref_order = 0
     reflection_max_order = ref_order
     
     rt60_tgt = 0.2  # seconds
@@ -220,16 +220,16 @@ if __name__ == '__main__':
         max_order=ref_order,
         ray_tracing=False,
         air_absorption=True)
-    
+
     call_durn = 7e-3
     t_call = np.linspace(0,call_durn, int(fs*call_durn))
     batcall = signal.chirp(t_call, 85000, t_call[-1], 9000,'linear')
     batcall *= signal.hamming(batcall.size)
     batcall *= 0.5
-    
+
     num_sources = int(np.random.choice(range(5,7),1)) # or overruled by the lines below.
     random = False
-    
+
     xyzrange = [np.arange(0,dimension, 0.01) for dimension in room_dim]
     if not random:
         sources = [[8, 6, 0.7],
@@ -243,11 +243,11 @@ if __name__ == '__main__':
         for each in range(num_sources):
             each_source = [float(np.random.choice(each,1)) for each in xyzrange]
             sources.append(each_source)
-    
+
     delay = np.linspace(0,0.030,len(sources))
     for each, emission_delay in zip(sources, delay):
         room.add_source(position=each, signal=batcall, delay=emission_delay)
-    
+
     room.add_microphone_array(array_geom.T)
     room.compute_rir()
     print('room simultation started...')
@@ -278,7 +278,7 @@ if __name__ == '__main__':
               'no_neg':False}
     kwargs['max_loop_residual'] = 0.25e-4
     kwargs['K'] = 7
-    dd = 0.001 + np.max(distance_matrix(array_geom, array_geom))/343  
+    dd = 0.5*np.max(distance_matrix(array_geom, array_geom))/343  
     dd_samples = int(kwargs['fs']*dd)
 
     start_samples = np.arange(0,sim_audio.shape[0], 192)
@@ -286,7 +286,7 @@ if __name__ == '__main__':
     max_inds = 50
     start = time.perf_counter_ns()
     all_candidates = []
-    for (st, en) in zip(start_samples[:max_inds], end_samples[:max_inds]):
+    for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds])):
         candidates = generate_candidate_sources(sim_audio[st:en,:], **kwargs)
         refined = refine_candidates_to_room_dims(candidates, 0.5e-4, room_dim)
         all_candidates.append(refined)
@@ -298,43 +298,60 @@ if __name__ == '__main__':
     clustered_pos_sd = []
     for each in all_candidates:
         try:
-            mean_cluster_posn, std_cluster_posn = dbscan_cluster(each, 0.5, 1)
+            mean_cluster_posn, std_cluster_posn = dbscan_cluster(each, 0.3, 1)
             clustered_positions.append(np.array(mean_cluster_posn).reshape(-1,3))
             clustered_pos_sd.append(np.array(std_cluster_posn).reshape(-1,3))
         except ValueError:
             clustered_positions.append([])
             clustered_pos_sd.append([])        
     #%%
+    # Also calculate the expected time that the calls will arrive at the mics. 
+    array_source_flightime = distance_matrix(array_geom, sources)/343
+    toa_sounds_start = array_source_flightime.copy()
+    for i, source in enumerate(sources):
+        toa_sounds_start[:,i] += delay[i]
+    toa_sounds_stop = toa_sounds_start + 7.5e-3
+    toa_startstop = np.row_stack((toa_sounds_start, toa_sounds_stop))
+    toa_minmax = np.apply_along_axis(lambda X: (np.min(X), np.max(X)), 0, toa_startstop)
+    toa_minmax *= 1000
+    toa_minmax = np.int64(toa_minmax)
+    toa_sets = [set(range(toa_minmax[0,j], toa_minmax[1,j]+1)) for j in range(4)]
+
+    #%%
+    from mpl_toolkits import mplot3d
+    plt.figure()
+    a0 = plt.subplot(111, projection='3d')
     
-    # plt.figure()
-    # plt.subplot(211)
-    # plt.plot(pred_posns[:,0], pred_posns[:,1], '*', alpha=0.5)
-    # for s in sources:
-    #     plt.scatter(s[0], s[1], color='r', s=100)
+    # plot 10 ms slot
+    # plot *all* points
     
-    # for each in cluster_locns:
-    #     every = each[0]
-    #     plt.plot(every[0], every[1],'g*')
-    # plt.subplot(212)
-    # plt.plot(pred_posns[:,1], pred_posns[:,2], '*')
-    # for s in sources:
-    #     plt.plot(s[1], s[2], 'r*')
+    for t, clus_posns in  enumerate(clustered_positions):
+        a0.set_xlim(0,room_dim[0])
+        a0.set_ylim(0,room_dim[1])
+        a0.set_zlim(0, room_dim[2])
+        # plot array
+        
+        a0.view_init(21, -7)
+        try:
+            a0.plot(*[clus_posns[:,i] for i in range(3)],'k^')
+        except:
+            pass
+        for every in array_geom:
+            a0.scatter3D(every[0], every[1], every[2], s=50, color='g', marker='^')
+        # plot source locations
+        for i, each in enumerate(sources):
+            a0.scatter3D(*[xx for xx in each], marker='*', color='r', s=150, alpha=0.5)
+        
+        for s_num, each in enumerate(toa_sets):
+            if len(each.intersection({t}))>0:
+                source_xyz = sources[s_num]
+                a0.text(source_xyz[0], source_xyz[1], source_xyz[2], f'source {s_num+1}')
+        
+        plt.tight_layout()
+        plt.title(f'Clustered sources {t}-{t+int(1e3*dd_samples/fs)} ms', y = 0.85)
+        plt.savefig(f'frame_{t}_plots_short.png')
+        a0.clear()    
     
-    # for each in cluster_locns:
-    #     every = each[0]
-    #     plt.plot(every[1], every[2],'g*')
-    # #%% 
-    # from mpl_toolkits import mplot3d
-    # plt.figure()
-    # a0 = plt.subplot(111, projection='3d')
-    # st = 200
-    # plt.plot(pred_posns[:st,0], pred_posns[:st,1], pred_posns[:st,2], '*')
-    # for each in sources:
-    #     plt.plot(*[xx for xx in each], 'r*')
-    # a0.set_xlim(0,room_dim[0])
-    # a0.set_ylim(0,room_dim[1])
-    # a0.set_zlim(0, room_dim[2])
-    # # plot array
-    # for every in array_geom:
-    #     plt.plot(*[yy for yy in every], 'g^')
+    
+    
     
