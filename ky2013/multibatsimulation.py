@@ -98,7 +98,7 @@ for batnum in range(nbats):
     call_type = str(choose(['logarithmic','linear','hyperbolic'], 1)[0])
     batcall = signal.chirp(t_call, maxf, t_call[-1], minf,call_type)
     batcall *= signal.hamming(batcall.size)
-    batcall *= 0.5
+    batcall *= 1/nbats
     for each, emission_delay in zip(bat_xyz[batnum], emission_times[batnum]):
         room.add_source(position=each, signal=batcall, delay=emission_delay)
 

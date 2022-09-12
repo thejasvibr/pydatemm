@@ -86,17 +86,17 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
                     localised_geq4_out.loc[i,'x':'z'] = source_xyz
                     localised_geq4_out.loc[i,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
                                                                         source_xyz,
-                                                                        array_geom[channels,:])
+                                                                        kwargs['array_geom'][channels,:])
                     localised_geq4_out.loc[i,'cfl_inds'] = str(compat_cfl)
                 
             elif len(channels)==4:
-                source_xyz  = mellen_pachter_raquet_2003(array_geom[channels,:], d)
+                source_xyz  = mellen_pachter_raquet_2003(kwargs['array_geom'][channels,:], d)
                 if not np.sum(np.isnan(source_xyz))>0:
                     if np.logical_or(source_xyz.shape[0]==1,source_xyz.shape[0]==3):
                         localised_4ch_out.loc[ii,'x':'z'] = source_xyz
                         localised_4ch_out.loc[ii,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
                                                                             source_xyz,
-                                                                            array_geom[channels,:])
+                                                                            kwargs['array_geom'][channels,:])
                         ii += 1
 
                     elif source_xyz.shape[0]==2:
@@ -104,7 +104,7 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
                             localised_4ch_out.loc[ii,'x':'z'] = source_xyz[ss,:]
                             localised_4ch_out.loc[ii,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
                                                                                 source_xyz[ss,:],
-                                                                                array_geom[channels,:])
+                                                                                kwargs['array_geom'][channels,:])
                             ii += 1                    
                     localised_4ch_out.loc[ii,'cfl_inds'] = str(compat_cfl)
         else:
@@ -129,11 +129,9 @@ def generate_candidate_sources(sim_audio, **kwargs):
             except:
                 pass
     print('making the cfls...')
-    cfls_from_tdes = make_consistent_fls(top_K_tdes, nchannels,
-                                         max_loop_residual=kwargs.get('max_loop_residual',
-                                                                      0.5e-4))
+    cfls_from_tdes = make_consistent_fls(top_K_tdes, **kwargs)
     cfls_from_tdes = list(set(cfls_from_tdes))
-    all_fls = make_fundamental_loops(nchannels)
+    all_fls = make_fundamental_loops(kwargs['nchannels'])
     cfls_by_fl = {}
     for fl in all_fls:
         cfls_by_fl[fl] = []

@@ -222,7 +222,7 @@ def mic2source(sourcexyz, arraygeom):
 
 
 
-def make_consistent_fls(multich_tdes, nchannels, **kwargs):
+def make_consistent_fls(multich_tdes, **kwargs):
     '''
 
     Parameters
@@ -239,14 +239,24 @@ def make_consistent_fls(multich_tdes, nchannels, **kwargs):
         List with nx.DiGraphs of all consistent FLs
     '''
     max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
-    all_edges_fls = make_edges_for_fundamental_loops(nchannels)
+    all_edges_fls = make_edges_for_fundamental_loops(kwargs['nchannels'])
     all_cfls = []
+    reverse_chpair_peaks = {}
+    for chpair, peaks in multich_tdes.items():
+        if chpair[::-1] not in multich_tdes.keys():
+            rev_chpair = chpair[::-1]
+            rev_time_peaks = []
+            for each in peaks:
+                rev_time_peaks.append((each[0], -each[1], each[2]))
+            reverse_chpair_peaks[rev_chpair] = rev_time_peaks
+    reverse_chpair_peaks.update(multich_tdes)
+    
     for fundaloop, edges in all_edges_fls.items():
         #print(fundaloop)
         a,b,c = fundaloop
-        ba_tdes = multich_tdes[(b,a)]
-        ca_tdes = multich_tdes[(c,a)]
-        cb_tdes = multich_tdes[(c,b)]
+        ba_tdes = reverse_chpair_peaks[(b,a)]
+        ca_tdes = reverse_chpair_peaks[(c,a)]
+        cb_tdes = reverse_chpair_peaks[(c,b)]
         abc_combinations = product(ba_tdes, ca_tdes, cb_tdes)
         for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
             if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
@@ -288,37 +298,37 @@ def make_ccg_pll(cfls, **kwargs):
 
 
 
-if __name__ == '__main__':
-    array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
-    #array_geom = array_geom[:,:]
+# if __name__ == '__main__':
+#     array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
+#     #array_geom = array_geom[:,:]
     
-    nchannels = array_geom.shape[0]
-    sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([8,-2.5,10])]
+#     nchannels = array_geom.shape[0]
+#     sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([8,-2.5,10])]
     
     
     
-    mic2sources = [mic2source(each, array_geom) for each in sources]    
-    delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
+#     mic2sources = [mic2source(each, array_geom) for each in sources]    
+#     delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
 
-    for i,j in product(range(nchannels), range(nchannels)):
-        for source_num, each in enumerate(delta_tdes):
-            each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
-            each[i,j] /= vsound
-    #%%
-    # Make the cfls now:
-    cfls_s12 = [make_all_fundaloops_from_tdemat(deltatde) for deltatde in delta_tdes]
-    print('Making CCG Matrix now...')
-    ccg_s12 = [make_ccg_matrix(cfls_s) for cfls_s in cfls_s12]
-    # qq1 = combine_all(ccg_s12[0], set(range(nchannels)), set([]), set([]))
-    # qq2 = combine_all(ccg_s12[1], set(range(nchannels)), set([]), set([]))
-    # And now let's combine the two cfls sets together and see how well it all
-    # works
-    cfls_combined = list(chain(*cfls_s12))
-    ccg_combined = make_ccg_matrix(cfls_combined)
-    print('Running CombineAll..')
-    qq_combined = combine_all(ccg_combined, set(range(len(ccg_combined))), set([]), set([]))    
-    comp_cfls = format_combineall(qq_combined)
-    #%%
+#     for i,j in product(range(nchannels), range(nchannels)):
+#         for source_num, each in enumerate(delta_tdes):
+#             each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
+#             each[i,j] /= vsound
+#     #%%
+#     # Make the cfls now:
+#     cfls_s12 = [make_all_fundaloops_from_tdemat(deltatde) for deltatde in delta_tdes]
+#     print('Making CCG Matrix now...')
+#     ccg_s12 = [make_ccg_matrix(cfls_s) for cfls_s in cfls_s12]
+#     # qq1 = combine_all(ccg_s12[0], set(range(nchannels)), set([]), set([]))
+#     # qq2 = combine_all(ccg_s12[1], set(range(nchannels)), set([]), set([]))
+#     # And now let's combine the two cfls sets together and see how well it all
+#     # works
+#     cfls_combined = list(chain(*cfls_s12))
+#     ccg_combined = make_ccg_matrix(cfls_combined)
+#     print('Running CombineAll..')
+#     qq_combined = combine_all(ccg_combined, set(range(len(ccg_combined))), set([]), set([]))    
+#     #comp_cfls = format_combineall(qq_combined)
+#     #%%
     # all_channel_pairs = combinations(range(nchannels),2)
     # part_1 = np.zeros(deltaR1.shape)
     # for (i,j) in all_channel_pairs:
@@ -335,18 +345,18 @@ if __name__ == '__main__':
     # plt.title('Original S1')
     #%%
     # Compose. 
-    for compat_cfls in comp_cfls:
-        source_cfls = [cfls_combined[each] for each in compat_cfls]
-        s1_composed = combine_compatible_triples(source_cfls)
-        s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
-        channels = list(s1_composed.nodes)
-        if array_geom[channels,:].shape[0]>4:
-            print(spiesberger_wahlberg_solution(array_geom[channels,:],s1c_tde[1:,0]*340))
-    #%%
-    # Now let's try to combine the compatible triples. 
-    #qq_s1, qq_s2 = comp_cfls
-    #trips_s1 = [cfls_combined[each] for each in qq_s1]
-    plt.figure()
-    for i,subp in enumerate(range(511, 516)):
-        plt.subplot(subp)
-        plot_graph_w_labels(cfls_s12[0][i], plt.gca())
+    # for compat_cfls in comp_cfls:
+    #     source_cfls = [cfls_combined[each] for each in compat_cfls]
+    #     s1_composed = combine_compatible_triples(source_cfls)
+    #     s1c_tde = nx.to_numpy_array(s1_composed, weight='tde')
+    #     channels = list(s1_composed.nodes)
+    #     if array_geom[channels,:].shape[0]>4:
+    #         print(spiesberger_wahlberg_solution(array_geom[channels,:],s1c_tde[1:,0]*340))
+    # #%%
+    # # Now let's try to combine the compatible triples. 
+    # #qq_s1, qq_s2 = comp_cfls
+    # #trips_s1 = [cfls_combined[each] for each in qq_s1]
+    # plt.figure()
+    # for i,subp in enumerate(range(511, 516)):
+    #     plt.subplot(subp)
+    #     plot_graph_w_labels(cfls_s12[0][i], plt.gca())
