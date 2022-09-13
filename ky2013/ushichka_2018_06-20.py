@@ -45,13 +45,14 @@ kwargs = {'nchannels':nchannels,
           'vsound' : 343.0, 
           'no_neg':False}
 kwargs['max_loop_residual'] = 0.25e-4
-kwargs['K'] = 5
+kwargs['K'] = 7
 dd = np.max(distance_matrix(array_geom, array_geom))/343  
+dd *= 0.8
 dd_samples = int(kwargs['fs']*dd)
 
-start_samples = np.arange(0,array_audio.shape[0], 192)
+start_samples = np.arange(0,array_audio.shape[0], 96)
 end_samples = start_samples+dd_samples
-max_inds = 100
+max_inds = 40
 start = time.perf_counter_ns()
 all_candidates = []
 for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds])):
@@ -59,19 +60,80 @@ for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds]))
     candidates = generate_candidate_sources(audio_chunk, **kwargs)
     #refined = refine_candidates_to_room_dims(candidates, 0.5e-4, room_dim)
     all_candidates.append(candidates)
+
+for frame, df in enumerate(all_candidates):
+    df['frame'] = frame
+
+
 stop = time.perf_counter_ns()
 durn_s = (stop - start)/1e9
 print(f'Time for {max_inds} ms of audio analysis: {durn_s} s')
 #%%
+import trackpy as tp
+all_frames = pd.concat(all_candidates).reset_index(drop=True)
+#coarse_good_positions = all_frames[abs(all_frames['x'])<20]
+coarse_positions = all_frames[np.logical_and(np.abs(all_frames['x'])<10,
+                                             np.abs(all_frames['y'])<10)]
+coarse_positions = coarse_positions[np.abs(coarse_positions['z'])<3]
+# also filter by good tdoa residual
+tdoa_filtered = coarse_positions[coarse_positions['tdoa_resid_s']<1e-3].reset_index(drop=True)
+
+#%% 
+# Run DBSCAN to reduce the number of tracked points per frame!
+filtered_by_frame = tdoa_filtered.groupby('frame')
+
+all_dbscanned = []
+for framenum, subdf in filtered_by_frame:
+    dbscanned, std = dbscan_cluster(subdf, dbscan_eps=0.2, n_points=1)
+    dbscanned_points = pd.DataFrame(data=[], index=range(len(dbscanned)),
+                                                         columns=['x','y','z','frame'])
+    dbscanned_points.loc[:,'x':'z'] = np.array(dbscanned).reshape(-1,3)
+    dbscanned_points['frame'] = framenum
+    all_dbscanned.append(dbscanned_points)
+
+all_dbscanned = pd.concat(all_dbscanned).reset_index(drop=True)
+linked = tp.link_df(all_dbscanned, search_range=0.2, pos_columns=['x','y','z'], memory=2)
+# Keep only those particles that have been seen in at least 3 frames:
+persistent_particles = []
+for p_id, subdf in linked.groupby('particle'):
+    if subdf.shape[0] >=4:
+        persistent_particles.append(subdf)
+all_persistent = pd.concat(persistent_particles).reset_index(drop=True)
+all_persistent['t_sec'] = all_persistent['frame']*0.5e-3
+avged_positions = []
+for particle, subdf in all_persistent.groupby('particle'):
+    xyz = subdf.loc[:,'x':'z'].to_numpy(dtype=np.float64)
+    xyz_avg = np.mean(xyz, 0)
+    avged_positions.append(xyz_avg)
+#%%
 plt.figure()
 a0 = plt.subplot(111, projection='3d')
-for i, data in enumerate(all_candidates):
-    x,y,z = [data.loc[:,ax]  for ax in ['x','y','z']]
-    a0.plot(x,y,z,'*')
+for framenum, subdf in all_persistent.groupby('frame'):
+    a0.clear()
     a0.plot(array_geom[:,0],array_geom[:,1], array_geom[:,2],'^')
+    #plt.plot(subdf['x'], subdf['y'], subdf['z'],'*')
+    for particle_id, subsubdf in subdf.groupby('particle'):
+        x,y,z = subsubdf.loc[:,'x':'z'].to_numpy(dtype=np.float64).flatten()
+        a0.text(x, y, z, str(particle_id))
     a0.set_xlim(-7, 1)
     a0.set_ylim(-1, 4)
     a0.set_zlim(-3, 3)
-    plt.savefig(f'miaow{i}.png')
-    a0.clear()
+    a0.view_init(28,-26)
+    plt.tight_layout()
+    plt.title(f'frame: {framenum}', y=0.85)
+    plt.savefig(f'sources_by_frames_{framenum}.png')
+    plt.pause(0.2)
+    
+#%%
+# plt.figure()
+# a1 = plt.subplot(111, projection='3d')
+# for i, data in enumerate(all_candidates):
+#     x,y,z = [data.loc[:,ax]  for ax in ['x','y','z']]
+#     a1.plot(x,y,z,'*')
+#     a1.plot(array_geom[:,0],array_geom[:,1], array_geom[:,2],'^')
+#     a1.set_xlim(-7, 1)
+#     a1.set_ylim(-1, 4)
+#     a1.set_zlim(-3, 3)
+#     plt.savefig(f'miaow{i}.png')
+#     a1.clear()
 

@@ -15,8 +15,8 @@ import natsort
 import glob
 
 image_files = natsort.natsorted(glob.glob('*.png'))
-clip = ImageSequenceClip(image_files, fps=2.5)
-clip.write_gif('clustered_positions.gif', fps=2.5)
+clip = ImageSequenceClip(image_files, fps=1.5)
+clip.write_gif('clustered_positions.gif', fps=1.5)
 clip.close()
 
 
