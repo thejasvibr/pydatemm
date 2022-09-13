@@ -61,6 +61,7 @@ for xy in [ [bat1x,bat1y], [bat2x,bat2y], [bat3x, bat3y]]:
 
 batxyz_df = pd.DataFrame(data = np.array(bat_xyz).reshape(-1,3), columns=['x','y','z'])
 batxyz_df['t'] = [ every for each in emission_times for every in each]
+batxyz_df['batnum'] = [ batnum for batnum in range(nbats) for ee in range(ncalls)]
 #%%
 
 
@@ -88,6 +89,7 @@ array_geom = np.array(([3, 9, 1.5],
                       [0, 7, 2.0],
                       )
                       )
+array_geom += np.random.choice(np.linspace(-0.01,0.01,20), array_geom.size).reshape(array_geom.shape)
 num_sources = int(np.random.choice(range(5,7),1)) # or overruled by the lines below.
 random = False
 
@@ -129,5 +131,7 @@ else:
     sf.write(f'{nbats}-bats_trajectory_simulation_{ref_order}-order-reflections.wav', sim_audio, fs)
 
 batxyz_df.to_csv('multibat_xyz_emissiontime.csv')
+
+pd.DataFrame(array_geom, columns=['x','y','z']).to_csv('multibat_sim_micarray.csv')
 
 
