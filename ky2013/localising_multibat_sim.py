@@ -31,13 +31,15 @@ kwargs = {'nchannels':nchannels,
           'vsound' : 343.0, 
           'no_neg':False}
 kwargs['max_loop_residual'] = 0.25e-4
-kwargs['K'] = 4
+kwargs['K'] = 10
 dd = np.max(distance_matrix(array_geom, array_geom))/343  
 dd_samples = int(kwargs['fs']*dd)
 
-start_samples = np.arange(1920,array_audio.shape[0], 96)
+ignorable_start = int(0.01*fs)
+shift_samples = 96
+start_samples = np.arange(ignorable_start,array_audio.shape[0], shift_samples)
 end_samples = start_samples+dd_samples
-max_inds = 90
+max_inds = int(0.2*fs/shift_samples)
 start = time.perf_counter_ns()
 all_candidates = []
 
@@ -59,20 +61,22 @@ import trackpy as tp
 all_frames = pd.concat(all_candidates).reset_index(drop=True)
 #coarse_good_positions = all_frames[abs(all_frames['x'])<20]
 valid_rows = np.tile(True, all_frames.shape[0])
-for axis in ['x','y','z']:
-    satisfying_rows = np.logical_and(all_frames[axis]<=4,
+
+room_dim = [4, 9, 3]
+for ax_lim, axis in zip(room_dim, ['x','y','z']):
+    satisfying_rows = np.logical_and(all_frames[axis]<=ax_lim,
                                              all_frames[axis]>0)
     valid_rows *= satisfying_rows
 coarse_positions = all_frames[valid_rows]
 # also filter by good tdoa residual
-tdoa_filtered = coarse_positions[coarse_positions['tdoa_resid_s']<1e-3].reset_index(drop=True)
+tdoa_filtered = coarse_positions[coarse_positions['tdoa_resid_s']<1.5e-3].reset_index(drop=True)
 
 #%% 
 # Run DBSCAN to reduce the number of tracked points per frame!
 filtered_by_frame = tdoa_filtered.groupby('frame')
 
 all_dbscanned = []
-for framenum, subdf in filtered_by_frame:
+for framenum, subdf in tqdm.tqdm(filtered_by_frame):
     dbscanned, std = dbscan_cluster(subdf, dbscan_eps=0.2, n_points=1)
     dbscanned_points = pd.DataFrame(data=[], index=range(len(dbscanned)),
                                                          columns=['x','y','z','frame'])
@@ -85,10 +89,10 @@ linked = tp.link_df(all_dbscanned, search_range=0.2, pos_columns=['x','y','z'], 
 # Keep only those particles that have been seen in at least 3 frames:
 persistent_particles = []
 for p_id, subdf in linked.groupby('particle'):
-    if subdf.shape[0] >=2:
+    if subdf.shape[0] >=int(fs*0.004/shift_samples):
         persistent_particles.append(subdf)
 all_persistent = pd.concat(persistent_particles).reset_index(drop=True)
-all_persistent['t_sec'] = all_persistent['frame']*0.5e-3
+all_persistent['t_sec'] = ignorable_start/fs + all_persistent['frame']*0.5e-3
 avged_positions = []
 for particle, subdf in all_persistent.groupby('particle'):
     xyz = subdf.loc[:,'x':'z'].to_numpy(dtype=np.float64)
@@ -109,7 +113,65 @@ for framenum, subdf in all_persistent.groupby('frame'):
     a0.set_zlim(0, 3)
     a0.view_init(18,-56)
     plt.tight_layout()
-    plt.title(f'frame: {framenum}', y=0.85)
+    time_s = np.around((framenum*shift_samples+ignorable_start)/fs, 4)
+    plt.title(f'frame: {framenum}, time: {time_s}', y=0.85)
     #plt.savefig(f'sources_by_frames_{framenum}.png')
     plt.pause(0.2)
 
+#%% Load the flight trajectory (in principle obtained from another sensor, e.g. thermal video)
+from scipy.interpolate import interp1d 
+
+bat_xyz = pd.read_csv('multibat_xyz_emissiontime.csv')
+# extra and intrapolate the data a bit. 
+interp_by_batnum = {}
+for batnum, subdf in bat_xyz.groupby('batnum'):
+    interp_by_batnum[batnum] = [interp1d(subdf['t'],subdf[axis]) for axis in ['x','y','z']]
+
+def interpolate_by_batnum(t, batnum, interp_dict):
+    x, y, z = [interp_dict[batnum][i](t) for i in range(3)]
+    return np.array([x,y,z])
+# interpolate at every 0.5 ms between start and end time of trajectory
+interp_trajectories = []
+for batnum, subdf in bat_xyz.groupby('batnum'):
+    t = subdf['t'].tolist()
+    t_extended = np.arange(t[0], t[-1], 0.5e-3)
+    interp_xyz = np.array([interpolate_by_batnum(step, batnum, interp_by_batnum) for step in t_extended])
+    # add some noise already here
+    interp_xyz += np.random.normal(0,0.05,interp_xyz.size).reshape(interp_xyz.shape)
+    interp_traj_batnum = pd.DataFrame(data=interp_xyz, columns=['x','y','z'])
+    interp_traj_batnum['t'] = t_extended
+    interp_traj_batnum['batnum'] = batnum
+    interp_trajectories.append(interp_traj_batnum)
+interp_trajectories = pd.concat(interp_trajectories).reset_index(drop=True)
+
+#%%
+# Now let's try to align the video interpolated trajectories with the unlabelled
+# acoustic source coordinates. We can simplify the problem by assuming that the
+# call reaches within Delta time of the emission time. This means, broadly calculating
+# the expected bat-array distance and then filtering out all sources that were detected 
+# after that time point. 
+
+particle_to_traj = {}
+for particle, subdf in all_persistent.groupby('particle'):
+    emission_xyz = subdf.loc[:,['x','y','z']].to_numpy(dtype=np.float64)
+    average_emission = np.median(emission_xyz, 0)
+    t_detection = np.min(subdf['t_sec'])
+    # find all potential trajectories that are within 30 cm of the source, if
+    # and -30 ms of emission detection time. 
+    valid_window = np.logical_and(interp_trajectories['t'] < t_detection,
+                                  interp_trajectories['t'] >= t_detection - 0.03)
+    close_in_time = interp_trajectories[valid_window].reset_index(drop=True)
+    # find all points that are close-by in space - within ~0.3 m
+    traj_xyz = close_in_time.loc[:,['x','y','z']].to_numpy(dtype=np.float64)
+    dist_mat = distance_matrix(traj_xyz,
+                               average_emission.reshape(1,3))
+    space_close = close_in_time[dist_mat < 0.3]
+    particle_to_traj[particle] = []
+    for batnum, subdf in space_close.groupby('batnum'):
+        # append the first trajectory point as the start of the call emission.
+        particle_to_traj[particle].append(subdf.loc[np.min(subdf.index),:])
+# keep only those particles with a trajectory associated to them. 
+matched_particle_trajs = {}
+for particle, trajs in particle_to_traj.items():
+    if len(trajs)>0:
+        matched_particle_trajs[particle] = trajs
