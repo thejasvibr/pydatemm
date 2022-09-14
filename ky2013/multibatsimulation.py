@@ -93,8 +93,9 @@ array_geom += np.random.choice(np.linspace(-0.01,0.01,20), array_geom.size).resh
 num_sources = int(np.random.choice(range(5,7),1)) # or overruled by the lines below.
 random = False
 
+all_calldurns = []
 for batnum in range(nbats):
-    call_durn = float(choose(np.linspace(5e-3,7e-3,20),1))
+    call_durn = float(choose(np.linspace(5e-3,7e-3,5),1))
     minf, maxf = float(choose([15000,20000,22000],1)), float(choose([88000, 89000, 92000],1))
     t_call = np.linspace(0,call_durn, int(fs*call_durn))
     call_type = str(choose(['logarithmic','linear','hyperbolic'], 1)[0])
@@ -103,6 +104,7 @@ for batnum in range(nbats):
     batcall *= 1/nbats
     for each, emission_delay in zip(bat_xyz[batnum], emission_times[batnum]):
         room.add_source(position=each, signal=batcall, delay=emission_delay)
+        all_calldurns.append(call_durn)
 
 room.add_microphone_array(array_geom.T)
 room.compute_rir()
@@ -130,6 +132,7 @@ if ray_tracing:
 else:
     sf.write(f'{nbats}-bats_trajectory_simulation_{ref_order}-order-reflections.wav', sim_audio, fs)
 
+batxyz_df['call_durn'] = all_calldurns
 batxyz_df.to_csv('multibat_xyz_emissiontime.csv')
 
 pd.DataFrame(array_geom, columns=['x','y','z']).to_csv('multibat_sim_micarray.csv')
