@@ -10,8 +10,11 @@ Created on Tue Sep 13 22:04:44 2022
 
 @author: theja
 """
-
+import pandas as pd
+from scipy.spatial import distance_matrix
 import soundfile as sf
+import time
+import tqdm
 import trackpy as tp
 from ky2013_fullsim_chain import *
 np.random.seed(82319)

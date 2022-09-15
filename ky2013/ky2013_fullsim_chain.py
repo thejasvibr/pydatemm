@@ -349,7 +349,3 @@ if __name__ == '__main__':
         plt.title(f'Clustered sources {t}-{t+int(1e3*dd_samples/fs)} ms', y = 0.85)
         plt.savefig(f'frame_{t}_plots_short.png')
         a0.clear()    
-    
-    
-    
-    

@@ -10,7 +10,7 @@ reflections.
 @author: theja
 """
 from pydatemm.localisation import spiesberger_wahlberg_solution
-from pydatemm.triple_generation import make_channel_pairs_from_triple
+#from pydatemm.triple_generation import make_channel_pairs_from_triple
 from itertools import combinations, product, chain
 import joblib
 from joblib import Parallel, delayed
@@ -19,8 +19,6 @@ import pandas as pd
 import numpy as np 
 import networkx as nx
 from scipy.spatial import distance_matrix
-from combineall import combine_all
-from joblib import Parallel, delayed
 seednum = 78464 # 8221, 82319, 78464
 #np.random.seed(seednum) # what works np.random.seed(82310)
 vsound = 343
@@ -236,8 +234,6 @@ def mic2source(sourcexyz, arraygeom):
                                  np.vstack((sourcexyz, arraygeom)))[1:,0]
     return mic_source
 
-
-
 def make_consistent_fls(multich_tdes, **kwargs):
     '''
 
@@ -258,21 +254,21 @@ def make_consistent_fls(multich_tdes, **kwargs):
     all_edges_fls = make_edges_for_fundamental_loops(kwargs['nchannels'])
     all_cfls = []
     reverse_chpair_peaks = {}
-    for chpair, peaks in multich_tdes.items():
-        if chpair[::-1] not in multich_tdes.keys():
-            rev_chpair = chpair[::-1]
-            rev_time_peaks = []
-            for each in peaks:
-                rev_time_peaks.append((each[0], -each[1], each[2]))
-            reverse_chpair_peaks[rev_chpair] = rev_time_peaks
-    reverse_chpair_peaks.update(multich_tdes)
+    #for chpair, peaks in multich_tdes.items():
+    #     if chpair[::-1] not in multich_tdes.keys():
+    #         rev_chpair = chpair[::-1]
+    #         rev_time_peaks = []
+    #         for each in peaks:
+    #             rev_time_peaks.append((each[0], -each[1], each[2]))
+    #         #reverse_chpair_peaks[rev_chpair] = rev_time_peaks
+    # reverse_chpair_peaks.update(multich_tdes)
     
     for fundaloop, edges in all_edges_fls.items():
         #print(fundaloop)
         a,b,c = fundaloop
-        ba_tdes = reverse_chpair_peaks[(b,a)]
-        ca_tdes = reverse_chpair_peaks[(c,a)]
-        cb_tdes = reverse_chpair_peaks[(c,b)]
+        ba_tdes = multich_tdes[(b,a)]
+        ca_tdes = multich_tdes[(c,a)]
+        cb_tdes = multich_tdes[(c,b)]
         abc_combinations = product(ba_tdes, ca_tdes, cb_tdes)
         for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
             if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
