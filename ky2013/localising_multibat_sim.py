@@ -16,7 +16,7 @@ import soundfile as sf
 import time
 import tqdm
 import trackpy as tp
-from ky2013_fullsim_chain import *
+from build_ccg import *
 np.random.seed(82319)
 #%%
 filename = '3-bats_trajectory_simulation_raytracing-2.wav'
@@ -59,6 +59,12 @@ for frame, df in enumerate(all_candidates):
 stop = time.perf_counter_ns()
 durn_s = (stop - start)/1e9
 print(f'Time for {max_inds} ms of audio analysis: {durn_s} s')
+
+#%%
+%load_ext line_profiler
+from ky2013_fullsim_chain import localise_sounds
+#%%
+
 #%%
 all_frames = pd.concat(all_candidates).reset_index(drop=True)
 #coarse_good_positions = all_frames[abs(all_frames['x'])<20]

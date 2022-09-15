@@ -198,9 +198,8 @@ def make_consistent_fls(multich_tdes, **kwargs):
     max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
     all_edges_fls = make_edges_for_fundamental_loops(kwargs['nchannels'])
     all_cfls = []
-   
+
     for fundaloop, edges in all_edges_fls.items():
-        #print(fundaloop)
         a,b,c = fundaloop
         ba_tdes = multich_tdes[(b,a)]
         ca_tdes = multich_tdes[(c,a)]

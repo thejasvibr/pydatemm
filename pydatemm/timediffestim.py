@@ -238,16 +238,16 @@ def get_multich_tdoas(multich_cc, **kwargs):
     '''
     multich_tdoas = {}
     for ch_pair, crosscor in multich_cc.items():
-        
-        max_delay_s = max_interch_delay(ch_pair, kwargs['array_geom'],
-                                        kwargs.get('vsound',343))
-        max_delay_samples = int(kwargs['fs']*max_delay_s)
+        # print(ch_pair)
+        # max_delay_s = max_interch_delay(ch_pair, kwargs['array_geom'],
+        #                                 kwargs.get('vsound',343))
+        # max_delay_samples = int(kwargs['fs']*max_delay_s)
         midpoint = int(crosscor.size*0.5)
-        start, stop = midpoint-max_delay_samples, midpoint + max_delay_samples
-        relevant_cc = crosscor[start:stop]
-        peaks_raw = np.array(get_peaks(relevant_cc, **kwargs))
-        peaks_raw += start
-        cc_delay_sec = np.array( peaks_raw - int(crosscor.size/2.0),
+        # start, stop = midpoint-max_delay_samples, midpoint + max_delay_samples
+        # relevant_cc = crosscor[start:stop]
+        peaks_raw = np.array(get_peaks(crosscor, **kwargs))
+        # peaks_raw += start
+        cc_delay_sec = np.array( peaks_raw - midpoint,
                                                               dtype=np.float64)
         cc_delay_sec /= np.float64(kwargs['fs']) # divide sample delay by sampling rate
         peak_values = crosscor[peaks_raw]

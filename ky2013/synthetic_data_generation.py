@@ -253,16 +253,7 @@ def make_consistent_fls(multich_tdes, **kwargs):
     max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
     all_edges_fls = make_edges_for_fundamental_loops(kwargs['nchannels'])
     all_cfls = []
-    reverse_chpair_peaks = {}
-    #for chpair, peaks in multich_tdes.items():
-    #     if chpair[::-1] not in multich_tdes.keys():
-    #         rev_chpair = chpair[::-1]
-    #         rev_time_peaks = []
-    #         for each in peaks:
-    #             rev_time_peaks.append((each[0], -each[1], each[2]))
-    #         #reverse_chpair_peaks[rev_chpair] = rev_time_peaks
-    # reverse_chpair_peaks.update(multich_tdes)
-    
+
     for fundaloop, edges in all_edges_fls.items():
         #print(fundaloop)
         a,b,c = fundaloop
