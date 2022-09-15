@@ -12,8 +12,9 @@ Created on Tue Sep 13 22:04:44 2022
 """
 
 import soundfile as sf
+import trackpy as tp
 from ky2013_fullsim_chain import *
-
+np.random.seed(82319)
 #%%
 filename = '3-bats_trajectory_simulation_raytracing-2.wav'
 fs = sf.info(filename).samplerate
@@ -30,8 +31,8 @@ kwargs = {'nchannels':nchannels,
           'min_peak_diff':0.35e-4, 
           'vsound' : 343.0, 
           'no_neg':False}
-kwargs['max_loop_residual'] = 0.25e-4
-kwargs['K'] = 10
+kwargs['max_loop_residual'] = 0.5e-4
+kwargs['K'] = 7
 dd = np.max(distance_matrix(array_geom, array_geom))/343  
 dd_samples = int(kwargs['fs']*dd)
 
@@ -52,12 +53,10 @@ for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds]))
 for frame, df in enumerate(all_candidates):
     df['frame'] = frame
 
-
 stop = time.perf_counter_ns()
 durn_s = (stop - start)/1e9
 print(f'Time for {max_inds} ms of audio analysis: {durn_s} s')
 #%%
-import trackpy as tp
 all_frames = pd.concat(all_candidates).reset_index(drop=True)
 #coarse_good_positions = all_frames[abs(all_frames['x'])<20]
 valid_rows = np.tile(True, all_frames.shape[0])
@@ -69,15 +68,14 @@ for ax_lim, axis in zip(room_dim, ['x','y','z']):
     valid_rows *= satisfying_rows
 coarse_positions = all_frames[valid_rows]
 # also filter by good tdoa residual
-tdoa_filtered = coarse_positions[coarse_positions['tdoa_resid_s']<1.5e-3].reset_index(drop=True)
+tdoa_filtered = coarse_positions[coarse_positions['tdoa_resid_s']<5e-4].reset_index(drop=True)
 
 #%% 
 # Run DBSCAN to reduce the number of tracked points per frame!
-filtered_by_frame = tdoa_filtered.groupby('frame')
 
 all_dbscanned = []
-for framenum, subdf in tqdm.tqdm(filtered_by_frame):
-    dbscanned, std = dbscan_cluster(subdf, dbscan_eps=0.2, n_points=1)
+for framenum, subdf in tqdm.tqdm(tdoa_filtered.groupby('frame')):
+    dbscanned, std = dbscan_cluster(subdf, dbscan_eps=0.5, n_points=1)
     dbscanned_points = pd.DataFrame(data=[], index=range(len(dbscanned)),
                                                          columns=['x','y','z','frame'])
     dbscanned_points.loc[:,'x':'z'] = np.array(dbscanned).reshape(-1,3)
@@ -85,38 +83,41 @@ for framenum, subdf in tqdm.tqdm(filtered_by_frame):
     all_dbscanned.append(dbscanned_points)
 
 all_dbscanned = pd.concat(all_dbscanned).reset_index(drop=True)
-linked = tp.link_df(all_dbscanned, search_range=0.2, pos_columns=['x','y','z'], memory=2)
+#%%
+linked = tp.link_df(all_dbscanned, search_range=0.3, pos_columns=['x','y','z'], memory=3)
+linked = linked.reset_index(drop=True)
+linked['t_sec'] = ignorable_start/fs + linked['frame']*0.5e-3
 # Keep only those particles that have been seen in at least 3 frames:
 persistent_particles = []
 for p_id, subdf in linked.groupby('particle'):
-    if subdf.shape[0] >=int(fs*0.004/shift_samples):
+    if subdf.shape[0] >=int(fs*0.001/shift_samples):
         persistent_particles.append(subdf)
 all_persistent = pd.concat(persistent_particles).reset_index(drop=True)
-all_persistent['t_sec'] = ignorable_start/fs + all_persistent['frame']*0.5e-3
+#all_persistent['t_sec'] = 
 avged_positions = []
 for particle, subdf in all_persistent.groupby('particle'):
     xyz = subdf.loc[:,'x':'z'].to_numpy(dtype=np.float64)
     xyz_avg = np.mean(xyz, 0)
     avged_positions.append(xyz_avg)
-#%%
-plt.figure()
-a0 = plt.subplot(111, projection='3d')
-for framenum, subdf in all_persistent.groupby('frame'):
-    a0.clear()
-    a0.plot(array_geom[:,0],array_geom[:,1], array_geom[:,2],'^')
-    #plt.plot(subdf['x'], subdf['y'], subdf['z'],'*')
-    for particle_id, subsubdf in subdf.groupby('particle'):
-        x,y,z = subsubdf.loc[:,'x':'z'].to_numpy(dtype=np.float64).flatten()
-        a0.text(x, y, z, str(particle_id))
-    a0.set_xlim(0, 4)
-    a0.set_ylim(0, 9)
-    a0.set_zlim(0, 3)
-    a0.view_init(18,-56)
-    plt.tight_layout()
-    time_s = np.around((framenum*shift_samples+ignorable_start)/fs, 4)
-    plt.title(f'frame: {framenum}, time: {time_s}', y=0.85)
-    #plt.savefig(f'sources_by_frames_{framenum}.png')
-    plt.pause(0.2)
+# #%%
+# plt.figure()
+# a0 = plt.subplot(111, projection='3d')
+# for framenum, subdf in all_persistent.groupby('frame'):
+#     a0.clear()
+#     a0.plot(array_geom[:,0],array_geom[:,1], array_geom[:,2],'^')
+#     #plt.plot(subdf['x'], subdf['y'], subdf['z'],'*')
+#     for particle_id, subsubdf in subdf.groupby('particle'):
+#         x,y,z = subsubdf.loc[:,'x':'z'].to_numpy(dtype=np.float64).flatten()
+#         a0.text(x, y, z, str(particle_id))
+#     a0.set_xlim(0, 4)
+#     a0.set_ylim(0, 9)
+#     a0.set_zlim(0, 3)
+#     a0.view_init(18,-56)
+#     plt.tight_layout()
+#     time_s = np.around((framenum*shift_samples+ignorable_start)/fs, 4)
+#     plt.title(f'frame: {framenum}, time: {time_s}', y=0.85)
+#     #plt.savefig(f'sources_by_frames_{framenum}.png')
+#     plt.pause(0.2)
 
 #%% Load the flight trajectory (in principle obtained from another sensor, e.g. thermal video)
 from scipy.interpolate import interp1d 
@@ -156,10 +157,16 @@ for particle, subdf in all_persistent.groupby('particle'):
     emission_xyz = subdf.loc[:,['x','y','z']].to_numpy(dtype=np.float64)
     average_emission = np.median(emission_xyz, 0)
     t_detection = np.min(subdf['t_sec'])
+    deltaT_nearestmic = distance_matrix(average_emission.reshape(1,3), array_geom).min()/343
+    #min_timedelay -= 3e-3 # error margin 
+    deltaT_furthestmic = distance_matrix(average_emission.reshape(1,3), array_geom).max()/343
+    #max_timedelay += 5e-3
     # find all potential trajectories that are within 30 cm of the source, if
     # and -30 ms of emission detection time. 
-    valid_window = np.logical_and(interp_trajectories['t'] < t_detection,
-                                  interp_trajectories['t'] >= t_detection - 0.03)
+    earliest_t_emission =  t_detection - deltaT_furthestmic #max_timedelay
+    latest_t_emission = t_detection - deltaT_nearestmic
+    valid_window = np.logical_and(interp_trajectories['t'] <= latest_t_emission + 3e-3,
+                                  interp_trajectories['t'] >= earliest_t_emission)
     close_in_time = interp_trajectories[valid_window].reset_index(drop=True)
     # find all points that are close-by in space - within ~0.3 m
     traj_xyz = close_in_time.loc[:,['x','y','z']].to_numpy(dtype=np.float64)
@@ -167,11 +174,34 @@ for particle, subdf in all_persistent.groupby('particle'):
                                average_emission.reshape(1,3))
     space_close = close_in_time[dist_mat < 0.3]
     particle_to_traj[particle] = []
-    for batnum, subdf in space_close.groupby('batnum'):
+    for batnum, subsubdf in space_close.groupby('batnum'):
         # append the first trajectory point as the start of the call emission.
-        particle_to_traj[particle].append(subdf.loc[np.min(subdf.index),:])
+        particle_to_traj[particle].append(subsubdf.loc[np.min(subsubdf.index),:])
 # keep only those particles with a trajectory associated to them. 
 matched_particle_trajs = {}
 for particle, trajs in particle_to_traj.items():
     if len(trajs)>0:
         matched_particle_trajs[particle] = trajs
+all_df = []
+for particle, trajs in matched_particle_trajs.items():
+    df = pd.DataFrame(data=trajs)
+    df['particle'] = particle
+    all_df.append(df)
+
+final_callpositions = pd.concat(all_df).sort_values(['batnum','t'])
+print(final_callpositions)
+#%%
+b0_c2 = bat_xyz.loc[3,'x':'z'].to_numpy(dtype=np.float64)
+xx = distance_matrix(all_persistent.loc[:,'x':'z'], b0_c2.reshape(1,3))
+xx.min()
+yy = distance_matrix(all_dbscanned.loc[:,'x':'z'], b0_c2.reshape(1,3))
+yy.min()
+
+zz = distance_matrix(linked.loc[:,'x':'z'], b0_c2.reshape(1,3))
+zz.min()
+
+pid = all_persistent.loc[np.argmin(xx),:]['particle']
+print(all_persistent.loc[np.argmin(xx),:])
+
+#%% 
+bxyz = bat_xyz[bat_xyz['t'] < np.max(all_frames['frame'])*0.5e-3+ignorable_start/fs]
