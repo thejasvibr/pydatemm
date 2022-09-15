@@ -82,7 +82,6 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
 def generate_candidate_sources(sim_audio, **kwargs):
     multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
     cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
-    #valid_tdoas = deepcopy(cc_peaks)
     
     K = kwargs.get('K',5)
     top_K_tdes = {}
@@ -95,12 +94,8 @@ def generate_candidate_sources(sim_audio, **kwargs):
             except:
                 pass
     print('making the cfls...')
-    cfls_from_tdes_raw = make_consistent_fls(top_K_tdes, **kwargs)
-    print(f'Length of cfls before set and listing: {len(cfls_from_tdes_raw)}')
-    print(f'first node pre set-ing: {nx.to_numpy_array(cfls_from_tdes_raw[0], weight="tde")}')
-    cfls_from_tdes = list(set(cfls_from_tdes_raw ))
-    print(f'Number of cFLs created post: {len(cfls_from_tdes)}')
-    print(f'first node post set-ing: {nx.to_numpy_array(cfls_from_tdes[0], weight="tde")}')
+    cfls_from_tdes = make_consistent_fls(top_K_tdes, **kwargs)
+    print(f'len of cfls: {len(cfls_from_tdes)}')
     # put all consistent loops into fundamental loop 'bins'
     all_fls = make_fundamental_loops(kwargs['nchannels'])
     cfls_by_fl = {}
@@ -118,15 +113,11 @@ def generate_candidate_sources(sim_audio, **kwargs):
         ccg_matrix = make_ccg_pll(cfls_from_tdes)
 
     solns_cpp = CCG_solutions(ccg_matrix)
-    print(f'Length of all solutions: {len(solns_cpp)}')
-    print(f'solns_cpp 5th element: {solns_cpp[4]}')
-    
-    # parts = joblib.cpu_count()
-    # split_solns = [solns_cpp[i::parts] for i in range(parts)]
-    # out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
-    # all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
-    # print(f'Number of solutions: {all_locs.shape[0]}')
-    return solns_cpp, cfls_from_tdes_raw
+    parts = joblib.cpu_count()
+    split_solns = (solns_cpp[i::parts] for i in range(parts))
+    out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
+    all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
+    return all_locs 
 
 def CCG_solutions(ccg_matrix):
     n_rows = ccg_matrix.shape[0]
@@ -208,9 +199,13 @@ if __name__ == '__main__':
     #for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds])):
         # audio_chunk = array_audio[st:en,:]
     import time
-    start = time.perf_counter_ns()
-    solns, soln_mat = generate_candidate_sources(audio_chunk, **kwargs)
-    solns2, soln_mat2 = generate_candidate_sources(audio_chunk, **kwargs)
-    print((time.perf_counter_ns()-start)/1e9 , ' s')
+    # start = time.perf_counter_ns()
+    # all_locs = generate_candidate_sources(audio_chunk, **kwargs)
+    # print(all_locs.shape)
+    # all_locs2 = generate_candidate_sources(audio_chunk, **kwargs)
+    # print(all_locs2.shape)
+    # print((time.perf_counter_ns()-start)/1e9 , ' s')
+    # generate_candidate_sources(audio_chunk, **kwargs)
     #%% 
-    
+    %load_ext line_profiler
+    %lprun -f generate_candidate_sources generate_candidate_sources(audio_chunk, **kwargs)

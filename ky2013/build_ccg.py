@@ -204,12 +204,11 @@ def make_consistent_fls(multich_tdes, **kwargs):
         ba_tdes = multich_tdes[(b,a)]
         ca_tdes = multich_tdes[(c,a)]
         cb_tdes = multich_tdes[(c,b)]
-        abc_combinations = product(ba_tdes, ca_tdes, cb_tdes)
+        abc_combinations = list(product(ba_tdes, ca_tdes, cb_tdes))
         for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
             if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
                 this_cfl = nx.ordered.Graph()
                 for e, tde in zip(edges, [tde1, tde2, tde3]):
-                    #print(e, tde)
                     this_cfl.add_edge(e[0], e[1], tde=tde[1])
-                    all_cfls.append(this_cfl)
+                all_cfls.append(this_cfl)
     return all_cfls
