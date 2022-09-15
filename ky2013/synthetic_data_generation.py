@@ -183,7 +183,23 @@ def ccg_definer(X,Y):
         relation = -1
     return relation
 
+# def make_ccg_matrix(cfls):
+        
+#     num_cfls = len(cfls)
+#     ccg = np.zeros((num_cfls, num_cfls), dtype='int32')
+#     cfl_ij = combinations(range(num_cfls), 2)
+#     for (i,j) in cfl_ij:
+#         trip1, trip2  = cfls[i], cfls[j]
+#         cc_out = ccg_definer(trip1, trip2)
+#         ccg[i,j] = cc_out; ccg[j,i] = cc_out
+#     return ccg
+
+
 def make_ccg_matrix(cfls):
+    '''
+    Sped up version. Previous version had explicit assignment of i,j and j,i
+    compatibilities.
+    '''
         
     num_cfls = len(cfls)
     ccg = np.zeros((num_cfls, num_cfls), dtype='int32')
@@ -191,9 +207,9 @@ def make_ccg_matrix(cfls):
     for (i,j) in cfl_ij:
         trip1, trip2  = cfls[i], cfls[j]
         cc_out = ccg_definer(trip1, trip2)
-        ccg[i,j] = cc_out; ccg[j,i] = cc_out
+        ccg[i,j] = cc_out
+    ccg += ccg.T
     return ccg
-
 
 def combine_compatible_triples(compatible_triples):
     combined = nx.compose_all(compatible_triples)
@@ -298,27 +314,31 @@ def make_ccg_pll(cfls, **kwargs):
 
 
 
-# if __name__ == '__main__':
-#     array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
-#     #array_geom = array_geom[:,:]
+if __name__ == '__main__':
+    array_geom = pd.read_csv('../pydatemm/tests/scheuing-yang-2008_micpositions.csv').to_numpy()
+    #array_geom = array_geom[:,:]
     
-#     nchannels = array_geom.shape[0]
-#     sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([8,-2.5,10])]
+    nchannels = array_geom.shape[0]
+    sources = [np.array([1,2,3]), np.array([5,0.5,-2]), np.array([8,-2.5,10])]
     
     
     
-#     mic2sources = [mic2source(each, array_geom) for each in sources]    
-#     delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
+    mic2sources = [mic2source(each, array_geom) for each in sources]    
+    delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
 
-#     for i,j in product(range(nchannels), range(nchannels)):
-#         for source_num, each in enumerate(delta_tdes):
-#             each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
-#             each[i,j] /= vsound
-#     #%%
-#     # Make the cfls now:
-#     cfls_s12 = [make_all_fundaloops_from_tdemat(deltatde) for deltatde in delta_tdes]
-#     print('Making CCG Matrix now...')
-#     ccg_s12 = [make_ccg_matrix(cfls_s) for cfls_s in cfls_s12]
+    for i,j in product(range(nchannels), range(nchannels)):
+        for source_num, each in enumerate(delta_tdes):
+            each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
+            each[i,j] /= vsound
+    #%%
+    # Make the cfls now:
+    import time
+    cfls_s12 = [make_all_fundaloops_from_tdemat(deltatde) for deltatde in delta_tdes]
+    print('Making CCG Matrix now...')
+    start1 = time.perf_counter_ns()
+    ccg_s12 = [make_ccg_matrix(cfls_s) for cfls_s in cfls_s12]
+    stop = time.perf_counter_ns()
+    print((stop-start1)/1e9)
 #     # qq1 = combine_all(ccg_s12[0], set(range(nchannels)), set([]), set([]))
 #     # qq2 = combine_all(ccg_s12[1], set(range(nchannels)), set([]), set([]))
 #     # And now let's combine the two cfls sets together and see how well it all
