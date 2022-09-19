@@ -14,12 +14,19 @@ import numpy as np
 import pandas as pd
 from build_ccg import *
 from pydatemm.timediffestim import generate_multich_crosscorr, get_multich_tdoas
-from pydatemm.localisation import spiesberger_wahlberg_solution
+from pydatemm.localisation import spiesberger_wahlberg_solution, choose_SW_valid_solution_tau51
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from pydatemm.tdoa_quality import residual_tdoa_error
 try:
     import cppyy 
+    cppyy.add_include_path('./eigen/')
+    cppyy.include('./localisation.cpp')
     cppyy.include('./combineall_cpp/ui_combineall.cpp')
+    MatrixXd = cppyy.gbl.Eigen.MatrixXd
+    VectorXd = cppyy.gbl.Eigen.VectorXd
+    MatrixXd = cppyy.gbl.Eigen.MatrixXd
+    VectorXd = cppyy.gbl.Eigen.VectorXd
+    
     vector_cpp = cppyy.gbl.std.vector
     set_cpp = cppyy.gbl.std.set
 except ImportError:
@@ -78,6 +85,29 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     localised_combined = pd.concat([localised_geq4_out, localised_4ch_out]).reset_index(drop=True).dropna()
     return localised_combined
 
+def cpp_spiesberger_wahlberg(array_geom_np, d_np, **kwargs):
+    mic0 = np.zeros((1,3))
+    if np.sum(array_geom_np[0,:]) != 0:
+        mic0 = array_geom_np[0,:]
+        array_geom_np -= array_geom_np[0,:]
+        
+    rows, cols = array_geom_np.shape
+    array_geom = MatrixXd(rows, cols)
+    for i in range(rows):
+        for j in range(cols):
+            array_geom[i,j] = array_geom_np[i,j]
+    
+    d = VectorXd(rows-1)
+    for i, value in enumerate(d_np):
+        d[i] = value
+    
+
+    solutions = cppyy.gbl.spiesberger_wahlberg_solution(array_geom, d, 343.0)
+    s = list(map(lambda X: np.array(list(X)), solutions))
+    valid_solution = choose_SW_valid_solution_tau51(s, array_geometry+mic0, d_np,
+                                                                      **kwargs)
+    return valid_solution
+    
 
 def generate_candidate_sources(sim_audio, **kwargs):
     multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
@@ -199,13 +229,11 @@ if __name__ == '__main__':
     #for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds])):
         # audio_chunk = array_audio[st:en,:]
     import time
-    # start = time.perf_counter_ns()
-    # all_locs = generate_candidate_sources(audio_chunk, **kwargs)
-    # print(all_locs.shape)
-    # all_locs2 = generate_candidate_sources(audio_chunk, **kwargs)
-    # print(all_locs2.shape)
-    # print((time.perf_counter_ns()-start)/1e9 , ' s')
+    start = time.perf_counter_ns()
+    all_locs = generate_candidate_sources(audio_chunk, **kwargs)
+    print((time.perf_counter_ns()-start)/1e9 , ' s')
+    all_locs.to_csv('np_outputs.csv')
     # generate_candidate_sources(audio_chunk, **kwargs)
     #%% 
-    %load_ext line_profiler
-    %lprun -f generate_candidate_sources generate_candidate_sources(audio_chunk, **kwargs)
+    # %load_ext line_profiler
+    # %lprun -f generate_candidate_sources generate_candidate_sources(audio_chunk, **kwargs)
