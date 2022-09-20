@@ -17,28 +17,24 @@ from pydatemm.timediffestim import generate_multich_crosscorr, get_multich_tdoas
 from pydatemm.localisation import spiesberger_wahlberg_solution, choose_SW_valid_solution_tau51
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from pydatemm.tdoa_quality import residual_tdoa_error
-#from joblib import wrap_non_picklable_objects
+from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
-#from joblib.externals.loky import set_loky_pickler
+from joblib.externals.loky import set_loky_pickler
 #set_loky_pickler('pickle')
 try:
     import cppyy 
     cppyy.add_include_path('./eigen/')
-    cppyy.include('./localisation.h')
-    MatrixXd = cppyy.gbl.Eigen.MatrixXd
-    VectorXd = cppyy.gbl.Eigen.VectorXd
+    cppyy.include('./localisation.h')    
     MatrixXd = cppyy.gbl.Eigen.MatrixXd
     VectorXd = cppyy.gbl.Eigen.VectorXd
     cppyy.include('./combineall_cpp/ui_combineall.cpp')
     vector_cpp = cppyy.gbl.std.vector
     set_cpp = cppyy.gbl.std.set
 except ImportError:
+    MatrixXd = cppyy.gbl.Eigen.MatrixXd
+    VectorXd = cppyy.gbl.Eigen.VectorXd
     vector_cpp = cppyy.gbl.std.vector
-    set_cpp = cppyy.gbl.std.set
-    MatrixXd = cppyy.gbl.Eigen.MatrixXd
-    VectorXd = cppyy.gbl.Eigen.VectorXd
-    MatrixXd = cppyy.gbl.Eigen.MatrixXd
-    VectorXd = cppyy.gbl.Eigen.VectorXd
+    set_cpp = cppyy.gbl.std.set  
     pass
 
 def localise_sounds(compatible_solutions, all_cfls, **kwargs):
@@ -47,6 +43,7 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     localised_4ch_out = pd.DataFrame(index=range(len(compatible_solutions)), 
                                  data=[], columns=['x','y','z','tdoa_resid_s','cfl_inds'])
     ii = 0
+    which_fn = kwargs.get('which_fun', 'numpy')
     for i, compat_cfl in enumerate(compatible_solutions):
         #print(f'i: {i}')
         if len(compat_cfl)>=2:
@@ -58,7 +55,7 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
             source_xyz = np.array([np.nan])
             if len(channels)>4:
                 try:
-                    source_xyz = cpp_spiesberger_wahlberg(kwargs['array_geom'][channels,:],
+                    source_xyz = function_choice[which_fn](kwargs['array_geom'][channels,:],
                                                            d)
                 except:
                     pass
@@ -112,10 +109,13 @@ def cpp_spiesberger_wahlberg(array_geom_np, d_np, **kwargs):
         d[i] = value
 
     solutions = cppyy.gbl.spiesberger_wahlberg_solution(array_geom, d, 343.0)
-    s = list(map(lambda X: np.array(list(X)), solutions))
+    s = list(map(lambda X: np.array(list(X))+mic0, solutions))
     valid_solution = choose_SW_valid_solution_tau51(s, array_geom_np+mic0, d_np,
                                                                       **kwargs)
     return valid_solution
+
+function_choice = {'numpy': spiesberger_wahlberg_solution,
+                   'cpp' : cpp_spiesberger_wahlberg}
 
 def generate_candidate_sources(sim_audio, **kwargs):
     multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
@@ -153,7 +153,7 @@ def generate_candidate_sources(sim_audio, **kwargs):
     solns_cpp = CCG_solutions(ccg_matrix)
     parts = joblib.cpu_count()
     split_solns = (solns_cpp[i::parts] for i in range(parts))
-    out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
+    out_dfs = Parallel(n_jobs=-1, backend='multiprocessing')(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
     all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
     return all_locs
 
@@ -229,16 +229,25 @@ start_samples = np.arange(ignorable_start,array_audio.shape[0], shift_samples)
 end_samples = start_samples+dd_samples
 max_inds = int(0.2*fs/shift_samples)
 
+#%%
 all_candidates = []
-i = 5
-audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-#for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds])):
-    # audio_chunk = array_audio[st:en,:]
 import time
-start = time.perf_counter_ns()
-all_locs = generate_candidate_sources(audio_chunk, **kwargs)
-print((time.perf_counter_ns()-start)/1e9 , ' s')
-all_locs.to_csv('np_outputs.csv')
+
+durations = {}
+for fn in ['numpy', 'cpp']:
+    each_fn = []
+    durations[fn] = []
+    start = time.perf_counter_ns()
+    for i in [4, 6, 8]:
+        audio_chunk = array_audio[start_samples[i]:end_samples[i]]
+        all_locs = generate_candidate_sources(audio_chunk, **kwargs)
+        each_fn.append(all_locs)
+    pd.concat(each_fn).reset_index(drop=True).to_csv(f'{fn}_output.csv')
+    #print((time.perf_counter_ns()-start)/1e9 , ' s')
+    total = (time.perf_counter_ns()-start)/1e9
+    print(f'{fn} version: {total} s')
+    durations[fn] = total
+
 # generate_candidate_sources(audio_chunk, **kwargs)
 #%% 
 # %load_ext line_profiler
