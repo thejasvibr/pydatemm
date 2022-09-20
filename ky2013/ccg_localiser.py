@@ -17,10 +17,10 @@ from pydatemm.timediffestim import generate_multich_crosscorr, get_multich_tdoas
 from pydatemm.localisation import spiesberger_wahlberg_solution, choose_SW_valid_solution_tau51
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from pydatemm.tdoa_quality import residual_tdoa_error
-from joblib import wrap_non_picklable_objects
+#from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
-from joblib.externals.loky import set_loky_pickler
-set_loky_pickler('pickle')
+#from joblib.externals.loky import set_loky_pickler
+#set_loky_pickler('pickle')
 try:
     import cppyy 
     cppyy.add_include_path('./eigen/')
