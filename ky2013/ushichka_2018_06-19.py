@@ -25,7 +25,9 @@ Recording
 The current audio recording has what seems to be multiple bats in it!
 """
 import soundfile as sf
-from ky2013_fullsim_chain import *
+import time, tqdm
+from ccg_localiser import *
+from scipy.spatial import distance_matrix
 
 array_geometry = pd.read_csv('../examples/array_geom_2018-06-19_onlymics.csv')
 array_geom = array_geometry.loc[:,'x':'z'].to_numpy()
