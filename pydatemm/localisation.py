@@ -64,6 +64,7 @@ def spiesberger_wahlberg_solution(array_geometry, d, **kwargs):
         mic1 = array_geometry[0,:]
         array_geometry = array_geometry - mic1
     else:
+        mic1 = np.zeros(3)
         mic1_notorigin = False
 
     # the receiver matrix- excluding the first channel.

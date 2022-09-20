@@ -11,7 +11,7 @@ using Eigen::Vector3f;
 using namespace std;
 
 
-vector<VectorXd> spiesberger_wahlberg_solution(MatrixXd array_geom, VectorXd d,  double c=343.0){
+std::vector<VectorXd> spiesberger_wahlberg_solution(MatrixXd array_geom, VectorXd d,  double c=343.0){
  /*
 
  @param array_geom MatrixXd (nmics, 3)
@@ -35,7 +35,7 @@ vector<VectorXd> spiesberger_wahlberg_solution(MatrixXd array_geom, VectorXd d, 
 
   tau = d/c;
   R = MatrixXd::Zero(array_geom.rows()-1, array_geom.cols());
-  vector<VectorXd> both_solutions;
+  std::vector<VectorXd> both_solutions;
   
   //Assign R to all data from row 1 onwards.
   for (int i=0; i < array_geom.rows()-1; i++){
@@ -67,9 +67,3 @@ vector<VectorXd> spiesberger_wahlberg_solution(MatrixXd array_geom, VectorXd d, 
   both_solutions.push_back(s2);
   return both_solutions;
 	}
-
-
-int main()
-{
-  return 0;
-}
