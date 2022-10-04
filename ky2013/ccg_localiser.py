@@ -19,27 +19,70 @@ from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from pydatemm.tdoa_quality import residual_tdoa_error
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
-from joblib.externals.loky import set_loky_pickler
-set_loky_pickler('pickle')
-try:
-    import cppyy 
-    cppyy.add_include_path('./eigen/')
-    cppyy.include('./localisation.h')
-    MatrixXd = cppyy.gbl.Eigen.MatrixXd
-    VectorXd = cppyy.gbl.Eigen.VectorXd
-    MatrixXd = cppyy.gbl.Eigen.MatrixXd
-    VectorXd = cppyy.gbl.Eigen.VectorXd
-    cppyy.include('./combineall_cpp/ui_combineall.cpp')
-    vector_cpp = cppyy.gbl.std.vector
-    set_cpp = cppyy.gbl.std.set
-except ImportError:
-    vector_cpp = cppyy.gbl.std.vector
-    set_cpp = cppyy.gbl.std.set
-    MatrixXd = cppyy.gbl.Eigen.MatrixXd
-    VectorXd = cppyy.gbl.Eigen.VectorXd
-    MatrixXd = cppyy.gbl.Eigen.MatrixXd
-    VectorXd = cppyy.gbl.Eigen.VectorXd
-    pass
+
+import os 
+os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2'
+import cppyy 
+cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
+cppyy.add_include_path('./eigen/')
+cppyy.include('./sw2002_vectorbased.h')
+cppyy.include('./combineall_cpp/ui_combineall.cpp')
+vector_cpp = cppyy.gbl.std.vector
+set_cpp = cppyy.gbl.std.set
+
+
+def cppyy_sw2002(micntde):
+    as_Vxd = cppyy.gbl.sw_matrix_optim(vector_cpp['double'](micntde.tolist()),
+                                       )
+    return np.array(as_Vxd, dtype=np.float64)
+
+def pll_cppyy_sw2002(many_micntde, num_cores, c):
+    block_in = vector_cpp[vector_cpp['double']](many_micntde.shape[0])
+    a = time.perf_counter_ns()/1e9
+    for i in range(many_micntde.shape[0]):
+        block_in[i] = vector_cpp['double'](many_micntde[i,:].tolist())
+    b = time.perf_counter_ns()/1e9
+    print(f'Vector assignment took: {b-a} s')
+    block_out = cppyy.gbl.pll_sw_optim(block_in, num_cores, c)
+    pred_sources = np.array([each for each in block_out])
+    return pred_sources
+
+def create_tde_data(compatible_solutions, all_cfls, **kwargs):
+    ''' Creates dictionary of 2D numpy arrays with 
+    Parameters
+    ----------
+    compatible_solutions :  list with sub-lists
+    all_cfls : list with nx.Graphs
+        Containing all the consistent fundamental loops
+    Keyword Args
+    ------------
+    vsound, array_geom
+    
+    Returns
+    -------
+    tde_by_channelnum : dict
+        Keys are number of channels, entries hold np.arrays of size
+        Mrows x (3*Nchannels + Nchannels-1)
+    '''
+    raw_tde_by_channelnum = {}
+    for i, compat_cfl in enumerate(compatible_solutions):
+        source_graph = combine_compatible_triples([all_cfls[j] for j in compat_cfl])
+        source_tde = nx.to_numpy_array(source_graph, weight='tde')
+        d = source_tde[1:,0]*kwargs['vsound']
+        channels = list(source_graph.nodes)
+        numchannels = len(channels)
+        tde_data = np.concatenate((kwargs['array_geom'][channels,:].flatten(), d))
+        if raw_tde_by_channelnum.get(numchannels) is None:
+            raw_tde_by_channelnum[numchannels] = []
+            raw_tde_by_channelnum[numchannels].append(tde_data)
+        else:
+            raw_tde_by_channelnum[numchannels].append(tde_data)
+    
+    tde_by_channelnum = {}
+    for nchannels, tde_data in raw_tde_by_channelnum.items():
+        tde_by_channelnum[nchannels] = np.row_stack(tde_data)
+    return tde_by_channelnum
+        
 
 def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     localised_geq4_out = pd.DataFrame(index=range(len(compatible_solutions)), 
@@ -92,31 +135,6 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     localised_combined = pd.concat([localised_geq4_out, localised_4ch_out]).reset_index(drop=True).dropna()
     return localised_combined
 
-def cpp_spiesberger_wahlberg(array_geom_np, d_np, **kwargs):
-    '''
-
-    '''
-    mic0 = np.zeros((1,3))
-    if np.sum(array_geom_np[0,:]) != 0:
-        mic0 = array_geom_np[0,:]
-        array_geom_np -= array_geom_np[0,:]
-
-    rows, cols = array_geom_np.shape
-    array_geom = MatrixXd(rows, cols)
-    for i in range(rows):
-        for j in range(cols):
-            array_geom[i,j] = array_geom_np[i,j]
-
-    d = VectorXd(rows-1)
-    for i, value in enumerate(d_np):
-        d[i] = value
-
-    solutions = cppyy.gbl.spiesberger_wahlberg_solution(array_geom, d, 343.0)
-    s = list(map(lambda X: np.array(list(X)), solutions))
-    valid_solution = choose_SW_valid_solution_tau51(s, array_geom_np+mic0, d_np,
-                                                                      **kwargs)
-    return valid_solution
-
 def generate_candidate_sources(sim_audio, **kwargs):
     multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
     cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
@@ -153,7 +171,7 @@ def generate_candidate_sources(sim_audio, **kwargs):
     solns_cpp = CCG_solutions(ccg_matrix)
     parts = joblib.cpu_count()
     split_solns = (solns_cpp[i::parts] for i in range(parts))
-    out_dfs = Parallel(n_jobs=-1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
+    out_dfs = Parallel(n_jobs=1)(delayed(localise_sounds)(comp_subset, cfls_from_tdes, **kwargs) for comp_subset in split_solns)
     all_locs = pd.concat(out_dfs).reset_index(drop=True).dropna()
     return all_locs
 
@@ -198,57 +216,57 @@ def dbscan_cluster(candidates, dbscan_eps, n_points):
         cluster_locns_mean.append(cluster_locn)
         cluster_locns_std.append(cluster_varn)
     return cluster_locns_mean, cluster_locns_std
-
-
-import soundfile as sf
-from scipy.spatial import distance_matrix
-
-filename = '3-bats_trajectory_simulation_raytracing-2.wav'
-fs = sf.info(filename).samplerate
-array_audio, fs = sf.read(filename, stop=int(0.2*fs))
-array_geom = pd.read_csv('multibat_sim_micarray.csv').to_numpy()[:,1:]
-
-nchannels = array_audio.shape[1]
-kwargs = {'nchannels':nchannels,
-          'fs':fs,
-          'array_geom':array_geom,
-          'pctile_thresh': 95,
-          'use_gcc':True,
-          'gcc_variant':'phat', 
-          'min_peak_diff':0.35e-4, 
-          'vsound' : 343.0, 
-          'no_neg':False}
-kwargs['max_loop_residual'] = 0.5e-4
-kwargs['K'] = 7
-dd = np.max(distance_matrix(array_geom, array_geom))/343  
-dd_samples = int(kwargs['fs']*dd)
-
-ignorable_start = int(0.01*fs)
-shift_samples = 96
-start_samples = np.arange(ignorable_start,array_audio.shape[0], shift_samples)
-end_samples = start_samples+dd_samples
-max_inds = int(0.2*fs/shift_samples)
-
-all_candidates = []
-i = 5
-audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-#for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds])):
-    # audio_chunk = array_audio[st:en,:]
-import time
-start = time.perf_counter_ns()
-all_locs = generate_candidate_sources(audio_chunk, **kwargs)
-print((time.perf_counter_ns()-start)/1e9 , ' s')
-all_locs.to_csv('np_outputs.csv')
-# generate_candidate_sources(audio_chunk, **kwargs)
-#%% 
-# %load_ext line_profiler
-# %lprun -f generate_candidate_sources generate_candidate_sources(audio_chunk, **kwargs)
-
-for i in range(20):
-    mic_posns, d = np.random.normal(0,1,21).reshape(-1,3), np.random.choice(np.linspace(-0.2,0.2,20), 6)
-    st = time.perf_counter_ns()
-    uu = cpp_spiesberger_wahlberg(mic_posns, d)
-    print(f'cpp {(time.perf_counter_ns()-st)/1e9} s')
-    st2 = time.perf_counter_ns()
-    vv = spiesberger_wahlberg_solution(mic_posns, d)
-    print(f'np: {(time.perf_counter_ns()-st)/1e9} s')
+#%%
+if __name__ == "__main__":
+    import soundfile as sf
+    from scipy.spatial import distance_matrix
+    
+    filename = '3-bats_trajectory_simulation_raytracing-2.wav'
+    fs = sf.info(filename).samplerate
+    array_audio, fs = sf.read(filename, stop=int(0.2*fs))
+    array_geom = pd.read_csv('multibat_sim_micarray.csv').to_numpy()[:,1:]
+    
+    nchannels = array_audio.shape[1]
+    kwargs = {'nchannels':nchannels,
+              'fs':fs,
+              'array_geom':array_geom,
+              'pctile_thresh': 95,
+              'use_gcc':True,
+              'gcc_variant':'phat', 
+              'min_peak_diff':0.35e-4, 
+              'vsound' : 343.0, 
+              'no_neg':False}
+    kwargs['max_loop_residual'] = 0.5e-4
+    kwargs['K'] = 7
+    dd = np.max(distance_matrix(array_geom, array_geom))/343  
+    dd_samples = int(kwargs['fs']*dd)
+    
+    ignorable_start = int(0.01*fs)
+    shift_samples = 96
+    start_samples = np.arange(ignorable_start,array_audio.shape[0], shift_samples)
+    end_samples = start_samples+dd_samples
+    max_inds = int(0.2*fs/shift_samples)
+    
+    all_candidates = []
+    i = 5
+    audio_chunk = array_audio[start_samples[i]:end_samples[i]]
+    #for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds])):
+        # audio_chunk = array_audio[st:en,:]
+    import time
+    start = time.perf_counter_ns()
+    all_locs = generate_candidate_sources(audio_chunk, **kwargs)
+    print((time.perf_counter_ns()-start)/1e9 , ' s')
+    all_locs.to_csv('np_outputs.csv')
+    # generate_candidate_sources(audio_chunk, **kwargs)
+    #%% 
+    # %load_ext line_profiler
+    # %lprun -f generate_candidate_sources generate_candidate_sources(audio_chunk, **kwargs)
+    
+    for i in range(20):
+        mic_posns, d = np.random.normal(0,1,21).reshape(-1,3), np.random.choice(np.linspace(-0.2,0.2,20), 6)
+        st = time.perf_counter_ns()
+        uu = cpp_spiesberger_wahlberg(mic_posns, d)
+        print(f'cpp {(time.perf_counter_ns()-st)/1e9} s')
+        st2 = time.perf_counter_ns()
+        vv = spiesberger_wahlberg_solution(mic_posns, d)
+        print(f'np: {(time.perf_counter_ns()-st)/1e9} s')

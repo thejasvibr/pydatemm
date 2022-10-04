@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyroomacoustics as pra
+from scipy.spatial import distance_matrix
 import scipy.signal as signal 
 from sklearn import cluster
 import time 
@@ -119,13 +120,13 @@ if __name__ == '__main__':
     import soundfile as sf
     sf.write(f'simaudio_reflection-order_{ref_order}.wav', sim_audio, samplerate=fs)
 
-    mic2sources = [mic2source(each, array_geom) for each in sources]    
-    delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
+    # mic2sources = [mic2source(each, array_geom) for each in sources]    
+    # delta_tdes = [np.zeros((nchannels, nchannels)) for each in range(len(mic2sources))]
     
-    for i,j in product(range(nchannels), range(nchannels)):
-        for source_num, each in enumerate(delta_tdes):
-            each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
-            each[i,j] /= vsound
+    # for i,j in product(range(nchannels), range(nchannels)):
+    #     for source_num, each in enumerate(delta_tdes):
+    #         each[i,j] = mic2sources[source_num][i]-mic2sources[source_num][j] 
+    #         each[i,j] /= vsound
     #%%
     kwargs = {'nchannels':nchannels,
               'fs':fs,
