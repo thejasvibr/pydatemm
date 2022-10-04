@@ -13,6 +13,7 @@ import networkx as nx
 import numpy as np 
 import pandas as pd
 from build_ccg import *
+from sklearn import cluster
 from pydatemm.timediffestim import generate_multich_crosscorr, get_multich_tdoas
 from pydatemm.localisation import spiesberger_wahlberg_solution, choose_SW_valid_solution_tau51
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
@@ -82,7 +83,6 @@ def create_tde_data(compatible_solutions, all_cfls, **kwargs):
     for nchannels, tde_data in raw_tde_by_channelnum.items():
         tde_by_channelnum[nchannels] = np.row_stack(tde_data)
     return tde_by_channelnum
-        
 
 def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     localised_geq4_out = pd.DataFrame(index=range(len(compatible_solutions)), 
@@ -101,7 +101,7 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
             source_xyz = np.array([np.nan])
             if len(channels)>4:
                 try:
-                    source_xyz = cpp_spiesberger_wahlberg(kwargs['array_geom'][channels,:],
+                    source_xyz = spiesberger_wahlberg_solution(kwargs['array_geom'][channels,:],
                                                            d)
                 except:
                     pass
@@ -138,7 +138,7 @@ def localise_sounds(compatible_solutions, all_cfls, **kwargs):
 def generate_candidate_sources(sim_audio, **kwargs):
     multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
     cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
-    
+
     K = kwargs.get('K',5)
     top_K_tdes = {}
     for ch_pair, tdes in cc_peaks.items():
@@ -216,10 +216,16 @@ def dbscan_cluster(candidates, dbscan_eps, n_points):
         cluster_locns_mean.append(cluster_locn)
         cluster_locns_std.append(cluster_varn)
     return cluster_locns_mean, cluster_locns_std
+<<<<<<< HEAD
 #%%
 if __name__ == "__main__":
     import soundfile as sf
     from scipy.spatial import distance_matrix
+=======
+
+if __name__ == "__main__":
+    import soundfile as sf
+>>>>>>> f3b3f9bbe2f54c42d03f4548593aa1a2b89781b1
     
     filename = '3-bats_trajectory_simulation_raytracing-2.wav'
     fs = sf.info(filename).samplerate
@@ -247,6 +253,7 @@ if __name__ == "__main__":
     end_samples = start_samples+dd_samples
     max_inds = int(0.2*fs/shift_samples)
     
+<<<<<<< HEAD
     all_candidates = []
     i = 5
     audio_chunk = array_audio[start_samples[i]:end_samples[i]]
@@ -270,3 +277,18 @@ if __name__ == "__main__":
         st2 = time.perf_counter_ns()
         vv = spiesberger_wahlberg_solution(mic_posns, d)
         print(f'np: {(time.perf_counter_ns()-st)/1e9} s')
+=======
+    #%%
+    import time
+    i = 4
+    audio_chunk = array_audio[start_samples[i]:end_samples[i]]
+    #all_locs = generate_candidate_sources(audio_chunk, **kwargs)
+    start = time.perf_counter_ns()
+    generate_candidate_sources(audio_chunk, **kwargs)
+    stop = time.perf_counter_ns()
+    print(f'{(stop-start)/1e9} seconds')
+    #%% 
+    # %load_ext line_profiler
+    # %lprun -f localise_sounds generate_candidate_sources(audio_chunk, **kwargs)
+    
+>>>>>>> f3b3f9bbe2f54c42d03f4548593aa1a2b89781b1

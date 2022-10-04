@@ -17,6 +17,7 @@ import time
 import tqdm
 import trackpy as tp
 from build_ccg import *
+from ccg_localiser import * 
 np.random.seed(82319)
 #%%
 filename = '3-bats_trajectory_simulation_raytracing-2.wav'
@@ -40,7 +41,7 @@ dd = np.max(distance_matrix(array_geom, array_geom))/343
 dd_samples = int(kwargs['fs']*dd)
 
 ignorable_start = int(0.01*fs)
-shift_samples = 96
+shift_samples = 384
 start_samples = np.arange(ignorable_start,array_audio.shape[0], shift_samples)
 end_samples = start_samples+dd_samples
 max_inds = int(0.2*fs/shift_samples)
@@ -60,10 +61,6 @@ stop = time.perf_counter_ns()
 durn_s = (stop - start)/1e9
 print(f'Time for {max_inds} ms of audio analysis: {durn_s} s')
 
-#%%
-%load_ext line_profiler
-from ky2013_fullsim_chain import localise_sounds
-#%%
 
 #%%
 all_frames = pd.concat(all_candidates).reset_index(drop=True)
