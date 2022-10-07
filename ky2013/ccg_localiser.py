@@ -64,8 +64,12 @@ def create_tde_data(compatible_solutions, all_cfls, **kwargs):
     tde_by_channelnum : dict
         Keys are number of channels, entries hold np.arrays of size
         Mrows x (3*Nchannels + Nchannels-1)
+    cfl_id : dict
+        Keys are channel numbers, entries are cFL index numbers. 
+        This dictionary helps with troubleshooting and error tracking.
     '''
     raw_tde_by_channelnum = {}
+    cfl_ids = {} # for troubleshooting and error tracing
     for i, compat_cfl in enumerate(compatible_solutions):
         source_graph = combine_compatible_triples([all_cfls[j] for j in compat_cfl])
         source_tde = nx.to_numpy_array(source_graph, weight='tde')
@@ -76,13 +80,25 @@ def create_tde_data(compatible_solutions, all_cfls, **kwargs):
         if raw_tde_by_channelnum.get(numchannels) is None:
             raw_tde_by_channelnum[numchannels] = []
             raw_tde_by_channelnum[numchannels].append(tde_data)
+            cfl_ids[numchannels] = []
+            cfl_ids[numchannels].append(compat_cfl)
         else:
             raw_tde_by_channelnum[numchannels].append(tde_data)
-    
+            cfl_ids[numchannels].append(compat_cfl)
     tde_by_channelnum = {}
     for nchannels, tde_data in raw_tde_by_channelnum.items():
         tde_by_channelnum[nchannels] = np.row_stack(tde_data)
-    return tde_by_channelnum
+    return tde_by_channelnum, cfl_ids
+
+def pll_create_tde_data(solns_cpp, all_cfls, **kwargs):
+    parts = os.cpu_count()
+    #split data into parts
+    split_solns = (solns_cpp[i::parts] for i in range(parts))
+    results = Parallel(n_jobs=parts)(delayed(create_tde_data)(chunk, all_cfls, **kwargs) for chunk in split_solns)
+    # join split data into single dictionaries
+    
+    for (tracking_dict, cflids) in results:
+        
 
 def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     localised_geq4_out = pd.DataFrame(index=range(len(compatible_solutions)), 
@@ -216,16 +232,11 @@ def dbscan_cluster(candidates, dbscan_eps, n_points):
         cluster_locns_mean.append(cluster_locn)
         cluster_locns_std.append(cluster_varn)
     return cluster_locns_mean, cluster_locns_std
-<<<<<<< HEAD
-#%%
-if __name__ == "__main__":
-    import soundfile as sf
-    from scipy.spatial import distance_matrix
-=======
 
 if __name__ == "__main__":
     import soundfile as sf
->>>>>>> f3b3f9bbe2f54c42d03f4548593aa1a2b89781b1
+    from scipy.spatial import distance_matrix
+
     
     filename = '3-bats_trajectory_simulation_raytracing-2.wav'
     fs = sf.info(filename).samplerate
@@ -253,31 +264,7 @@ if __name__ == "__main__":
     end_samples = start_samples+dd_samples
     max_inds = int(0.2*fs/shift_samples)
     
-<<<<<<< HEAD
-    all_candidates = []
-    i = 5
-    audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-    #for (st, en) in tqdm.tqdm(zip(start_samples[:max_inds], end_samples[:max_inds])):
-        # audio_chunk = array_audio[st:en,:]
-    import time
-    start = time.perf_counter_ns()
-    all_locs = generate_candidate_sources(audio_chunk, **kwargs)
-    print((time.perf_counter_ns()-start)/1e9 , ' s')
-    all_locs.to_csv('np_outputs.csv')
-    # generate_candidate_sources(audio_chunk, **kwargs)
-    #%% 
-    # %load_ext line_profiler
-    # %lprun -f generate_candidate_sources generate_candidate_sources(audio_chunk, **kwargs)
-    
-    for i in range(20):
-        mic_posns, d = np.random.normal(0,1,21).reshape(-1,3), np.random.choice(np.linspace(-0.2,0.2,20), 6)
-        st = time.perf_counter_ns()
-        uu = cpp_spiesberger_wahlberg(mic_posns, d)
-        print(f'cpp {(time.perf_counter_ns()-st)/1e9} s')
-        st2 = time.perf_counter_ns()
-        vv = spiesberger_wahlberg_solution(mic_posns, d)
-        print(f'np: {(time.perf_counter_ns()-st)/1e9} s')
-=======
+
     #%%
     import time
     i = 4
@@ -291,4 +278,3 @@ if __name__ == "__main__":
     # %load_ext line_profiler
     # %lprun -f localise_sounds generate_candidate_sources(audio_chunk, **kwargs)
     
->>>>>>> f3b3f9bbe2f54c42d03f4548593aa1a2b89781b1
