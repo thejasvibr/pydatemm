@@ -87,10 +87,8 @@ VectorXd choose_correct_solution(VectorXd both_solutions, const VectorXd &ranged
 	else if (residuals[1] < residuals[0]){
 		return solution2;
 	} else if (residuals[0] == residuals[1]){
-		//std::cout << "Rangediff "<< rangediff.transpose() << std::endl;
-		//throw std::invalid_argument( "BOTH RESIDUALS ARE EQUAL!!" );
-		// BAD PRACTICE - BUT PUTTING IT NOW SO MY CODE CALLS DON'T ALWAYS CRASH COMPLETELY!
-		return to_VXd(vector<double>{-999,-999,-999});
+		return Vector3d({-999, -999, -999});
+		//throw std::invalid_argument( "Cannot choose between SW solutions -  maybe input array has <=4 channels?" );
 	}
 	}
 
@@ -122,66 +120,51 @@ vector<double> sw_matrix_optim(const vector<double> &mic_ntde_raw, const double 
     VectorXd g(nmics-1);
     VectorXd tau(nmics-1);
 	VectorXd s1(3),s2(3);
-    long long int position_inds = nmics*3;
-	VectorXd mic0 = mic_ntde.head(3);
-	tau = mic_ntde.tail(nmics-1)/c;
-	MatrixXd R(nmics-1,3);
-	MatrixXd R_inv(3, nmics-1);
-	ArithmeticSequence< long long int, long long int, long long int > starts = seq(3, position_inds-3, 3);
-	ArithmeticSequence< long long int, long long int, long long int > stops = seq(5, position_inds-1, 3);
-	for (long long int i=0; i<starts.size(); i++){
-		mic_ntde(seq(starts[i],stops[i])) +=  -mic0;
-		}
+
+    int position_inds = nmics*3;  
+   	VectorXd mic0 = mic_ntde.head(3);
+   	tau = mic_ntde.tail(nmics-1)/c;
+   	MatrixXd R(nmics-1,3);
+   	MatrixXd R_inv(3, nmics-1);
+   	ArithmeticSequence starts = seq(3, position_inds-3, 3);
+   	ArithmeticSequence stops = seq(5, position_inds-1, 3);
+   	for (int i=0; i<starts.size(); i++){
+   		mic_ntde(seq(starts[i],stops[i])) +=  -mic0;
+   		}
+    		
 	R = mic_ntde(seq(3,position_inds-1)).reshaped(3,nmics-1).transpose();
-	
 	MatrixXd Eye(R.rows(),R.rows());
     Eye = MatrixXd::Zero(R.rows(), R.rows());
     Eye.diagonal() = VectorXd::Ones(R.rows());
 	
-    //R_inv = R.colPivHouseholderQr().solve(Eye);
-	//double epsilon = std::numeric_limits<double>::epsilon();
-	//acobiSVD<MatrixXd> svd; // thanks https://gist.github.com/pshriwise/67c2ae78e5db3831da38390a8b2a209f
-	//R_inv = svd.compute(R, ComputeThinU | ComputeThinV).solve(Eye); // thanks https://stackoverflow.com/a/72753193/4955732
-	//std::cout << R_inv << std::endl; 
-	R_inv = R.fullPivHouseholderQr().solve(Eye);
-	//R_inv = R.completeOrthogonalDecomposition().pseudoInverse();
-    //R_inv = R.jacobiSvd().solve(Eye);
-	//R_inv = pseudoInverse(R);
+    
+    R_inv = R.fullPivHouseholderQr().solve(Eye);
 	
 	for (int i=0; i < nmics-1; i++){
-	b(i) = pow(R.row(i).norm(),2) - pow(c*tau(i),2);
-	f(i) = (c*c)*tau(i);
-	g(i) = 0.5*(c*c-c*c);  
+		b(i) = pow(R.row(i).norm(),2) - pow(c*tau(i),2);
+		f(i) = (c*c)*tau(i);
+		g(i) = 0.5*(c*c-c*c);  
   	}
     a1 = (R_inv*b).transpose()*(R_inv*b);
     a2 = (R_inv*b).transpose()*(R_inv*f);
-	//std::cout << "\n \n Rinv*f: " << R_inv*f << std::endl;
     a3 = (R_inv*f).transpose()*(R_inv*f);
-	//std::cout << "many_u:" << mic_ntde_raw_vx.head(15) << std::endl;
-	//std::cout << "Rinv " << R_inv << std::endl;
-	//std::cout<< "a1,2,3 "<< a1<< ", "<<a2<< ", "<<a3<<std::endl; 
-    a_quad = a3 - pow(c,2);
+	a_quad = a3 - pow(c,2);
     b_quad = -1.0*a2;
     c_quad = a1/4.0;
-	//std::cout << "a_quad" << a_quad << " b_quad " << b_quad << "c_quad" << c_quad << std::endl;	
-	//std::cout << "yy_pt1: " << pow(b_quad,2)<< " yy_pt2: " <<  4*a_quad*c_quad << std::endl;
-	//std::cout << "yy_pt1-pt2: " << pow(b_quad,2)-4*a_quad*c_quad << std::endl;
-	//std::cout<< "Potential: " << std::setprecision(12) << yy << ",  "<< zz << "\n" <<std::endl;
-	
     t_soln1 = (-b_quad + sqrt(pow(b_quad,2) - 4*a_quad*c_quad))/(2*a_quad);
     t_soln2 = (-b_quad - sqrt(pow(b_quad,2) - 4*a_quad*c_quad))/(2*a_quad);	
-	//std::cout << a_quad << ", "<< b_quad << ", "<<c_quad << ", "<< t_soln1 << ", " << t_soln2 << std::endl;
-    solutions_vx(seq(0,2)) = R_inv*b*0.5 - (R_inv*f)*t_soln1;
+
+	solutions_vx(seq(0,2)) = R_inv*b*0.5 - (R_inv*f)*t_soln1;
 	solutions_vx(seq(0,2)) += mic0;
     solutions_vx(seq(3,5)) = R_inv*b*0.5 - (R_inv*f)*t_soln2;
 	solutions_vx(seq(3,5)) += mic0;
-	//std::cout << "Both Solutions" << solutions_vx << std::endl;
+
 	best_solution = choose_correct_solution(solutions_vx, tau*c,mic_ntde_raw_vx.head(nmics*3));
 	solution = to_vectdouble(best_solution);
 	return solution;
 }
 
-vector<vector<double>> pll_sw_optim(const vector<vector<double>> &all_inputs, const int &num_cores, double c=343.0){
+vector<vector<double>> pll_sw_optim(const vector<vector<double>> &all_inputs, double c=343.0){
 	/*
 	The non-block based parallel implementation. Lets OMP do all the chunking instead of doing it explicitly. 
 	*/
@@ -195,71 +178,3 @@ vector<vector<double>> pll_sw_optim(const vector<vector<double>> &all_inputs, co
 
 	return flattened_output;
 					}
-
-
-/*int main(){
-	std::cout << "starting" << std::endl;
-	
-	std::vector<double> qq {3.79879879879879,-1.11611611611611,-3.83883883883883,
-								-0.745745745745745,-0.525525525525525,4.12912912912912,
-								0.765765765765765,1.59659659659659,1.18618618618618,
-								-2.57757757757757,0.125125125125125,4.88988988988988,
-								-1.28628628628628,-4.78978978978978,-2.37737737737737,
-								-0.0905304146393017,-2.31630692205105,-0.244370170276845,-0.270533433265002
-								};
-								
-	 std::cout << " Nmics " << get_nmics(qq) << std::endl;						
-	//VectorXd mictde = to_VXd(qq);
-	/*
-	int n_mics = 5;
-	vector<double> output;
-	auto start = chrono::steady_clock::now();
-	output = sw_matrix_optim(qq, n_mics);
-	auto stop = chrono::steady_clock::now();
-	double durn1 = chrono::duration_cast<chrono::microseconds>(stop - start).count();
-	
-	for (auto ii : output){
-		std::cout << ii  << std::endl;
-	}
-	
-	// Now run the parallelised version 
-	int nruns = 10000;
-	vector<vector<double>> block_in(nruns);
-	vector<vector<double>> pll_out;
-	vector<int> block_nmics(block_in.size());
-	
-	std::cout << block_in.size() << std::endl;
-	for (int i=0; i < block_in.size(); i++){
-		block_in[i] = qq;
-		block_nmics[i] = n_mics;
-	}
-	// run the whole code without parallelism
-	std::cout << "Serial run starting... " << std::endl;
-	auto start1 = chrono::steady_clock::now(); 
-	vector<vector<double>> serial_out(nruns);
-	for (int i=0; i<nruns; i++){
-		serial_out[i] = sw_matrix_optim(qq, n_mics);
-	}
-	auto stop1 = chrono::steady_clock::now();
-	durn1 = chrono::duration_cast<chrono::microseconds>(stop1-start1).count();
-	std::cout << durn1 << " Serial s"<< std::endl;
-
-	// Now finally try to run the actual pll function
-	std::cout << "Parallel run starting... " << std::endl;
-	auto start2 = chrono::steady_clock::now();
-	pll_out = pll_sw_optim(block_in, block_nmics, 8, 343.0);
-	auto stop2 = chrono::steady_clock::now();
-	auto durn2 = chrono::duration_cast<chrono::microseconds>(stop2 - start2).count();
-	std::cout << durn2 << " FN pll s"<< std::endl;
-	
-	std::cout << "Obtained speedup: " << durn1/durn2 << std::endl;
-	
-	VectorXd corr_soln;
-	//corr_soln = choose_correct_solution(
-	MatrixXd reshaped = to_VXd(qq).head(15).reshaped(3,5).transpose();
-	VectorXd correct_soln;
-	VectorXd bothsoln, tau, micxyz;
-	bothsoln = to_VXd(serial_out[0]);
-	std::cout << "Both Solns " << bothsoln << std::endl;
-	
-	return 0;}*/
