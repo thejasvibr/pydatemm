@@ -27,8 +27,8 @@ import os
 try:
     os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2'
     import cppyy 
-    #cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
-    cppyy.load_library("/home/thejasvi/anaconda3/lib/libiomp5.so")
+    cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
+    #cppyy.load_library("/home/thejasvi/anaconda3/lib/libiomp5.so")
     cppyy.add_include_path('./eigen/')
     cppyy.include('./sw2002_vectorbased.h')
     cppyy.include('./combineall_cpp/ui_combineall.cpp')
@@ -47,16 +47,10 @@ def cppyy_sw2002(micntde):
     return np.array(as_Vxd, dtype=np.float64)
 
 def pll_cppyy_sw2002(many_micntde, c):
-    sta = time.perf_counter_ns()/1e9
     block_in = vector_cpp[vector_cpp['double']](many_micntde.shape[0])
-    a = time.perf_counter_ns()/1e9
     for i in range(many_micntde.shape[0]):
         block_in[i] = vector_cpp['double'](many_micntde[i,:])
-    b = time.perf_counter_ns()/1e9
     block_out = cppyy.gbl.pll_sw_optim(block_in, c)
-    sto = time.perf_counter_ns()/1e9
-    #print(f'Vector assignment took: {b-a} s')
-    #print(f'Fn itself took {sto-sta} s ')
     return np.array([each for each in block_out])
 
 def row_based_mpr2003(tde_data):
@@ -213,57 +207,6 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
     sources, cfl_ids = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)
     return sources, cfl_ids
 
-def localise_sounds(compatible_solutions, all_cfls, **kwargs):
-    localised_geq4_out = pd.DataFrame(index=range(len(compatible_solutions)), 
-                                 data=[], columns=['x','y','z','tdoa_resid_s','cfl_inds'])
-    localised_4ch_out = pd.DataFrame(index=range(len(compatible_solutions)), 
-                                 data=[], columns=['x','y','z','tdoa_resid_s','cfl_inds'])
-    ii = 0
-    for i, compat_cfl in enumerate(compatible_solutions):
-        #print(f'i: {i}')
-        if len(compat_cfl)>=2:
-            source_graph = combine_compatible_triples([all_cfls[j] for j in compat_cfl])
-            source_tde = nx.to_numpy_array(source_graph, weight='tde')
-            d = source_tde[1:,0]*kwargs['vsound']
-            channels = list(source_graph.nodes)
-            #print('channels', channels)
-            source_xyz = np.array([np.nan])
-            if len(channels)>4:
-                try:
-                    source_xyz = spiesberger_wahlberg_solution(kwargs['array_geom'][channels,:],
-                                                           d)
-                except:
-                    pass
-                if not np.sum(np.isnan(source_xyz))>0:
-                    localised_geq4_out.loc[i,'x':'z'] = source_xyz
-                    localised_geq4_out.loc[i,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
-                                                                        source_xyz,
-                                                                        kwargs['array_geom'][channels,:])
-                    localised_geq4_out.loc[i,'cfl_inds'] = str(compat_cfl)
-                
-            elif len(channels)==4:
-                source_xyz  = mellen_pachter_raquet_2003(kwargs['array_geom'][channels,:], d)
-                if not np.sum(np.isnan(source_xyz))>0:
-                    if np.logical_or(source_xyz.shape[0]==1,source_xyz.shape[0]==3):
-                        localised_4ch_out.loc[ii,'x':'z'] = source_xyz
-                        localised_4ch_out.loc[ii,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
-                                                                            source_xyz,
-                                                                            kwargs['array_geom'][channels,:])
-                        ii += 1
-
-                    elif source_xyz.shape[0]==2:
-                        for ss in range(2):
-                            localised_4ch_out.loc[ii,'x':'z'] = source_xyz[ss,:]
-                            localised_4ch_out.loc[ii,'tdoa_resid_s'] = residual_tdoa_error(source_graph,
-                                                                                source_xyz[ss,:],
-                                                                                kwargs['array_geom'][channels,:])
-                            ii += 1                    
-                    localised_4ch_out.loc[ii,'cfl_inds'] = str(compat_cfl)
-        else:
-            pass
-    localised_combined = pd.concat([localised_geq4_out, localised_4ch_out]).reset_index(drop=True).dropna()
-    return localised_combined
-
 def generate_candidate_sources(sim_audio, **kwargs):
     multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
     cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
@@ -367,7 +310,7 @@ if __name__ == "__main__":
               'vsound' : 343.0, 
               'no_neg':False}
     kwargs['max_loop_residual'] = 0.5e-4
-    kwargs['K'] = 7
+    kwargs['K'] = 5
     dd = np.max(distance_matrix(array_geom, array_geom))/343  
     dd_samples = int(kwargs['fs']*dd)
     
@@ -378,16 +321,11 @@ if __name__ == "__main__":
     max_inds = int(0.2*fs/shift_samples)
 
     #%%
-    i = 8
-    audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-    sta = time.perf_counter_ns()/1e9
-    aa,jj = generate_candidate_sources_v2(audio_chunk, **kwargs)
-    sto = time.perf_counter_ns()/1e9
-    print(f'{sto-sta} s time')
-    aa,jj = generate_candidate_sources_v2(audio_chunk, **kwargs)
-    #aa,jj = localise_sounds_v2(compatible_solutions, all_cfls, **kwargs)
-    # tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
+    import tqdm
+    for i in tqdm.trange(20):
+        audio_chunk = array_audio[start_samples[i]:end_samples[i]]
+        sta = time.perf_counter_ns()/1e9
+        aa,jj = generate_candidate_sources_v2(audio_chunk, **kwargs)
+        sto = time.perf_counter_ns()/1e9
+        print(f'{sto-sta} s time')
     
-    # nchannels = 8
-    # tde_input = tde_data[nchannels]
-    # calc_sources = pll_cppyy_sw2002(tde_input, kwargs['vsound'])

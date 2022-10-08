@@ -145,13 +145,6 @@ def plot_graph(G):
     nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
     
         
-    
-    
-    
-    
-    
-    
-
 def residual_position_error(true_pos, obtained_pos):
     '''
     Eqn. 31
@@ -197,6 +190,28 @@ def residual_tdoa_error(source_graph, source, array_geom, **kwargs):
     tdoa_resid /= np.sqrt(n_channels)
     return tdoa_resid
     
-    
-    
+        
+
+def residual_tdoa_error_nongraph(d, source, array_geom, **kwargs):
+    '''
+    Parameters
+    ----------
+    d : (Nchannels-1) np.array
+        Range differences
+    array_geom : (Nchannels,3) np.array
+    kwargs:
+        'c' : v of sound in m/s
+    '''
+    obs_d = d.copy()
+    n_channels = array_geom.shape[0]
+    source_array_dist = np.apply_along_axis(euclidean, 1, array_geom, source)
+    # the TDOA vector measured from data
+    obtained_n_tilde = source_array_dist[1:] - source_array_dist[0]
+    obtained_n_tilde /= kwargs.get('c', 343.0)
+    # tdoa residual 
+    obs_d /= kwargs.get('c', 343.0)
+    tdoa_resid = euclidean(obs_d, obtained_n_tilde)
+    tdoa_resid /= np.sqrt(n_channels)
+    return tdoa_resid
+
     

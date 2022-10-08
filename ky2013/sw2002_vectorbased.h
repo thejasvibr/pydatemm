@@ -8,6 +8,7 @@
 #include <cmath>
 #include <vector>
 #include <stdexcept>
+#include "tdoa_residual.h"
 #define EIGEN_DONT_PARALLELIZE
 
 	
@@ -92,7 +93,6 @@ VectorXd choose_correct_solution(VectorXd both_solutions, const VectorXd &ranged
 	}
 	}
 
-
 vector<double> sw_matrix_optim(const vector<double> &mic_ntde_raw, const double &c=343.0){
 	/*
 	
@@ -103,18 +103,21 @@ vector<double> sw_matrix_optim(const vector<double> &mic_ntde_raw, const double 
 	
 	*/
 	//std::cout<<"Miaow "<< std::endl;
+	VectorXd intermediate_out(4);
 	int nmics = get_nmics(mic_ntde_raw);
 	Vector3d best_solution;
-	VectorXd mic_ntde_raw_vx = to_VXd(mic_ntde_raw);
+	VectorXd mic_ntde_vx_raw = to_VXd(mic_ntde_raw); // without any subtraction
+	//VectorXd mic_ntde_raw_vx = to_VXd(mic_ntde_raw);
 	//std::cout << "\n" << std::endl;
 	//std::cout << std::setprecision(15) << "mic_ntde_raw " << mic_ntde_raw_vx << std::endl;
 	//std::cout << "\n" << std::endl;
 	VectorXd mic_ntde = to_VXd(mic_ntde_raw);
 	VectorXd solutions_vx(6);
-	vector<double> solution(3);
+	vector<double> solution(4);
 	double a1,a2,a3; 
     double a_quad,b_quad, c_quad;
     double t_soln1, t_soln2;
+	double tdoa_resid;
     VectorXd b(nmics-1);
     VectorXd f(nmics-1);
     VectorXd g(nmics-1);
@@ -159,8 +162,14 @@ vector<double> sw_matrix_optim(const vector<double> &mic_ntde_raw, const double 
     solutions_vx(seq(3,5)) = R_inv*b*0.5 - (R_inv*f)*t_soln2;
 	solutions_vx(seq(3,5)) += mic0;
 
-	best_solution = choose_correct_solution(solutions_vx, tau*c,mic_ntde_raw_vx.head(nmics*3));
-	solution = to_vectdouble(best_solution);
+	best_solution = choose_correct_solution(solutions_vx, tau*c, mic_ntde_vx_raw.head(nmics*3));
+	MatrixXd arraygeom(nmics,3);
+	arraygeom = mic_ntde_vx_raw(seq(0,3*nmics - 1)).reshaped(3,nmics).transpose();
+    std::cout << "di \n " << mic_ntde_vx_raw.tail(nmics-1) << "\n" << " best_soln \n" << best_solution << " array-geom \n" << arraygeom << std::endl;
+	intermediate_out(3) = residual_tdoa_error(mic_ntde_vx_raw.tail(nmics-1), best_solution, arraygeom, c);
+	std::cout << "tdoa resid \n " << tdoa_resid << "\n" << std::endl;
+	intermediate_out.head(3) = best_solution;
+	solution = to_vectdouble(intermediate_out);
 	return solution;
 }
 
