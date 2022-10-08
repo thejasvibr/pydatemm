@@ -59,8 +59,6 @@ def pll_cppyy_sw2002(many_micntde, c):
 def row_based_mpr2003(tde_data):
     nmics = get_nmics(tde_data.size())
     return mellen_pachter_raquet_2003(tde_data[:nmics*3].reshape(-1,3), tde_data[-(nmics-1):])
-def vector_based_mpr2003(tde_input):
-    all_inputs = []
 
 def create_tde_data(compatible_solutions, all_cfls, **kwargs):
     '''
@@ -137,20 +135,38 @@ def pll_create_tde_data(solns_cpp, all_cfls, **kwargs):
         channelwise_cflid[nchannels] = list(chain(*channelwise_cflid[nchannels]))
     return channelwise_tdedata, channelwise_cflid        
 
-
-
-
 def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
     '''
     '''
     tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
     sources = []
     ncores = os.cpu_count()
+    all_sources = []
+    all_cfls = []
     for (nchannels, tde_input) in tde_data.items():
         print(nchannels)
-        calc_sources = pll_cppyy_sw2002(tde_input, kwargs['vsound'])
-        if nchannels == 4:
-            print(calc_sources)
+        print(tde_input.shape)
+        
+        if nchannels > 4:
+            calc_sources = pll_cppyy_sw2002(tde_input, kwargs['vsound'])
+            all_sources.append(calc_sources)
+            all_cfls.append(cfl_ids[nchannels])
+        elif nchannels == 4:
+            for i in range(tde_input.shape[0]):
+                calc_sources = row_based_mpr2003(tde_input[i,:])
+                if calc_sources.shape[0]==2:
+                    all_sources.append(calc_sources[0,:])
+                    all_cfls.append(cfl_ids[nchannels][i])
+                    all_sources.append(calc_sources[1,:])
+                    all_cfls.append(cfl_ids[nchannels][i])
+                elif calc_sources.size==3:
+                    all_sources.append(calc_sources)
+                    all_cfls.append(cfl_ids[nchannels][i])
+                elif len(calc_sources) == 0:
+                    pass
+        else:
+            print(f'{nchannels} channels encountered - Ignoring...')
+    return np.row_stack(all_sources), list(chain(*all_cfls))
 
 def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     localised_geq4_out = pd.DataFrame(index=range(len(compatible_solutions)), 
