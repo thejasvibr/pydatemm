@@ -24,20 +24,25 @@ from joblib import Parallel, delayed
 import time
 
 import os 
-os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2'
-import cppyy 
-#cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
-cppyy.load_library("/home/thejasvi/anaconda3/lib/libiomp5.so")
-cppyy.add_include_path('./eigen/')
-cppyy.include('./sw2002_vectorbased.h')
-cppyy.include('./combineall_cpp/ui_combineall.cpp')
-vector_cpp = cppyy.gbl.std.vector
-set_cpp = cppyy.gbl.std.set
+try:
+    os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2'
+    import cppyy 
+    #cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
+    cppyy.load_library("/home/thejasvi/anaconda3/lib/libiomp5.so")
+    cppyy.add_include_path('./eigen/')
+    cppyy.include('./sw2002_vectorbased.h')
+    cppyy.include('./combineall_cpp/ui_combineall.cpp')
+    vector_cpp = cppyy.gbl.std.vector
+    set_cpp = cppyy.gbl.std.set
+except ImportError:
+    vector_cpp = cppyy.gbl.std.vector
+    set_cpp = cppyy.gbl.std.set
+    pass
 
 get_nmics = lambda X: int((X.size+1)/4)
 
 def cppyy_sw2002(micntde):
-    as_Vxd = cppyy.gbl.sw_matrix_optim(vector_cpp['double'](micntde.tolist()),
+    as_Vxd = cppyy.gbl.sw_matrix_optim(vector_cpp['double'](micntde),
                                        )
     return np.array(as_Vxd, dtype=np.float64)
 
@@ -46,25 +51,26 @@ def pll_cppyy_sw2002(many_micntde, c):
     block_in = vector_cpp[vector_cpp['double']](many_micntde.shape[0])
     a = time.perf_counter_ns()/1e9
     for i in range(many_micntde.shape[0]):
-        block_in[i] = vector_cpp['double'](many_micntde[i,:].tolist())
+        block_in[i] = vector_cpp['double'](many_micntde[i,:])
     b = time.perf_counter_ns()/1e9
-    
     block_out = cppyy.gbl.pll_sw_optim(block_in, c)
-    pred_sources = np.array([each for each in block_out])
     sto = time.perf_counter_ns()/1e9
-    print(f'Vector assignment took: {b-a} s')
-    print(f'Fn itself took {sto-sta} s ')
-    return pred_sources
+    #print(f'Vector assignment took: {b-a} s')
+    #print(f'Fn itself took {sto-sta} s ')
+    return np.array([each for each in block_out])
 
 def row_based_mpr2003(tde_data):
-    nmics = get_nmics(tde_data.size())
+    nmics = get_nmics(tde_data)
     return mellen_pachter_raquet_2003(tde_data[:nmics*3].reshape(-1,3), tde_data[-(nmics-1):])
 
 def create_tde_data(compatible_solutions, all_cfls, **kwargs):
     '''
-    Returns
-    -------
-    None.
+    Wrapper to decide if the serial or parallel version is used. 
+    
+    See Also
+    --------
+    chunk_create_tde_data
+    pll_create_tde_data
     '''
     if len(compatible_solutions) > 500:
         return pll_create_tde_data(compatible_solutions, all_cfls, **kwargs)
@@ -152,21 +158,60 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
             all_sources.append(calc_sources)
             all_cfls.append(cfl_ids[nchannels])
         elif nchannels == 4:
+            fourchannel_cflids= []
             for i in range(tde_input.shape[0]):
                 calc_sources = row_based_mpr2003(tde_input[i,:])
-                if calc_sources.shape[0]==2:
+                if calc_sources.size==6:
                     all_sources.append(calc_sources[0,:])
-                    all_cfls.append(cfl_ids[nchannels][i])
+                    fourchannel_cflids.append(cfl_ids[nchannels][i])
                     all_sources.append(calc_sources[1,:])
-                    all_cfls.append(cfl_ids[nchannels][i])
+                    fourchannel_cflids.append(cfl_ids[nchannels][i])
                 elif calc_sources.size==3:
                     all_sources.append(calc_sources)
-                    all_cfls.append(cfl_ids[nchannels][i])
+                    fourchannel_cflids.append(cfl_ids[nchannels][i])
                 elif len(calc_sources) == 0:
                     pass
+            all_cfls.append(fourchannel_cflids)
         else:
             print(f'{nchannels} channels encountered - Ignoring...')
     return np.row_stack(all_sources), list(chain(*all_cfls))
+
+def generate_candidate_sources_v2(sim_audio, **kwargs):
+    multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
+    cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
+
+    K = kwargs.get('K',5)
+    top_K_tdes = {}
+    for ch_pair, tdes in cc_peaks.items():
+        descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
+        top_K_tdes[ch_pair] = []
+        for i in range(K):
+            try:
+                top_K_tdes[ch_pair].append(descending_quality[i])
+            except:
+                pass
+    print('making the cfls...')
+    cfls_from_tdes = make_consistent_fls(top_K_tdes, **kwargs)
+    print(f'len of cfls: {len(cfls_from_tdes)}')
+    # put all consistent loops into fundamental loop 'bins'
+    all_fls = make_fundamental_loops(kwargs['nchannels'])
+    cfls_by_fl = {}
+    for fl in all_fls:
+        cfls_by_fl[fl] = []
+
+    for i,each in enumerate(cfls_from_tdes):
+        for fl in all_fls:
+            if set(each.nodes) == set(fl):
+                cfls_by_fl[fl].append(i)
+
+    if len(cfls_from_tdes) < 500:
+        ccg_matrix = make_ccg_matrix(cfls_from_tdes)
+    else:
+        ccg_matrix = make_ccg_pll(cfls_from_tdes)
+
+    solns_cpp = CCG_solutions(ccg_matrix)
+    sources, cfl_ids = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)
+    return sources, cfl_ids
 
 def localise_sounds(compatible_solutions, all_cfls, **kwargs):
     localised_geq4_out = pd.DataFrame(index=range(len(compatible_solutions)), 
@@ -333,55 +378,16 @@ if __name__ == "__main__":
     max_inds = int(0.2*fs/shift_samples)
 
     #%%
-    import time
-    i = 4
+    i = 8
     audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-    #all_locs = generate_candidate_sources(audio_chunk, **kwargs)
-    # start = time.perf_counter_ns()
-    # generate_candidate_sources(audio_chunk, **kwargs)
-    # stop = time.perf_counter_ns()
-    # print(f'{(stop-start)/1e9} seconds')
-    #%% 
-    sim_audio = audio_chunk.copy()
-    multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
-    cc_peaks = get_multich_tdoas(multich_cc, **kwargs)
-
-    K = kwargs.get('K',5)
-    top_K_tdes = {}
-    for ch_pair, tdes in cc_peaks.items():
-        descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
-        top_K_tdes[ch_pair] = []
-        for i in range(K):
-            try:
-                top_K_tdes[ch_pair].append(descending_quality[i])
-            except:
-                pass
-    print('making the cfls...')
-    cfls_from_tdes = make_consistent_fls(top_K_tdes, **kwargs)
-    print(f'len of cfls: {len(cfls_from_tdes)}')
-    # put all consistent loops into fundamental loop 'bins'
-    all_fls = make_fundamental_loops(kwargs['nchannels'])
-    cfls_by_fl = {}
-    for fl in all_fls:
-        cfls_by_fl[fl] = []
-
-    for i,each in enumerate(cfls_from_tdes):
-        for fl in all_fls:
-            if set(each.nodes) == set(fl):
-                cfls_by_fl[fl].append(i)
-
-    if len(cfls_from_tdes) < 500:
-        ccg_matrix = make_ccg_matrix(cfls_from_tdes)
-    else:
-        ccg_matrix = make_ccg_pll(cfls_from_tdes)
-
-    solns_cpp = CCG_solutions(ccg_matrix)
+    sta = time.perf_counter_ns()/1e9
+    aa,jj = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    sto = time.perf_counter_ns()/1e9
+    print(f'{sto-sta} s time')
+    aa,jj = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    #aa,jj = localise_sounds_v2(compatible_solutions, all_cfls, **kwargs)
+    # tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
     
-    from copy import deepcopy
-    compatible_solutions = deepcopy(solns_cpp)
-    all_cfls = deepcopy(cfls_from_tdes)
-    tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
-    
-    nchannels = 8
-    tde_input = tde_data[nchannels]
-    calc_sources = pll_cppyy_sw2002(tde_input, kwargs['vsound'])
+    # nchannels = 8
+    # tde_input = tde_data[nchannels]
+    # calc_sources = pll_cppyy_sw2002(tde_input, kwargs['vsound'])
