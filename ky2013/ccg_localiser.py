@@ -30,8 +30,8 @@ import os
 try:
     os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2'
     import cppyy 
-    cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
-    #cppyy.load_library("/home/thejasvi/anaconda3/lib/libiomp5.so")
+    #cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
+    cppyy.load_library("/home/thejasvi/anaconda3/lib/libiomp5.so")
     cppyy.add_include_path('./eigen/')
     cppyy.include('./sw2002_vectorbased.h')
     cppyy.include('./combineall_cpp/ui_combineall.cpp')
@@ -163,12 +163,14 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
     ncores = os.cpu_count()
     all_sources = []
     all_cfls = []
+    all_tdedata = []
     for (nchannels, tde_input) in tde_data.items():
        
         if nchannels > 4:
             calc_sources = pll_cppyy_sw2002(tde_input, kwargs['vsound'])
             all_sources.append(calc_sources)
             all_cfls.append(cfl_ids[nchannels])
+            all_tdedata.append(tde_input.tolist())
         elif nchannels == 4:
             fourchannel_cflids= []
             for i in range(tde_input.shape[0]):
@@ -176,17 +178,23 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
                 if calc_sources.size==6:
                     all_sources.append(calc_sources[0,:])
                     fourchannel_cflids.append(cfl_ids[nchannels][i])
+                    all_tdedata.append(tde_input.tolist())
                     all_sources.append(calc_sources[1,:])
                     fourchannel_cflids.append(cfl_ids[nchannels][i])
+                    all_tdedata.append(tde_input.tolist())
                 elif calc_sources.size==3:
                     all_sources.append(calc_sources)
                     fourchannel_cflids.append(cfl_ids[nchannels][i])
+                    all_tdedata.append(tde_input.tolist())
                 elif len(calc_sources) == 0:
                     pass
             all_cfls.append(fourchannel_cflids)
         else:
-            print(f'{nchannels} channels encountered - Ignoring...')
-    return np.row_stack(all_sources), list(chain(*all_cfls))
+            pass # if <4 channels encountered
+    if len(all_sources)>0:
+        return np.row_stack(all_sources), list(chain(*all_cfls)), list(chain(*all_tdedata))
+    else:
+        return np.array([]), [], []
 
 def generate_candidate_sources_v2(sim_audio, **kwargs):
     multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
@@ -210,20 +218,20 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
     cfls_by_fl = {}
     for fl in all_fls:
         cfls_by_fl[fl] = []
-
+    
     for i,each in enumerate(cfls_from_tdes):
         for fl in all_fls:
             if set(each.nodes) == set(fl):
                 cfls_by_fl[fl].append(i)
-
+    print('Making CCG matrix')
     if len(cfls_from_tdes) < 500:
         ccg_matrix = make_ccg_matrix(cfls_from_tdes)
     else:
         ccg_matrix = make_ccg_pll(cfls_from_tdes)
 
     solns_cpp = CCG_solutions(ccg_matrix)
-    sources, cfl_ids = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)
-    return sources, cfl_ids
+    sources, cfl_ids, tdedata = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)
+    return sources, cfl_ids, tdedata
 
 def generate_candidate_sources(sim_audio, **kwargs):
     multich_cc = generate_multich_crosscorr(sim_audio, **kwargs )
@@ -306,13 +314,13 @@ def dbscan_cluster(candidates, dbscan_eps, n_points):
         cluster_locns_mean.append(cluster_locn)
         cluster_locns_std.append(cluster_varn)
     return cluster_locns_mean, cluster_locns_std
-
+#%%
 if __name__ == "__main__":
     import soundfile as sf
     from scipy.spatial import distance_matrix
-
+    import multibatsimulation as multibat
     
-    filename = '3-bats_trajectory_simulation_raytracing-2.wav'
+    filename = '3-bats_trajectory_simulation_2-order-reflections.wav'
     fs = sf.info(filename).samplerate
     array_audio, fs = sf.read(filename, stop=int(0.2*fs))
     array_geom = pd.read_csv('multibat_sim_micarray.csv').to_numpy()[:,1:]
@@ -328,7 +336,7 @@ if __name__ == "__main__":
               'vsound' : 343.0, 
               'no_neg':False}
     kwargs['max_loop_residual'] = 0.5e-4
-    kwargs['K'] = 5
+    kwargs['K'] = 7
     dd = np.max(distance_matrix(array_geom, array_geom))/343  
     dd_samples = int(kwargs['fs']*dd)
     
@@ -337,12 +345,60 @@ if __name__ == "__main__":
     start_samples = np.arange(ignorable_start,array_audio.shape[0], shift_samples)
     end_samples = start_samples+dd_samples
     max_inds = int(0.2*fs/shift_samples)
-
     #%%
-    import tqdm
-    sta = time.perf_counter_ns()/1e9
-    for i in tqdm.trange(350):
-        audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-        aa,jj = generate_candidate_sources_v2(audio_chunk, **kwargs)
-    sto = time.perf_counter_ns()/1e9
-    print(f'{sto-sta} s time')    
+    i = 110
+    audio_chunk = array_audio[start_samples[i]:end_samples[i]]
+    #position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    %load_ext line_profiler
+    %lprun -f generate_candidate_sources_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
+    #%%
+    # import tqdm
+    # sta = time.perf_counter_ns()/1e9
+    
+    # all_frames = []
+    # all_tdedata = []
+    # for i in tqdm.trange(350):
+    #     audio_chunk = array_audio[start_samples[i]:end_samples[i]]
+    #     position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    #     if len(position_data)>0:
+    #         frame_data = pd.DataFrame(data=None, index=range(position_data.shape[0]),
+    #                                   columns=['frame_ind','x','y','z','tdoa_residual', 'cfl_ids'])
+    #         frame_data.loc[:,'x':'tdoa_residual'] = position_data
+    #         frame_data['cfl_ids'] = cfl_ids
+    #         frame_data.loc[:,'frame_ind'] = i
+    #         all_frames.append(frame_data)
+    #         all_tdedata.append(tdedata)
+    # all_frame_data = pd.concat(all_frames).reset_index(drop=True)
+    # all_tdedata = list(chain(*all_tdedata))
+    # sto = time.perf_counter_ns()/1e9
+    # print(f'\n {sto-sta} s time')    
+    # #%% Remove all -999 points and high tdoa residuals
+    # low_residuals = all_frame_data['tdoa_residual']<2e-3
+    # valid_positions = np.invert(all_frame_data['x']==-999.0)
+    # all_frame_data_filt = all_frame_data[np.logical_and(low_residuals, valid_positions)]
+    
+    # #%%
+    # # Check to see that all positions are being picked up. 
+    # simdata = pd.read_csv('multibat_xyz_emissiontime.csv')
+    # def error_calc(X,Y):
+    #     return np.apply_along_axis(euclidean, 1, X, Y)
+    # data_parts = np.array_split(all_frame_data_filt.loc[:,'x':'z'].to_numpy(dtype='float64'),
+    #                             os.cpu_count())
+
+    # for i in range(simdata.shape[0]):
+    #     pos1 = simdata.loc[i,'x':'z'].to_numpy()            
+    #     temission = simdata.loc[i,'t']
+    #     max_frame = int((21 + temission*1e3))
+    #     relevant_df = all_frame_data_filt[all_frame_data_filt['frame_ind']<max_frame]
+    #     data_parts = np.array_split(relevant_df.loc[:,'x':'z'].to_numpy(dtype='float64'),
+    #                                 os.cpu_count())
+    #     error = np.concatenate(Parallel(n_jobs=os.cpu_count())(delayed(error_calc)(chunk, pos1) for chunk in data_parts))
+    #     min_index = np.argmin(error)
+    #     position_df_index = all_frame_data_filt.index[min_index]
+    #     print('\n')
+    #     print(all_frame_data_filt.loc[position_df_index,:])
+    #     print(f'Original positions: {simdata.loc[i,:]}')
+        
+    # for each in position_df_index:
+    #     print(all_frame_data_filt.loc[each,['x','y','z','frame_ind']])
+    #     print(simdata.loc[0,['x','y','z','t']], '\n')

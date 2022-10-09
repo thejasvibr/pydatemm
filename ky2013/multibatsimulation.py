@@ -68,7 +68,7 @@ batxyz_df['batnum'] = [ batnum for batnum in range(nbats) for ee in range(ncalls
 fs = 192000
 ref_order = 2
 reflection_max_order = ref_order
-ray_tracing = True
+ray_tracing = False
 
 rt60_tgt = 0.2  # seconds
 e_absorption, max_order = pra.inverse_sabine(rt60_tgt, room_dims)
@@ -79,14 +79,14 @@ room = pra.ShoeBox(
     ray_tracing=ray_tracing,
     air_absorption=True)
 
-array_geom = np.array(([3, 9, 1.5],
-                      [2.5, 9, 1],
-                      [2, 9, 1.5],
-                      [1.5, 9,1],
-                      [1.0, 9, 1.5],
-                      [0, 8, 2.0],
-                      [0, 8, 1.5],
-                      [0, 7, 2.0],
+array_geom = np.array(([3, 8.9, 1.5],
+                      [2.5, 8.9, 1],
+                      [2, 8.9, 1.5],
+                      [1.5, 8.9,1],
+                      [1.0, 8.9, 1.5],
+                      [0.01, 8, 2.0],
+                      [0.01, 8, 1.5],
+                      [0.01, 7, 2.0],
                       )
                       )
 array_geom += np.random.choice(np.linspace(-0.01,0.01,20), array_geom.size).reshape(array_geom.shape)
@@ -114,17 +114,7 @@ print('room simultation ended...')
 sim_audio = room.mic_array.signals.T
 
 
-#%% 
-plt.figure()
-a0 = plt.subplot(111, projection='3d')
-plt.plot(array_geom[:,0], array_geom[:,1], array_geom[:,2], '*')
-for each in bat_xyz:
-    plt.plot(each[:,0], each[:,1], each[:,2], '*')
 
-plt.xlim(0,room_dims[0])
-plt.ylim(0,room_dims[1])
-
-a0.set_zlim(0,room_dims[2])
 
 #%%
 if ray_tracing:
@@ -137,4 +127,15 @@ batxyz_df.to_csv('multibat_xyz_emissiontime.csv')
 
 pd.DataFrame(array_geom, columns=['x','y','z']).to_csv('multibat_sim_micarray.csv')
 
+if __name__ == "__main__":
+    #%% 
+    plt.figure()
+    a0 = plt.subplot(111, projection='3d')
+    plt.plot(array_geom[:,0], array_geom[:,1], array_geom[:,2], '*')
+    for each in bat_xyz:
+        plt.plot(each[:,0], each[:,1], each[:,2], '*')
 
+    plt.xlim(0,room_dims[0])
+    plt.ylim(0,room_dims[1])
+
+    a0.set_zlim(0,room_dims[2])

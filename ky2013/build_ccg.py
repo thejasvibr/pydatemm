@@ -11,6 +11,7 @@ import joblib
 from joblib import Parallel, delayed
 import numpy as np 
 import networkx as nx
+import time
 
 def make_fundamental_loops(nchannels):
     G = nx.complete_graph(nchannels)
@@ -169,12 +170,17 @@ def make_ccg_pll(cfls, **kwargs):
     '''Parallel version of make_ccg_matrix'''
     num_cores = kwargs.get('num_cores', joblib.cpu_count())
     num_cfls = len(cfls)
+    print('Miaow')
     cfl_ij_parts = [list(combinations(range(num_cfls), 2))[i::num_cores] for i in range(num_cores)]
-    compatibility = Parallel(n_jobs=num_cores)(delayed(get_compatibility)(cfls, ij_parts)for ij_parts in cfl_ij_parts)
+    compatibility = Parallel(n_jobs=-1)(delayed(get_compatibility)(cfls, ij_parts)for ij_parts in cfl_ij_parts)
     ccg = np.zeros((num_cfls, num_cfls), dtype='int32')
+    print('assigning:')
+    sta = time.perf_counter_ns()
     for (ij_parts, compat_ijparts) in zip(cfl_ij_parts, compatibility):
         for (i,j), (comp_val) in zip(ij_parts, compat_ijparts):
             ccg[i,j] = comp_val
+    sto = time.perf_counter_ns()
+    print('done assigning: - took: {(sto-sta)/1e9}')
     # make symmetric
     ccg += ccg.T
     return ccg
