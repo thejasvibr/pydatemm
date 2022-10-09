@@ -30,8 +30,8 @@ import os
 try:
     os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2'
     import cppyy 
-    #cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
-    cppyy.load_library("/home/thejasvi/anaconda3/lib/libiomp5.so")
+    cppyy.load_library('C:\\Users\\theja\\anaconda3\\Library\\bin\\libiomp5md.dll')
+    #cppyy.load_library("/home/thejasvi/anaconda3/lib/libiomp5.so")
     cppyy.add_include_path('./eigen/')
     cppyy.include('./sw2002_vectorbased.h')
     cppyy.include('./combineall_cpp/ui_combineall.cpp')
@@ -224,13 +224,16 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
             if set(each.nodes) == set(fl):
                 cfls_by_fl[fl].append(i)
     print('Making CCG matrix')
-    if len(cfls_from_tdes) < 500:
+    if len(cfls_from_tdes) < 200:
         ccg_matrix = make_ccg_matrix(cfls_from_tdes)
     else:
         ccg_matrix = make_ccg_pll(cfls_from_tdes)
-
+    print('Finging solutions')
     solns_cpp = CCG_solutions(ccg_matrix)
+    print('Found solutions')
+    print('Doing tracking')
     sources, cfl_ids, tdedata = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)
+    print('Done with tracking.')
     return sources, cfl_ids, tdedata
 
 def generate_candidate_sources(sim_audio, **kwargs):
@@ -318,7 +321,7 @@ def dbscan_cluster(candidates, dbscan_eps, n_points):
 if __name__ == "__main__":
     import soundfile as sf
     from scipy.spatial import distance_matrix
-    import multibatsimulation as multibat
+    #import multibatsimulation as multibat
     
     filename = '3-bats_trajectory_simulation_2-order-reflections.wav'
     fs = sf.info(filename).samplerate
@@ -346,11 +349,17 @@ if __name__ == "__main__":
     end_samples = start_samples+dd_samples
     max_inds = int(0.2*fs/shift_samples)
     #%%
-    i = 110
+    # i = 110 -- tricky one 
+    i = 50
     audio_chunk = array_audio[start_samples[i]:end_samples[i]]
     #position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
     %load_ext line_profiler
     %lprun -f generate_candidate_sources_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
+    #%%
+    sta = time.perf_counter_ns()/1e9
+    a,b,c = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    sto = time.perf_counter_ns()/1e9
+    print(f'{sto-sta} s')
     #%%
     # import tqdm
     # sta = time.perf_counter_ns()/1e9
