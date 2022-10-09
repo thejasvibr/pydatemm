@@ -12,12 +12,15 @@ Created on Thu Sep 15 16:38:31 2022
 from itertools import chain
 import networkx as nx
 import numpy as np 
+from scipy.spatial import distance
+euclidean = distance.euclidean
 import pandas as pd
 from build_ccg import *
 from sklearn import cluster
 from pydatemm.timediffestim import generate_multich_crosscorr, get_multich_tdoas
 from pydatemm.localisation import spiesberger_wahlberg_solution, choose_SW_valid_solution_tau51
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
+from pydatemm.tdoa_quality import residual_tdoa_error_nongraph
 from pydatemm.tdoa_quality import residual_tdoa_error
 from joblib import wrap_non_picklable_objects
 from joblib import Parallel, delayed
@@ -55,8 +58,25 @@ def pll_cppyy_sw2002(many_micntde, c):
 
 def row_based_mpr2003(tde_data):
     nmics = get_nmics(tde_data)
-    return mellen_pachter_raquet_2003(tde_data[:nmics*3].reshape(-1,3), tde_data[-(nmics-1):])
-
+    sources = mellen_pachter_raquet_2003(tde_data[:nmics*3].reshape(-1,3), tde_data[-(nmics-1):])
+    
+    if sources.size ==3:
+        output = sources.reshape(1,3)
+        residual = np.zeros((1,1))
+        residual[0] = residual_tdoa_error_nongraph(tde_data[-(nmics-1):], sources,
+                                                tde_data[:nmics*3].reshape(-1,3))
+        return np.column_stack((output, residual))
+    elif sources.size==6:
+        output = np.zeros((sources.shape[0], sources.shape[1]))
+        output[:,:3] = sources
+        residual = np.zeros((2,1))
+        for i in range(2):
+            residual[i,:] = residual_tdoa_error_nongraph(tde_data[-(nmics-1):], sources[i,:],
+                                                tde_data[:nmics*3].reshape(-1,3))
+        return np.column_stack((output, residual))
+    else:
+        return np.array([])
+ 
 def create_tde_data(compatible_solutions, all_cfls, **kwargs):
     '''
     Wrapper to decide if the serial or parallel version is used. 
@@ -144,9 +164,7 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
     all_sources = []
     all_cfls = []
     for (nchannels, tde_input) in tde_data.items():
-        print(nchannels)
-        print(tde_input.shape)
-        
+       
         if nchannels > 4:
             calc_sources = pll_cppyy_sw2002(tde_input, kwargs['vsound'])
             all_sources.append(calc_sources)
@@ -322,10 +340,9 @@ if __name__ == "__main__":
 
     #%%
     import tqdm
-    for i in tqdm.trange(20):
+    sta = time.perf_counter_ns()/1e9
+    for i in tqdm.trange(350):
         audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-        sta = time.perf_counter_ns()/1e9
         aa,jj = generate_candidate_sources_v2(audio_chunk, **kwargs)
-        sto = time.perf_counter_ns()/1e9
-        print(f'{sto-sta} s time')
-    
+    sto = time.perf_counter_ns()/1e9
+    print(f'{sto-sta} s time')    

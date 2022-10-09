@@ -27,7 +27,6 @@ double residual_tdoa_error(VectorXd d, const VectorXd source, const MatrixXd arr
 	for (int i=0; i<nchannels; i++){
 		distmat(i) = euclidean_distance(source, arraygeom.row(i));
 	}
-	std::cout << "distmat " << distmat << std::endl;
 	//predicted range difference
 	VectorXd ref_dist(nchannels-1);
 	ref_dist = VectorXd::Ones(nchannels-1)*distmat(0);

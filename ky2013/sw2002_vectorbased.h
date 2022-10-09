@@ -165,9 +165,7 @@ vector<double> sw_matrix_optim(const vector<double> &mic_ntde_raw, const double 
 	best_solution = choose_correct_solution(solutions_vx, tau*c, mic_ntde_vx_raw.head(nmics*3));
 	MatrixXd arraygeom(nmics,3);
 	arraygeom = mic_ntde_vx_raw(seq(0,3*nmics - 1)).reshaped(3,nmics).transpose();
-    std::cout << "di \n " << mic_ntde_vx_raw.tail(nmics-1) << "\n" << " best_soln \n" << best_solution << " array-geom \n" << arraygeom << std::endl;
 	intermediate_out(3) = residual_tdoa_error(mic_ntde_vx_raw.tail(nmics-1), best_solution, arraygeom, c);
-	std::cout << "tdoa resid \n " << tdoa_resid << "\n" << std::endl;
 	intermediate_out.head(3) = best_solution;
 	solution = to_vectdouble(intermediate_out);
 	return solution;
