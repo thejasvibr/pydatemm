@@ -42,7 +42,7 @@ def make_emission_times(nbats, ncalls, **kwargs):
 nbats = 3
 ncalls = 3
 room_dims = [4,9,3]
-emission_times = make_emission_times(nbats, ncalls)
+emission_times = make_emission_times(nbats, ncalls, ipi_range=np.linspace(0.01,0.03,50))
 vbat = choose(np.linspace(2,4,20), nbats)
 trajectories = []
 f = 0.1
@@ -66,7 +66,7 @@ batxyz_df['batnum'] = [ batnum for batnum in range(nbats) for ee in range(ncalls
 
 
 fs = 192000
-ref_order = 2
+ref_order = 1
 reflection_max_order = ref_order
 ray_tracing = False
 
@@ -128,14 +128,15 @@ batxyz_df.to_csv('multibat_xyz_emissiontime.csv')
 pd.DataFrame(array_geom, columns=['x','y','z']).to_csv('multibat_sim_micarray.csv')
 
 if __name__ == "__main__":
+    pass
     #%% 
-    plt.figure()
-    a0 = plt.subplot(111, projection='3d')
-    plt.plot(array_geom[:,0], array_geom[:,1], array_geom[:,2], '*')
-    for each in bat_xyz:
-        plt.plot(each[:,0], each[:,1], each[:,2], '*')
+    # plt.figure()
+    # a0 = plt.subplot(111, projection='3d')
+    # plt.plot(array_geom[:,0], array_geom[:,1], array_geom[:,2], '*')
+    # for each in bat_xyz:
+    #     plt.plot(each[:,0], each[:,1], each[:,2], '*')
 
-    plt.xlim(0,room_dims[0])
-    plt.ylim(0,room_dims[1])
+    # plt.xlim(0,room_dims[0])
+    # plt.ylim(0,room_dims[1])
 
-    a0.set_zlim(0,room_dims[2])
+    # a0.set_zlim(0,room_dims[2])

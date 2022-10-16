@@ -179,14 +179,11 @@ def make_ccg_pll(cfls, **kwargs):
     cfl_ij_parts = [all_ij[i::num_cores] for i in range(num_cores)]
     compatibility = Parallel(n_jobs=-1)(delayed(get_compatibility)(cfls, ij_parts)for ij_parts in cfl_ij_parts)
     ccg = np.zeros((num_cfls, num_cfls), dtype='int32')
-    print('assigning:')
-    print('A context manager for loop is needed here...')
     sta = time.perf_counter_ns()
     for (ij_parts, compat_ijparts) in zip(cfl_ij_parts, compatibility):
         for (i,j), (comp_val) in zip(ij_parts, compat_ijparts):
             ccg[i,j] = comp_val
     sto = time.perf_counter_ns()
-    print(f'done assigning: - took: {(sto-sta)/1e9}')
     # make symmetric
     ccg += ccg.T
     return ccg
