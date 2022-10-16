@@ -413,6 +413,6 @@ if __name__ == "__main__":
         print(all_frame_data_filt.loc[position_df_index,:])
         print(f'Original positions: {simdata.loc[i,:]}')
         
-    for each in position_df_index:
-        print(all_frame_data_filt.loc[each,['x','y','z','frame_ind']])
-        print(simdata.loc[0,['x','y','z','t']], '\n')
+    # for each in position_df_index:
+    #     print(all_frame_data_filt.loc[each,['x','y','z','frame_ind']])
+    #     print(simdata.loc[0,['x','y','z','t']], '\n')
