@@ -231,7 +231,7 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
     print('Finging solutions')
     solns_cpp = CCG_solutions(ccg_matrix)
     print('Found solutions')
-    print('Doing tracking')
+    print(f'Doing tracking: {len(solns_cpp)}')
     sources, cfl_ids, tdedata = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)
     print('Done with tracking.')
     return sources, cfl_ids, tdedata
@@ -339,7 +339,7 @@ if __name__ == "__main__":
               'vsound' : 343.0, 
               'no_neg':False}
     kwargs['max_loop_residual'] = 0.5e-4
-    kwargs['K'] = 7
+    kwargs['K'] = 5
     dd = np.max(distance_matrix(array_geom, array_geom))/343  
     dd_samples = int(kwargs['fs']*dd)
     
@@ -349,17 +349,17 @@ if __name__ == "__main__":
     end_samples = start_samples+dd_samples
     max_inds = int(0.2*fs/shift_samples)
     #%%
-    # i = 110 -- tricky one 
-    i = 50
+    # i = 110 -- tricky one , 120 even worse
+    i = 35
     audio_chunk = array_audio[start_samples[i]:end_samples[i]]
     #position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
     %load_ext line_profiler
-    %lprun -f generate_candidate_sources_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
-    #%%
-    sta = time.perf_counter_ns()/1e9
-    a,b,c = generate_candidate_sources_v2(audio_chunk, **kwargs)
-    sto = time.perf_counter_ns()/1e9
-    print(f'{sto-sta} s')
+    %lprun -f localise_sounds_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
+    # #%%
+    # sta = time.perf_counter_ns()/1e9
+    # a,b,c = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    # sto = time.perf_counter_ns()/1e9
+    # print(f'{sto-sta} s')
     #%%
     # import tqdm
     # sta = time.perf_counter_ns()/1e9

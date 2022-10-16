@@ -166,6 +166,10 @@ def get_compatibility(cfls, ij_combis):
         output.append(cc_out)
     return output
 
+# def assigner_pll(matrix, indices, values):
+#     for (i,j), (comp_val) in zip(indices, values):
+#         matrix = 
+    
 def make_ccg_pll(cfls, **kwargs):
     '''Parallel version of make_ccg_matrix'''
     num_cores = kwargs.get('num_cores', joblib.cpu_count())
@@ -176,6 +180,7 @@ def make_ccg_pll(cfls, **kwargs):
     compatibility = Parallel(n_jobs=-1)(delayed(get_compatibility)(cfls, ij_parts)for ij_parts in cfl_ij_parts)
     ccg = np.zeros((num_cfls, num_cfls), dtype='int32')
     print('assigning:')
+    print('A context manager for loop is needed here...')
     sta = time.perf_counter_ns()
     for (ij_parts, compat_ijparts) in zip(cfl_ij_parts, compatibility):
         for (i,j), (comp_val) in zip(ij_parts, compat_ijparts):
