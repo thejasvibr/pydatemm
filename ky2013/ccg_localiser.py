@@ -355,10 +355,13 @@ if __name__ == "__main__":
     #%%
     # i = 110 -- tricky one , 120 even worse
     i = 20
+    sta = time.perf_counter()
     audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-    #position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
-    %load_ext line_profiler
-    %lprun -f localise_sounds_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
+    position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    sto = time.perf_counter()
+    print(f'Time taken: {sto-sta}')
+    # %load_ext line_profiler
+    # %lprun -f localise_sounds_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
     # #%%
     # sta = time.perf_counter_ns()/1e9
     #a,b,c = generate_candidate_sources_v2(audio_chunk, **kwargs)
