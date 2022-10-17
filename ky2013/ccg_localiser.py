@@ -159,7 +159,9 @@ def pll_create_tde_data(solns_cpp, all_cfls, **kwargs):
 def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
     '''
     '''
+    print('making tde data')
     tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
+    print('done making tde data')
     sources = []
     ncores = os.cpu_count()
     all_sources = []
@@ -352,11 +354,11 @@ if __name__ == "__main__":
     max_time = max_ind*(shift_samples/fs)+ignorable_start/fs
     #%%
     # i = 110 -- tricky one , 120 even worse
-    # i = 20
-    # audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-    # #position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
-    # %load_ext line_profiler
-    # %lprun -f chunk_create_tde_data generate_candidate_sources_v2(audio_chunk, **kwargs)
+    i = 20
+    audio_chunk = array_audio[start_samples[i]:end_samples[i]]
+    #position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    %load_ext line_profiler
+    %lprun -f localise_sounds_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
     # #%%
     # sta = time.perf_counter_ns()/1e9
     #a,b,c = generate_candidate_sources_v2(audio_chunk, **kwargs)
@@ -364,55 +366,55 @@ if __name__ == "__main__":
     # print(f'{sto-sta} s')
     #chunk_create_tde_data(compatible_solutions, all_cfls, **kwargs)
     #%%
-    import tqdm
-    sta = time.perf_counter_ns()/1e9
+    # import tqdm
+    # sta = time.perf_counter_ns()/1e9
     
-    all_frames = []
-    all_tdedata = []
-    for i in tqdm.trange(max_ind):
-        audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-        position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
-        if len(position_data)>0:
-            frame_data = pd.DataFrame(data=None, index=range(position_data.shape[0]),
-                                      columns=['frame_ind','x','y','z','tdoa_residual', 'cfl_ids'])
-            frame_data.loc[:,'x':'tdoa_residual'] = position_data
-            frame_data['cfl_ids'] = cfl_ids
-            frame_data.loc[:,'frame_ind'] = i
-            all_frames.append(frame_data)
-            all_tdedata.append(tdedata)
-    all_frame_data = pd.concat(all_frames).reset_index(drop=True)
-    all_tdedata = list(chain(*all_tdedata))
-    sto = time.perf_counter_ns()/1e9
-    print(f'\n {sto-sta} s time')    
-    #%% Remove all -999 points and high tdoa residuals
-    low_residuals = all_frame_data['tdoa_residual']<2e-3
-    valid_positions = np.invert(all_frame_data['x']==-999.0)
-    all_frame_data_filt = all_frame_data[np.logical_and(low_residuals, valid_positions)]
+    # all_frames = []
+    # all_tdedata = []
+    # for i in tqdm.trange(max_ind):
+    #     audio_chunk = array_audio[start_samples[i]:end_samples[i]]
+    #     position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    #     if len(position_data)>0:
+    #         frame_data = pd.DataFrame(data=None, index=range(position_data.shape[0]),
+    #                                   columns=['frame_ind','x','y','z','tdoa_residual', 'cfl_ids'])
+    #         frame_data.loc[:,'x':'tdoa_residual'] = position_data
+    #         frame_data['cfl_ids'] = cfl_ids
+    #         frame_data.loc[:,'frame_ind'] = i
+    #         all_frames.append(frame_data)
+    #         all_tdedata.append(tdedata)
+    # all_frame_data = pd.concat(all_frames).reset_index(drop=True)
+    # all_tdedata = list(chain(*all_tdedata))
+    # sto = time.perf_counter_ns()/1e9
+    # print(f'\n {sto-sta} s time')    
+    # #%% Remove all -999 points and high tdoa residuals
+    # low_residuals = all_frame_data['tdoa_residual']<2e-3
+    # valid_positions = np.invert(all_frame_data['x']==-999.0)
+    # all_frame_data_filt = all_frame_data[np.logical_and(low_residuals, valid_positions)]
     
-    # #%%
-    # Check to see that all positions are being picked up. 
-    simdata = pd.read_csv('multibat_xyz_emissiontime.csv')
-    simdata = simdata[simdata['t']<=max_time]
+    # # #%%
+    # # Check to see that all positions are being picked up. 
+    # simdata = pd.read_csv('multibat_xyz_emissiontime.csv')
+    # simdata = simdata[simdata['t']<=max_time]
     
-    def error_calc(X,Y):
-        return np.apply_along_axis(euclidean, 1, X, Y)
-    data_parts = np.array_split(all_frame_data_filt.loc[:,'x':'z'].to_numpy(dtype='float64'),
-                                os.cpu_count())
+    # def error_calc(X,Y):
+    #     return np.apply_along_axis(euclidean, 1, X, Y)
+    # data_parts = np.array_split(all_frame_data_filt.loc[:,'x':'z'].to_numpy(dtype='float64'),
+    #                             os.cpu_count())
 
-    for i in simdata.index:
-        pos1 = simdata.loc[i,'x':'z'].to_numpy()            
-        temission = simdata.loc[i,'t']
-        max_frame = int((21 + temission*1e3))
-        relevant_df = all_frame_data_filt[all_frame_data_filt['frame_ind']<max_frame]
-        data_parts = np.array_split(relevant_df.loc[:,'x':'z'].to_numpy(dtype='float64'),
-                                    os.cpu_count())
-        error = np.concatenate(Parallel(n_jobs=os.cpu_count())(delayed(error_calc)(chunk, pos1) for chunk in data_parts))
-        min_index = np.argmin(error)
-        position_df_index = all_frame_data_filt.index[min_index]
-        print('\n')
-        print(all_frame_data_filt.loc[position_df_index,:])
-        print(f'Original positions: {simdata.loc[i,:]}')
+    # for i in simdata.index:
+    #     pos1 = simdata.loc[i,'x':'z'].to_numpy()            
+    #     temission = simdata.loc[i,'t']
+    #     max_frame = int((21 + temission*1e3))
+    #     relevant_df = all_frame_data_filt[all_frame_data_filt['frame_ind']<max_frame]
+    #     data_parts = np.array_split(relevant_df.loc[:,'x':'z'].to_numpy(dtype='float64'),
+    #                                 os.cpu_count())
+    #     error = np.concatenate(Parallel(n_jobs=os.cpu_count())(delayed(error_calc)(chunk, pos1) for chunk in data_parts))
+    #     min_index = np.argmin(error)
+    #     position_df_index = all_frame_data_filt.index[min_index]
+    #     print('\n')
+    #     print(all_frame_data_filt.loc[position_df_index,:])
+    #     print(f'Original positions: {simdata.loc[i,:]}')
         
-    # for each in position_df_index:
-    #     print(all_frame_data_filt.loc[each,['x','y','z','frame_ind']])
-    #     print(simdata.loc[0,['x','y','z','t']], '\n')
+    # # for each in position_df_index:
+    # #     print(all_frame_data_filt.loc[each,['x','y','z','frame_ind']])
+    # #     print(simdata.loc[0,['x','y','z','t']], '\n')

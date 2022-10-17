@@ -72,7 +72,7 @@ def make_all_fundaloops_from_tdemat(tdematrix):
     all_cfls = []
     for fundaloop, edges in all_edges_fls.items():
         print(fundaloop)
-        this_cfl = nx.ordered.Graph()
+        this_cfl = nx.Graph()
         for e in sorted(edges):
             print(e)
             this_cfl.add_edge(e[0], e[1], tde=tdematrix[e[0],e[1]])
@@ -84,8 +84,8 @@ def check_for_one_common_edge(X,Y):
     with the same weight.
     X and Y are assumed to be undirected graphs!!
     '''
-    X_edge_weights = [ X.edges()[i]['tde'] for i in X.edges]
-    Y_edge_weights = [ Y.edges()[i]['tde'] for i in Y.edges]
+    X_edge_weights = [ (tuple(sorted(i)), X.edges()[i]['tde']) for i in X.edges]
+    Y_edge_weights = [ (tuple(sorted(i)), Y.edges()[i]['tde']) for i in Y.edges]
     common_edge = set(Y_edge_weights).intersection(set(X_edge_weights))
     if len(common_edge)==1:
         return 1
@@ -166,23 +166,20 @@ def get_compatibility(cfls, ij_combis):
         output.append(cc_out)
     return output
 
-# def assigner_pll(matrix, indices, values):
-#     for (i,j), (comp_val) in zip(indices, values):
-#         matrix = 
-    
 def make_ccg_pll(cfls, **kwargs):
     '''Parallel version of make_ccg_matrix'''
     num_cores = kwargs.get('num_cores', joblib.cpu_count())
     num_cfls = len(cfls)
-    print('Miaow')
     all_ij = list(combinations(range(num_cfls), 2))
     cfl_ij_parts = [all_ij[i::num_cores] for i in range(num_cores)]
+    print('Finding compatibility - pll')
     compatibility = Parallel(n_jobs=-1)(delayed(get_compatibility)(cfls, ij_parts)for ij_parts in cfl_ij_parts)
     ccg = np.zeros((num_cfls, num_cfls), dtype='int32')
     sta = time.perf_counter_ns()
     for (ij_parts, compat_ijparts) in zip(cfl_ij_parts, compatibility):
         for (i,j), (comp_val) in zip(ij_parts, compat_ijparts):
             ccg[i,j] = comp_val
+    print('Done finding compatibility - pll')
     sto = time.perf_counter_ns()
     # make symmetric
     ccg += ccg.T
