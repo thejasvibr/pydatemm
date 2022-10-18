@@ -17,7 +17,7 @@ import joblib
 from joblib import Parallel, delayed
 import pydatemm.localiser as lo
 import pydatemm.timediffestim as timediff
-import  pydatemm.graph_mainp as gramanip
+import  pydatemm.graph_manip as gramanip
 
 def get_tde(comp_triples):
     nodes = list(set(list(chain(*[each.vs['name'] for each in comp_triples]))))
@@ -35,11 +35,8 @@ def chunk_create_tde_data(compatible_solutions, all_cfls, **kwargs):
     raw_tde_by_channelnum = {}
     cfl_ids = {} # for troubleshooting and error tracing
     for i, compat_cfl in enumerate(compatible_solutions):
-        #source_graph = ig.union([all_cfls[j] for j in compat_cfl], byname=True)
         source_tde, channels = get_tde([all_cfls[j] for j in compat_cfl])
-        #source_tde = np.array(source_graph.get_adjacency(attribute='tde', default=np.nan).data)
         d = source_tde[1:,0]*kwargs['vsound']
-        #channels = merged.vs['name']
         numchannels = len(channels)
         tde_data = np.concatenate((kwargs['array_geom'][channels,:].flatten(), d))
         if raw_tde_by_channelnum.get(numchannels) is None:
@@ -78,11 +75,6 @@ def pll_create_tde_data(compatible_solutions,
         channelwise_cflid[nchannels] = list(chain(*channelwise_cflid[nchannels]))
     return channelwise_tdedata, channelwise_cflid        
 
-# def combine_compatible_triples(triple_list):
-#     '''Vestigial function - not performant - but still kept.
-#     '''
-#     return ig.union(triple_list, byname=True)
-
 def create_tde_data(compatible_solutions, all_cfls, **kwargs):
     '''
     Wrapper to decide if the serial or parallel version is used. 
@@ -105,13 +97,14 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
     all_cfls = []
     all_tdedata = []
     for (nchannels, tde_input) in tde_data.items():
-       
+        print('In For Loop', nchannels, tde_input.shape)
         if nchannels > 4:
             calc_sources = lo.pll_cppyy_sw2002(tde_input, kwargs['vsound'])
             all_sources.append(calc_sources)
             all_cfls.append(cfl_ids[nchannels])
             all_tdedata.append(tde_input.tolist())
         elif nchannels == 4:
+            num_misses = 0
             fourchannel_cflids= []
             for i in range(tde_input.shape[0]):
                 calc_sources = lo.row_based_mpr2003(tde_input[i,:])
@@ -127,15 +120,18 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
                     fourchannel_cflids.append(cfl_ids[nchannels][i])
                     all_tdedata.append(tde_input.tolist())
                 elif len(calc_sources) == 0:
+                    num_misses +=1 
                     pass
+            raise NotImplementedError('Here data to be appended to all_tdedata and all_sources ')
             all_cfls.append(fourchannel_cflids)
         else:
+            num_misses += 1
             pass # if <4 channels encountered
+    print(f'Total number of misses: {num_misses}')
     if len(all_sources)>0:
         return np.row_stack(all_sources), list(chain(*all_cfls)), list(chain(*all_tdedata))
     else:
         return np.array([]), [], []
-
 
 def generate_candidate_sources_v2(sim_audio, **kwargs):
     multich_cc = timediff.generate_multich_crosscorr(sim_audio, **kwargs )
