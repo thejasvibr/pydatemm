@@ -24,6 +24,16 @@ import time
 ns_time = time.perf_counter_ns
 
 def ig_make_fundamental_loops(nchannels):
+    '''
+    Parameters
+    ----------
+    nchannels : int
+        Number of channels, and thus number of nodes in the TDE graph.
+    Returns
+    -------
+    fundamental_loops : list
+        List with tuples containing integer node numbers.
+    '''
     G = ig.Graph.Full(nchannels)
     G.vs['name'] = range(nchannels)
     minspan_G = G.spanning_tree()
@@ -36,6 +46,18 @@ def ig_make_fundamental_loops(nchannels):
     return fundamental_loops
 
 def ig_make_edges_for_fundamental_loops(nchannels):
+    '''
+    Parameters
+    ----------
+    nchannels : int
+        Num. of channels.
+    
+    Returns
+    -------
+    triple_definition : dict
+        Keys are fundamental loops as tuples. Values are lists with
+        edges as tuples
+    '''
     funda_loops = ig_make_fundamental_loops(nchannels)
     triple_definition = {}
     for fun_loop in funda_loops:
@@ -48,6 +70,12 @@ def ig_make_edges_for_fundamental_loops(nchannels):
     return triple_definition
 
 def ig_make_consistent_fls(multich_tdes, **kwargs):
+    '''
+    Parameters
+    ----------
+    multich_tdes : dict
+        Keys are 
+    '''
     max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
     all_edges_fls = ig_make_edges_for_fundamental_loops(kwargs['nchannels'])
     all_cfls = []
@@ -218,7 +246,6 @@ def ig_chunk_create_tde_data(compatible_solutions, all_cfls, **kwargs):
     for nchannels, tde_data in raw_tde_by_channelnum.items():
         tde_by_channelnum[nchannels] = np.row_stack(tde_data)
     return tde_by_channelnum, cfl_ids
-
 
 def ig_pll_create_tde_data(compatible_solutions,
                            all_cfls, **kwargs):
