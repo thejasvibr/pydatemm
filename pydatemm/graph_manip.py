@@ -133,7 +133,7 @@ def ccg_definer(X,Y):
     return relation
 
 
-def make_ccg_matrix(cfls):
+def make_ccg_matrix(cfls, **kwargs):
     '''
     Sped up version. Previous version had explicit assignment of i,j and j,i
     compatibilities.
@@ -161,6 +161,7 @@ def get_compatibility(cfls, ij_combis):
 def make_ccg_pll(cfls, **kwargs):
     '''Parallel version of make_ccg_matrix'''
     num_cores = kwargs.get('num_cores', int(joblib.cpu_count()))
+    print(f'num cores: {num_cores}')
     num_cfls = len(cfls)
 
     all_ij = list(combinations(range(num_cfls), 2))

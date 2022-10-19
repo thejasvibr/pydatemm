@@ -19,6 +19,17 @@ import pydatemm.localiser as lo
 import pydatemm.timediffestim as timediff
 import  pydatemm.graph_manip as gramanip
 
+def get_numrows(X):
+    try:
+        nrows, ncols = X.shape
+    except ValueError:
+        if len(X)>0:
+            nrows = 1 
+        else:
+            nrows = 0
+    return nrows
+    
+
 def get_tde(comp_triples):
     nodes = list(set(list(chain(*[each.vs['name'] for each in comp_triples]))))
     global_node_to_ij = {n:i for i, n in enumerate(nodes)}
@@ -56,6 +67,7 @@ def pll_create_tde_data(compatible_solutions,
                            all_cfls, **kwargs):
     parts = kwargs.get('num_cores', joblib.cpu_count())
     #split data into parts
+    print(f'Num parts: {parts}')
     split_solns = (compatible_solutions[i::parts] for i in range(parts))
     results = Parallel(n_jobs=parts)(delayed(chunk_create_tde_data)(chunk, all_cfls, **kwargs) for chunk in split_solns)
     # join split data into single dictionaries
@@ -84,7 +96,7 @@ def create_tde_data(compatible_solutions, all_cfls, **kwargs):
     chunk_create_tde_data
     pll_create_tde_data
     '''
-    if len(compatible_solutions) > 500:
+    if len(compatible_solutions) > 250:
         return pll_create_tde_data(compatible_solutions, all_cfls, **kwargs)
     else:
         return chunk_create_tde_data(compatible_solutions, all_cfls, **kwargs)
@@ -104,30 +116,28 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
             all_cfls.append(cfl_ids[nchannels])
             all_tdedata.append(tde_input.tolist())
         elif nchannels == 4:
-            num_misses = 0
             fourchannel_cflids= []
+            fourchannel_tdedata = []
             for i in range(tde_input.shape[0]):
                 calc_sources = lo.row_based_mpr2003(tde_input[i,:])
-                if calc_sources.size==6:
+                nrows = get_numrows(calc_sources)
+                if nrows == 2:
                     all_sources.append(calc_sources[0,:])
                     fourchannel_cflids.append(cfl_ids[nchannels][i])
-                    all_tdedata.append(tde_input.tolist())
+                    fourchannel_tdedata.append(tde_input[i,:].tolist())
                     all_sources.append(calc_sources[1,:])
                     fourchannel_cflids.append(cfl_ids[nchannels][i])
-                    all_tdedata.append(tde_input.tolist())
-                elif calc_sources.size==3:
+                    fourchannel_tdedata.append(tde_input[i,:].tolist())
+                elif nrows == 1:
                     all_sources.append(calc_sources)
                     fourchannel_cflids.append(cfl_ids[nchannels][i])
-                    all_tdedata.append(tde_input.tolist())
-                elif len(calc_sources) == 0:
-                    num_misses +=1 
-                    pass
-            raise NotImplementedError('Here data to be appended to all_tdedata and all_sources ')
+                    fourchannel_tdedata.append(tde_input[i,:].tolist())
+                elif nrows == 0:
+                    pass                
             all_cfls.append(fourchannel_cflids)
+            all_tdedata.append(fourchannel_tdedata)
         else:
-            num_misses += 1
             pass # if <4 channels encountered
-    print(f'Total number of misses: {num_misses}')
     if len(all_sources)>0:
         return np.row_stack(all_sources), list(chain(*all_cfls)), list(chain(*all_tdedata))
     else:
@@ -162,9 +172,9 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
                 cfls_by_fl[fl].append(i)
     print('Making CCG matrix')
     if len(cfls_from_tdes) < 200:
-        ccg_matrix = gramanip.make_ccg_matrix(cfls_from_tdes)
+        ccg_matrix = gramanip.make_ccg_matrix(cfls_from_tdes, **kwargs)
     else:
-        ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes)
+        ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes, **kwargs)
     print('Finding solutions')
     solns_cpp = lo.CCG_solutions(ccg_matrix)
     print('Found solutions')

@@ -52,7 +52,7 @@ def load_and_compile_cpp_code():
     current_mod_path = os.path.abspath(__file__)
     current_folder = os.path.split(current_mod_path)[0]
     libiomp5_path = get_libiomp5_path()
-    os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2'
+    os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2 -g'
     not_compiled = True
     
     eigen_path = os.path.join(current_folder, 'eigen/')

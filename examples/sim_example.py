@@ -22,6 +22,7 @@ except:
     array_audio, fs = sf.read(filename, stop=int(0.2*fs))
 
 array_geom = pd.read_csv('multibat_sim_micarray.csv').to_numpy()[:,1:]
+simdata = pd.read_csv('multibat_xyz_emissiontime.csv')
 
 nchannels = array_audio.shape[1]
 kwargs = {'nchannels':nchannels,
@@ -34,20 +35,21 @@ kwargs = {'nchannels':nchannels,
           'vsound' : 343.0, 
           'no_neg':False}
 kwargs['max_loop_residual'] = 0.5e-4
-kwargs['K'] = 5
-dd = np.max(distance_matrix(array_geom, array_geom))/343  
-dd_samples = int(kwargs['fs']*dd)
-
-ignorable_start = int(0.01*fs)
-shift_samples = 96
-start_samples = np.arange(ignorable_start,array_audio.shape[0], shift_samples)
-end_samples = start_samples+dd_samples
-max_ind = int(0.010*1e3*2)
-max_time = max_ind*(shift_samples/fs)+ignorable_start/fs
+kwargs['K'] = 7
+max_delay = np.max(distance_matrix(array_geom, array_geom))/343  
 #%%
 # i = 110 -- tricky one , 120 even worse
-i = 20
-sta = time.perf_counter()
-audio_chunk = array_audio[start_samples[i]:end_samples[i]]
-position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
-sto = time.perf_counter()
+start_time = 0.030
+end_time = start_time  + max_delay
+start_sample, end_sample = int(fs*start_time), int(fs*end_time)
+
+for num_cores in [16]:
+    kwargs['num_cores'] = num_cores
+    sta = time.perf_counter()
+    audio_chunk = array_audio[start_sample:end_sample]
+    position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
+    sto = time.perf_counter()
+    print(f'{num_cores} Cores: {sto-sta} s taken')
+
+
+
