@@ -7,10 +7,11 @@ Finds libiomp5 library and runs cppyy based compilation.
 
 @author: thejasvi
 """
-import cppyy 
 import subprocess
 import sys
 import os 
+import glob
+import cppyy_backend.loader as l
 
 def get_libiomp5_path():
     '''
@@ -48,26 +49,38 @@ def get_libiomp5_path():
     else:
         raise NotImplementedError(f"{sys.platform} OS not handled currently")
 
-def load_and_compile_cpp_code():
-    current_mod_path = os.path.abspath(__file__)
-    current_folder = os.path.split(current_mod_path)[0]
-    libiomp5_path = get_libiomp5_path()
-    os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2 -g'
-    not_compiled = True
-    
-    eigen_path = os.path.join(current_folder, 'eigen/')
-    
-    cpp_files = [os.path.join(current_folder, each) for each in ['sw2002_vectorbased.h','combineall_cpp/ui_combineall.cpp']]
+def get_eigen_path():
+    current_module_path = os.path.abspath(__file__)
+    current_folder = os.path.split(current_module_path)[0]
+    return  os.path.join(current_folder, 'eigen/')
 
-    for each in libiomp5_path:
-        try:
-            cppyy.load_library(each)
-            cppyy.add_include_path(eigen_path)
-            cppyy.include(cpp_files[0])
-            cppyy.include(cpp_files[1])
-            not_compiled = False
-            break
-        except:
-            pass
-    if not_compiled:
-        print('Unable to compile - check if you have libiomp5 or if  the cpp code has already been compiled')
+def get_cpp_modules():
+    current_module_path = os.path.abspath(__file__)
+    current_folder = os.path.split(current_module_path)[0]
+    cpp_files = [os.path.join(current_folder, each) for each in ['sw2002_vectorbased.h','combineall_cpp/ui_combineall.cpp']]
+    return cpp_files
+
+
+
+    
+
+
+def load_and_compile_with_own_flags():
+    os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2 -g'
+    current_folder = os.path.split(os.getcwd())[0]
+    pch_folder = os.path.join(current_folder, 'cling_pch/')
+    if os.path.exists(pch_folder):
+        pass
+    else:
+        os.mkdir(pch_folder)
+    os.environ['CLING_STANDARD_PCH'] = os.path.join(pch_folder, 'std_with_openmp.pch')
+    
+    import cppyy
+    try:
+        cppyy.load_library(get_libiomp5_path()[0])
+    except:
+        raise ValueError(f'Could not load libiomp5 with')
+    cppyy.add_include_path(get_eigen_path())
+    for each in get_cpp_modules():
+        cppyy.include(each)
+    

@@ -9,7 +9,7 @@
 #include <vector>
 #include <stdexcept>
 #include "tdoa_residual.h"
-//#define EIGEN_DONT_PARALLELIZE
+#define EIGEN_DONT_PARALLELIZE
 
 	
 using Eigen::MatrixXd;
@@ -81,16 +81,17 @@ VectorXd choose_correct_solution(VectorXd both_solutions, const VectorXd &ranged
     
 	residuals[0] = abs(rangediff[3] - calculated_tdes[0]);
 	residuals[1] = abs(rangediff[3] - calculated_tdes[1]);
+	if (isnan(residuals[0]) || isnan(residuals[1])){
+    	return Vector3d({-999, -999, -999});
+    	}
+	
 	// Whichever solution results in the lower TDE residual is returned
 	if (residuals[0] < residuals[1]){
 		return solution1;
 	}
 	else if (residuals[1] < residuals[0]){
 		return solution2;
-	} else if (residuals[0] == residuals[1]){
-		return Vector3d({-999, -999, -999});
-		//throw std::invalid_argument( "Cannot choose between SW solutions -  maybe input array has <=4 channels?" );
-	}
+    	} 
 	}
 
 vector<double> sw_matrix_optim(const vector<double> &mic_ntde_raw, const double &c=343.0){
@@ -136,7 +137,6 @@ vector<double> sw_matrix_optim(const vector<double> &mic_ntde_raw, const double 
     Eye = MatrixXd::Zero(R.rows(), R.rows());
     Eye.diagonal() = VectorXd::Ones(R.rows());
 	
-    
     R_inv = R.fullPivHouseholderQr().solve(Eye);
 	
 	for (int i=0; i < nmics-1; i++){
@@ -159,21 +159,24 @@ vector<double> sw_matrix_optim(const vector<double> &mic_ntde_raw, const double 
 	solutions_vx(seq(3,5)) += mic0;
 
 	best_solution = choose_correct_solution(solutions_vx, tau*c, mic_ntde_vx_raw.head(nmics*3));
+
 	MatrixXd arraygeom(nmics,3);
 	arraygeom = mic_ntde_vx_raw(seq(0,3*nmics - 1)).reshaped(3,nmics).transpose();
 	intermediate_out(3) = residual_tdoa_error(mic_ntde_vx_raw.tail(nmics-1), best_solution, arraygeom, c);
 	intermediate_out.head(3) = best_solution;
+
 	solution = to_vectdouble(intermediate_out);
 	return solution;
 }
 
-vector<vector<double>> pll_sw_optim(const vector<vector<double>> &all_inputs, double c=343.0){
+vector<vector<double>> pll_sw_optim(const vector<vector<double>> &all_inputs, const int &num_cores, double c=343.0){
 	/*
 	The non-block based parallel implementation. Lets OMP do all the chunking instead of doing it explicitly. 
 	*/
 
 	vector<vector<double>> flattened_output(all_inputs.size());
 	// Now run the parallelisable code
+	omp_set_num_threads(num_cores);
 	#pragma omp parallel for 
 	for (int i = 0; i < all_inputs.size(); i++){
 		flattened_output[i] = sw_matrix_optim(all_inputs[i], c);

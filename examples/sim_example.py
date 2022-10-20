@@ -8,8 +8,7 @@ import pandas as pd
 import soundfile as sf
 from scipy.spatial import distance_matrix
 import time
-from pydatemm.source_generation import generate_candidate_sources_v2
-
+from pydatemm.source_generation import generate_candidate_sources_v2, localise_sounds_v2, create_tde_data
 #import multibatsimulation as multibat
 
 filename = '3-bats_trajectory_simulation_1-order-reflections.wav'
@@ -43,7 +42,7 @@ start_time = 0.030
 end_time = start_time  + max_delay
 start_sample, end_sample = int(fs*start_time), int(fs*end_time)
 
-for num_cores in [16]:
+for num_cores in [8, 16]:
     kwargs['num_cores'] = num_cores
     sta = time.perf_counter()
     audio_chunk = array_audio[start_sample:end_sample]
@@ -52,4 +51,10 @@ for num_cores in [16]:
     print(f'{num_cores} Cores: {sto-sta} s taken')
 
 
+#%% Write the data out into a txt file
+# import csv
+
+# with open("out.csv", "w") as f:
+#     wr = csv.writer(f)
+#     wr.writerows(tdedata[-500000:])
 

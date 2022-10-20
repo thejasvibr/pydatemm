@@ -15,14 +15,11 @@ euclidean = distance.euclidean
 from sklearn import cluster
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from pydatemm.tdoa_quality import residual_tdoa_error_nongraph
+from pydatemm.compilation_utils import load_and_compile_with_own_flags
+load_and_compile_with_own_flags()
 import cppyy
-
-from pydatemm.compilation_utils import load_and_compile_cpp_code
-
-load_and_compile_cpp_code()
-
-
-
+from time import perf_counter_ns as pcn
+time_s = lambda : pcn()/1e9
 
 try:
     vector_cpp = cppyy.gbl.std.vector
@@ -34,16 +31,29 @@ except ImportError:
 
 get_nmics = lambda X: int((X.size+1)/4)
 
+def make_vect_vect_double(X):
+    data = vector_cpp[vector_cpp['double']](X.shape[0])
+    for i in range(X.shape[0]):
+        data.push_back(X[i,:])
+    return data[X.shape[0]:]
+
 def cppyy_sw2002(micntde):
     as_Vxd = cppyy.gbl.sw_matrix_optim(vector_cpp['double'](micntde),
                                        )
     return np.array(as_Vxd, dtype=np.float64)
 
-def pll_cppyy_sw2002(many_micntde, c):
-    block_in = vector_cpp[vector_cpp['double']](many_micntde.shape[0])
-    for i in range(many_micntde.shape[0]):
-        block_in[i] = vector_cpp['double'](many_micntde[i,:])
-    block_out = cppyy.gbl.pll_sw_optim(block_in, c)
+def pll_cppyy_sw2002(many_micntde, num_cores, c):
+    aa = time_s()
+    # block_in = vector_cpp[vector_cpp['double']](many_micntde.shape[0])
+    # for i in range(many_micntde.shape[0]):
+    #     block_in[i] = vector_cpp['double'](many_micntde[i,:])
+    block_in = make_vect_vect_double(many_micntde)
+    bb = time_s()
+    print(f'Assigning takes: {bb-aa} s ')
+    sta = time_s()
+    block_out = cppyy.gbl.pll_sw_optim(block_in, num_cores, c)
+    sto = time_s()
+    print(f'Cpp code time: {sto-sta} s ')
     return np.array([each for each in block_out])
 
 def row_based_mpr2003(tde_data):

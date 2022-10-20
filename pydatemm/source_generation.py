@@ -104,6 +104,7 @@ def create_tde_data(compatible_solutions, all_cfls, **kwargs):
 def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
     '''
     '''
+    num_cores = kwargs.get('num_cores', joblib.cpu_count())
     tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
     all_sources = []
     all_cfls = []
@@ -111,7 +112,7 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
     for (nchannels, tde_input) in tde_data.items():
         print('In For Loop', nchannels, tde_input.shape)
         if nchannels > 4:
-            calc_sources = lo.pll_cppyy_sw2002(tde_input, kwargs['vsound'])
+            calc_sources = lo.pll_cppyy_sw2002(tde_input, num_cores, kwargs['vsound'])
             all_sources.append(calc_sources)
             all_cfls.append(cfl_ids[nchannels])
             all_tdedata.append(tde_input.tolist())
