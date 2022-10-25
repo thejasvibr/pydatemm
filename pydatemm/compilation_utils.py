@@ -47,6 +47,9 @@ def get_libiomp5_path():
         else:
             return only_libiomp5
     else:
+        #TODO : User needs to have added an environmental variable 
+        # for LIBIOMP5_PATH or something like that so Python can pick it up easily. 
+        # Maybe this is the best default solution actually?
         raise NotImplementedError(f"{sys.platform} OS not handled currently")
 
 def get_eigen_path():
@@ -79,8 +82,8 @@ def load_and_compile_with_own_flags():
     try:
         cppyy.load_library(get_libiomp5_path()[0])
     except:
-        raise ValueError(f'Could not load libiomp5 with')
+        raise ValueError(f'Could not load libiomp5 with {get_libiomp5_path()[0]}')
     cppyy.add_include_path(get_eigen_path())
     for each in get_cpp_modules():
         cppyy.include(each)
-    
+
