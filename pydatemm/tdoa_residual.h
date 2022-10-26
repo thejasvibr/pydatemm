@@ -3,10 +3,12 @@ Calculates the TDOA residuals given the array geometry and
 predicted sources - and then calculates the prediction-observation
 residual. 
 */
+#define EIGEN_INITIALIZE_MATRICES_BY_NAN
 #include <cmath>
 #include <iostream>
 #include <Eigen/Core>
 #include <Eigen/Dense>
+
 using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;

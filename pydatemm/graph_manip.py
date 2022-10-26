@@ -13,6 +13,10 @@ import igraph as ig
 import joblib
 from joblib import Parallel, delayed
 import numpy as np
+try:
+    import cppyy as cpy
+except:
+    pass
 
 
 def make_fundamental_loops(nchannels):
@@ -96,6 +100,29 @@ def make_consistent_fls(multich_tdes, **kwargs):
                 all_cfls.append(this_cfl)
     return all_cfls
 
+def make_consistent_fls_cpp(multich_tdes, **kwargs):
+    '''The C++-Python hybrid version. 
+    '''
+    max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
+    all_edges_fls = make_edges_for_fundamental_loops(kwargs['nchannels'])
+    all_cfls = []
+    k = 0
+    for fundaloop, edges in all_edges_fls.items():
+        a,b,c = fundaloop
+        ba_tdes = multich_tdes[(b,a)]
+        ca_tdes = multich_tdes[(c,a)]
+        cb_tdes = multich_tdes[(c,b)]
+        abc_combinations = list(product(ba_tdes, ca_tdes, cb_tdes))
+        #node_to_index = {nodeid: index for index, nodeid in  zip(range(3), fundaloop)}
+        for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
+            if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
+                this_cfl = cpy.gbl.Eigen.MatrixXd(kwargs['nchannels'], kwargs['nchannels'])
+                for e, tde in zip(edges, [tde1, tde2, tde3]):
+                    this_cfl[e[0],e[1]] = tde[1]
+                    this_cfl[e[1],e[0]] = tde[1]
+                k += 1 
+                all_cfls.append(this_cfl)
+    return all_cfls
 
 def node_names(ind_tup,X):
     node_names = X.vs['name']
@@ -148,7 +175,6 @@ def make_ccg_matrix(cfls, **kwargs):
         ccg[i,j] = cc_out
     ccg += ccg.T
     return ccg
-
 
 def get_compatibility(cfls, ij_combis):
     output = []
