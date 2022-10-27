@@ -60,7 +60,10 @@ def get_eigen_path():
 def get_cpp_modules():
     current_module_path = os.path.abspath(__file__)
     current_folder = os.path.split(current_module_path)[0]
-    cpp_files = [os.path.join(current_folder, each) for each in ['sw2002_vectorbased.h','combineall_cpp/ui_combineall.cpp']]
+    cpp_modules = ['sw2002_vectorbased.h',
+                   'combineall_cpp/ui_combineall.cpp',
+                   'graph_manip_ccp.cpp']
+    cpp_files = [os.path.join(current_folder, each) for each in cpp_modules]
     return cpp_files
 
 

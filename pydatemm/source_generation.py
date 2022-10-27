@@ -18,6 +18,7 @@ from joblib import Parallel, delayed
 import pydatemm.localiser as lo
 import pydatemm.timediffestim as timediff
 import  pydatemm.graph_manip as gramanip
+import cppyy as cpy
 
 def get_numrows(X):
     try:
@@ -185,8 +186,6 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
     return sources, cfl_ids, tdedata
 
 
-
-
 def generate_candidate_sources_hybrid(sim_audio, **kwargs):
     '''
     generate_candidate_sources_v2 but with C++ graphs as Eigen Matrices
@@ -219,7 +218,8 @@ def generate_candidate_sources_hybrid(sim_audio, **kwargs):
     #             cfls_by_fl[fl].append(i)
     print('Making CCG matrix')
     if len(cfls_from_tdes) < 200:
-        ccg_matrix = gramanip.make_ccg_matrix(cfls_from_tdes, **kwargs)
+        ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
+        
     else:
         ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes, **kwargs)
     print('Finding solutions')

@@ -10,6 +10,7 @@ from scipy.spatial import distance_matrix
 import time
 from pydatemm.source_generation import generate_candidate_sources_v2, localise_sounds_v2, create_tde_data
 from pydatemm.source_generation import chunk_create_tde_data, pll_create_tde_data, get_tde
+from pydatemm.localiser import CCG_solutions
 #import multibatsimulation as multibat
 #from memory_profiler import profile
 
@@ -55,10 +56,11 @@ kwargs['num_cores'] = 8
 
 #%%
 
-audio_chunk = array_audio[start_sample:end_sample]
+sim_audio = array_audio[start_sample:end_sample]
 #position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
 %load_ext line_profiler
-%lprun -f pll_create_tde_data generate_candidate_sources_v2(audio_chunk, **kwargs)
+%lprun -f CCG_solutions generate_candidate_sources_v2(sim_audio, **kwargs)
+%lprun -f generate_candidate_sources_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
 
 #%% Write the data out into a txt file
 # import csv

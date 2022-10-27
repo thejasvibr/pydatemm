@@ -88,6 +88,16 @@ def CCG_solutions(ccg_matrix):
     comp_cfls = [list(each) for each in solns_cpp]
     return comp_cfls
 
+def CCG_solutions_cpp(ccg_matrix):
+    ac_cpp = vector_cpp[vector_cpp[int]]([ccg_matrix[i,:].tolist() for i in range(n_rows)])
+    v_cpp = set_cpp[int](range(n_rows))
+    l_cpp = set_cpp[int]([])
+    x_cpp = set_cpp[int]([])
+    solns_cpp = cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
+    comp_cfls = list([]*len(solns_cpp))
+    comp_cfls = [list(each) for each in solns_cpp]
+    return comp_cfls
+
 def refine_candidates_to_room_dims(candidates, max_tdoa_res, room_dims):
     good_locs = candidates[candidates['tdoa_resid_s']<max_tdoa_res].reset_index(drop=True)
     
