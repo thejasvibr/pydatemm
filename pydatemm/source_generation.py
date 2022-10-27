@@ -18,7 +18,10 @@ from joblib import Parallel, delayed
 import pydatemm.localiser as lo
 import pydatemm.timediffestim as timediff
 import  pydatemm.graph_manip as gramanip
-import cppyy as cpy
+try:
+    import cppyy as cpy
+except:
+    pass
 
 def get_numrows(X):
     try:
@@ -173,7 +176,7 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
             if set(each.vs['name']) == set(fl):
                 cfls_by_fl[fl].append(i)
     print('Making CCG matrix')
-    if len(cfls_from_tdes) < 200:
+    if len(cfls_from_tdes) > 200:
         ccg_matrix = gramanip.make_ccg_matrix(cfls_from_tdes, **kwargs)
     else:
         ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes, **kwargs)
@@ -206,24 +209,15 @@ def generate_candidate_sources_hybrid(sim_audio, **kwargs):
     print('making the cfls...')
     cfls_from_tdes = gramanip.make_consistent_fls_cpp(top_K_tdes, **kwargs)
     print(f'len of cfls: {len(cfls_from_tdes)}')
-    # put all consistent loops into fundamental loop 'bins'
-    # all_fls = gramanip.make_fundamental_loops(kwargs['nchannels'])
-    # cfls_by_fl = {}
-    # for fl in all_fls:
-    #     cfls_by_fl[fl] = []
-    
-    # for i,each in enumerate(cfls_from_tdes):
-    #     for fl in all_fls:
-    #         if set(each.vs['name']) == set(fl):
-    #             cfls_by_fl[fl].append(i)
+
     print('Making CCG matrix')
-    if len(cfls_from_tdes) < 200:
+    if len(cfls_from_tdes) > 200:
         ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
         
     else:
         ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes, **kwargs)
     print('Finding solutions')
-    solns_cpp = lo.CCG_solutions(ccg_matrix)
+    solns_cpp = lo.CCG_solutions_cpp(ccg_matrix)
     print('Found solutions')
     print(f'Doing tracking: {len(solns_cpp)}')
     sources, cfl_ids, tdedata = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)

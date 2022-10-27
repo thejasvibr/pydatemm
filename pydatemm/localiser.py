@@ -78,25 +78,38 @@ def row_based_mpr2003(tde_data):
         return np.array([])
 
 def CCG_solutions(ccg_matrix):
+    a = time_s();
     n_rows = ccg_matrix.shape[0]
     ac_cpp = vector_cpp[vector_cpp[int]]([ccg_matrix[i,:].tolist() for i in range(n_rows)])
+    print(type(ac_cpp), ac_cpp.size())
     v_cpp = set_cpp[int](range(n_rows))
     l_cpp = set_cpp[int]([])
     x_cpp = set_cpp[int]([])
+    b = time_s();
     solns_cpp = cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
     comp_cfls = list([]*len(solns_cpp))
     comp_cfls = [list(each) for each in solns_cpp]
+    c = time_s();
+    print(f'{b-a}, {c-b}, {c-a} s ')
     return comp_cfls
 
-def CCG_solutions_cpp(ccg_matrix):
-    ac_cpp = vector_cpp[vector_cpp[int]]([ccg_matrix[i,:].tolist() for i in range(n_rows)])
-    v_cpp = set_cpp[int](range(n_rows))
+def CCG_solutions_cpp(eigen_ccg_matrix):
+    '''
+    Receives Eigen CCG matrix and outputs a vector<vector<int>> with
+    solutions. 
+    '''
+    a = time_s();
+    n_rows = int(eigen_ccg_matrix.rows());
+    ac_cpp = cppyy.gbl.mat2d_to_vector(eigen_ccg_matrix)
+    print(type(ac_cpp), ac_cpp.size())
+    v_cpp = set_cpp[int](list(range(n_rows)))
     l_cpp = set_cpp[int]([])
     x_cpp = set_cpp[int]([])
+    b = time_s();
     solns_cpp = cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
-    comp_cfls = list([]*len(solns_cpp))
-    comp_cfls = [list(each) for each in solns_cpp]
-    return comp_cfls
+    c = time_s();
+    print(f'{b-a}, {c-b}, {c-a} s ')
+    return solns_cpp
 
 def refine_candidates_to_room_dims(candidates, max_tdoa_res, room_dims):
     good_locs = candidates[candidates['tdoa_resid_s']<max_tdoa_res].reset_index(drop=True)

@@ -70,7 +70,7 @@ int check_for_one_common_edge(const set<int> &common_nodes, const MatrixXd &X, c
         return 1;
         }
     else{
-    return 0;
+    return -1;
         }
         
     /*if(common_nodes.size()==2){
@@ -128,21 +128,28 @@ MatrixXd make_ccg_matrix(const vector<MatrixXd> &all_cfls){
     }
 
 vector<vector<int>> mat2d_to_vector(MatrixXd X){
+    cout << "Here we are.." << endl;
     int num_cfls = X.rows();
     vector<int> vec_data(num_cfls);
     vector<vector<int>> to_vect (num_cfls);
     for (int i=0; i<num_cfls; i++){
         for (int j=0; j<num_cfls; j++)
             {
-            vec_data[j] = (int)X(i,j);
+            if (!isnan(X(i,j))){ 
+                vec_data[j] = (int)X(i,j);
+            }else{
+                vec_data[j] = -1; // 
+            }
+            
             }
         to_vect[i] = vec_data;
         }
+    cout << "Done we are.." << endl;
     return to_vect;
     }
 
 
-
+/*
 int main(){
     MatrixXd x(4,4);
     MatrixXd y(4,4);
@@ -191,5 +198,15 @@ int main(){
      
     MatrixXd abc = make_ccg_matrix(all_cfls);
     cout << "abc \n \n" << abc;
-    return 0;
+    
+    vector<vector<int>> mm = mat2d_to_vector(abc);
+    for (auto j : mm){
+    cout << "\n " << endl;
+    for(auto k:j)
+        {
+        cout << k << ", " ;
+        }
     }
+    
+    return 0;
+    }*/
