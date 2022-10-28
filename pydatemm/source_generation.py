@@ -46,6 +46,17 @@ def get_tde(comp_triples):
             tde_mat[global_node_to_ij[node_b], global_node_to_ij[node_a]] = edge['tde']
     return tde_mat, nodes
 
+def cpp_make_array_geom(**kwargs):
+    ''' Takes the np.array array_geom & converts it 
+    into a Eigen::MatrixXd 
+    '''
+    nmics, ncols = kwargs['array_geom'].shape
+    cpp_array_geom = cpy.gbl.Eigen.MatrixXd(nmics, ncols)
+    for i in range(nmics):
+        for j in range(ncols):
+            cpp_array_geom[i,j] = kwargs['array_geom'][i,j]
+    return cpp_array_geom
+
 def chunk_create_tde_data(compatible_solutions, all_cfls, **kwargs):
     raw_tde_by_channelnum = {}
     cfl_ids = {} # for troubleshooting and error tracing
@@ -55,6 +66,7 @@ def chunk_create_tde_data(compatible_solutions, all_cfls, **kwargs):
         numchannels = len(channels)
         tde_data = np.concatenate((kwargs['array_geom'][channels,:].flatten(), d))
         if raw_tde_by_channelnum.get(numchannels) is None:
+            print(f"Initialising {numchannels} at i:{i}")
             raw_tde_by_channelnum[numchannels] = []
             raw_tde_by_channelnum[numchannels].append(tde_data)
             cfl_ids[numchannels] = []
@@ -147,6 +159,52 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
         return np.row_stack(all_sources), list(chain(*all_cfls)), list(chain(*all_tdedata))
     else:
         return np.array([]), [], []
+
+
+def localise_sounds_cpp_v2(compatible_solutions, all_cfls, **kwargs):
+    '''
+    C++ version with compatible_solutions having 
+    '''
+    num_cores = kwargs.get('num_cores', joblib.cpu_count())
+    tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
+    all_sources = []
+    all_cfls = []
+    all_tdedata = []
+    for (nchannels, tde_input) in tde_data.items():
+        print('In For Loop', nchannels, tde_input.shape)
+        if nchannels > 4:
+            calc_sources = lo.pll_cppyy_sw2002(tde_input, num_cores, kwargs['vsound'])
+            all_sources.append(calc_sources)
+            all_cfls.append(cfl_ids[nchannels])
+            all_tdedata.append(tde_input.tolist())
+        elif nchannels == 4:
+            fourchannel_cflids= []
+            fourchannel_tdedata = []
+            for i in range(tde_input.shape[0]):
+                calc_sources = lo.row_based_mpr2003(tde_input[i,:])
+                nrows = get_numrows(calc_sources)
+                if nrows == 2:
+                    all_sources.append(calc_sources[0,:])
+                    fourchannel_cflids.append(cfl_ids[nchannels][i])
+                    fourchannel_tdedata.append(tde_input[i,:].tolist())
+                    all_sources.append(calc_sources[1,:])
+                    fourchannel_cflids.append(cfl_ids[nchannels][i])
+                    fourchannel_tdedata.append(tde_input[i,:].tolist())
+                elif nrows == 1:
+                    all_sources.append(calc_sources)
+                    fourchannel_cflids.append(cfl_ids[nchannels][i])
+                    fourchannel_tdedata.append(tde_input[i,:].tolist())
+                elif nrows == 0:
+                    pass                
+            all_cfls.append(fourchannel_cflids)
+            all_tdedata.append(fourchannel_tdedata)
+        else:
+            pass # if <4 channels encountered
+    if len(all_sources)>0:
+        return np.row_stack(all_sources), list(chain(*all_cfls)), list(chain(*all_tdedata))
+    else:
+        return np.array([]), [], []
+
 
 def generate_candidate_sources_v2(sim_audio, **kwargs):
     multich_cc = timediff.generate_multich_crosscorr(sim_audio, **kwargs )
