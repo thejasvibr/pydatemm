@@ -14,21 +14,22 @@ struct summary_data{
     map<int, vector<set<int>> > cfl_ids;
     };
 
-summary_data localise_sounds_v23(int num_cores, MatrixXd array_geom,
+summary_data localise_sounds_v21(int num_cores, MatrixXd array_geom,
                          vector<set<int>> compatible_solutions, vector<MatrixXd> all_cfls,
                                   double c=343.0){
     summary_data final_output;
     tde_data processed_tde;
     processed_tde = chunk_create_tde_data(compatible_solutions, array_geom, all_cfls);
     vector<vector<double>> sources;
-    for (auto const& x : processed_tde.tde_in){
+    for (auto x : processed_tde.tde_in){
         if (x.first>4){
             final_output.sources[x.first] = pll_sw_optim(x.second, num_cores, c);
-             
             }
     
         }
-    final_output.tde_in = processed_tde.tde_in;
+    final_output.tde_in.insert(processed_tde.tde_in.begin(), processed_tde.tde_in.end()); 
+    final_output.cfl_ids.insert(processed_tde.cfl_ids.begin(), processed_tde.cfl_ids.end()); 
+    //final_output.tde_in = processed_tde.tde_in;
     //final_output.tde_in.merge(processed_tde.tde_in);
     //final_output.cfl_ids.merge( processed_tde.cfl_ids);
      
