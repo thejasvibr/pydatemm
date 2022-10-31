@@ -10,6 +10,7 @@
 #include <cmath>
 #include <vector>
 #include <stdexcept>
+#include "eigen_utils.h"
 #include "tdoa_residual.h"
 	
 using Eigen::MatrixXd;
@@ -25,35 +26,6 @@ using Eigen::ComputeThinV;
 using namespace std;
 
 
-int get_nmics(const vector<double> tde_data){
-    
-    if ((tde_data.size()+1) % 4 == 0){
-		int nmics = (tde_data.size()+1)/4;
-		return nmics;}
-    else{
-	std::cout << "Invalid TDE vector: " << tde_data.size() << " elements." << std::endl;
-		throw std::invalid_argument( "Unable to calculate Nmics" );
-		}
-	}
-
-VectorXd to_VXd(const vector<double> &Vd){
-	VectorXd VXd(Vd.size());
-	for (int i=0; i<Vd.size(); i++){
-		VXd[i] = Vd[i];
-	}
-	return VXd;
-	}
-
-vector<double> to_vectdouble(const VectorXd &VXd)
-	{
-	vector<double> vectdouble(VXd.size());
-	//VectorXd::Map(&vectdouble[0], v1.size()) = VXd
-	for (int i=0; i < VXd.size(); i++)
-	{ 
-		vectdouble[i] = VXd[i];
-	}
-	return vectdouble;
-	}
 
 double rangediff_pair(Vector3d source, int chX, MatrixXd all_mic_posns){
 	double ch0_dist, chX_dist;

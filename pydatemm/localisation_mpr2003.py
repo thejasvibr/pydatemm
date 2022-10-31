@@ -152,7 +152,10 @@ if __name__ == "__main__":
     source = np.array([10,20,7])
     ndim = source.size
     num_mics = 4
-    mic_array = np.random.normal(0,2,ndim*num_mics).reshape(num_mics,-1)
+    mic_array = np.array([[0,0,1],
+                          [0,1,0],
+                          [1,0,0],
+                          [1,1.2,0]])
     mic_source_dist = lambda X,Y : spatial.distance.euclidean(X,Y)
     mic_2_source = np.apply_along_axis(mic_source_dist, 1, mic_array, source)
     xs = source - mic_array[0,:]
