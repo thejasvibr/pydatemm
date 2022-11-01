@@ -149,7 +149,7 @@ def solve_eqn_22(a,b):
 
 if __name__ == "__main__":
     np.random.seed(82319)
-    source = np.array([10,20,7])
+    source = np.array([1,2,7])
     ndim = source.size
     num_mics = 4
     mic_array = np.array([[0,0,1],
@@ -160,6 +160,7 @@ if __name__ == "__main__":
     mic_2_source = np.apply_along_axis(mic_source_dist, 1, mic_array, source)
     xs = source - mic_array[0,:]
     di = mic_2_source[1:] - mic_2_source[0] #+ np.random.normal(0,1e-1,num_mics-1)
+    print(di)
     print('what')
     out = mellen_pachter_raquet_2003(mic_array, di)
     print(out)

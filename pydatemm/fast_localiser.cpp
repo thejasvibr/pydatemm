@@ -25,6 +25,9 @@ summary_data localise_sounds_v21(int num_cores, MatrixXd array_geom,
         if (x.first>4){
             final_output.sources[x.first] = pll_sw_optim(x.second, num_cores, c);
             }
+        else if(x.first==4){
+            // 
+            }
     
         }
     final_output.tde_in.insert(processed_tde.tde_in.begin(), processed_tde.tde_in.end()); 
