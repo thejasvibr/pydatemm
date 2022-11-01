@@ -22,11 +22,10 @@ using Eigen::seq;
 using namespace std;
 
 Vector2d  solve_eqn_22(const VectorXd &a, const VectorXd &b){
-	// Inputs:
-	// VectorXd a,b
-	// nmics-1 length vector
-	// Output:
-	// Vector2d Rs12
+	/*
+	@param a, b Intermediate nmics-1 length Vectors
+	@return Rs12 radii from potential sources to 0th sensor.
+	*/
 	// Radius from 0th sensor.
 	Vector2d Rs12;
 
@@ -50,6 +49,13 @@ Vector2d  solve_eqn_22(const VectorXd &a, const VectorXd &b){
 VectorXd choose_correct_mpr_solutions(const VectorXd &mic_ntde_raw, const Vector2d &Rs_12,
 									const VectorXd &a, const VectorXd &b){
 	/*
+	@param mic_ntde_raw 1D vector containing the flattened 3d coordinates of the mic array
+		along with the range differences wrt mic 0.
+	@param Rs_12 Vector with 2 radial distances of potential sources to mic 0. 
+	@param a,b nmics-1 intermediate vectors. 
+	@return xs Vector with upto 6 valid values (when two potential solutions exist), 
+	else all nans or only 3 valid values. 
+
 	See Section C of Malanowski & Kulpa 2012.
 	*/
 	VectorXd xs(6);
@@ -76,17 +82,28 @@ VectorXd choose_correct_mpr_solutions(const VectorXd &mic_ntde_raw, const Vector
 	return xs;
 }
 
-
 vector<double> mpr2003_optim(const vector<double> &mic_ntde_raw, const double &c=343.0){
+	/*
+	@param mic_ntde_raw Vector with nmics*3 + nmics-1 entries. The first nmics*3 entries are 
+	the flattened coordinates of the microphones. The last nmics-1 are the range differences
+	in metres wrt the 0th sensor. 
+	@param c Optional. Speed of sound in m/s. Defaults to 343 m/s. 
+	@return out Vector with upto 8 valid entries when both solutions exist (4 entries for each solution).
+	4 entries correspond to x, y, z and TDOA-residual as defined in Scheuing & Yang 2008. 
+		
+	*/
     int nmics = get_nmics(mic_ntde_raw);
 	vector<double> out;
 	VectorXd mic_ntde_vx_raw = to_VXd(mic_ntde_raw); // without any subtraction
 	VectorXd mic_ntde = to_VXd(mic_ntde_raw);
 	MatrixXd S(nmics-1,3), invS_t_S(nmics-1,3);
 	MatrixXd S_t(nmics-1,3), inv_StS_St(nmics-1,3);
+	MatrixXd arraygeom(nmics,3);
 	VectorXd di(nmics-1),z(nmics-1),a(nmics-1), b(nmics-1);
 	Vector2d Rs_12;
 	VectorXd xs(6);
+	VectorXd xs_res(8);
+	double residual_1, residual_2; // tdoa residual
 
     if (nmics <= 3){
         throw std::invalid_argument( "Less than or equal to 3 mics detected. Aborting." );
@@ -122,24 +139,30 @@ vector<double> mpr2003_optim(const vector<double> &mic_ntde_raw, const double &c
     // substitute Rs into eqn. 19
     xs = choose_correct_mpr_solutions(mic_ntde_vx_raw, Rs_12, a,b);
 	//NEED TO CALCULATE TDOA RESIDUAL OUT HERE!!
-
-	for (auto ii : xs){
-		out.push_back(ii);
-		}
+	xs_res.head(3) = xs.head(3);
+	xs_res(seq(4,6)) = xs.tail(3);
+	arraygeom = mic_ntde_vx_raw(seq(0,3*nmics - 1)).reshaped(3,nmics).transpose();
+	if (!isnan(xs_res(0))){
+		xs_res(3) = residual_tdoa_error(mic_ntde_vx_raw.tail(nmics-1), xs.head(3), arraygeom, c);
+	}
+	if (!isnan(xs_res(4))){
+		xs_res(7) = residual_tdoa_error(mic_ntde_vx_raw.tail(nmics-1), xs.head(3), arraygeom, c);
+	}
+	out = to_vectdouble(xs_res);
 	return out;
 }
 
 
-int main(){
+/*int main(){
 	
 	VectorXd mic_array(15);
 	mic_array << 0,0,1.0,
 						  0,1.0,0,
 						  1.0,0,0,
 						  1.0,1.2,0,
-						  0.7383041911100019,
-						  0.8769856518476695,
-						0.6424417440905668;
+						   -0.8959416468645998,
+						  0.0,
+						-1.1891568622830988;
 	vector<double> mvect;
 	
 	for (auto i : mic_array){
@@ -157,4 +180,4 @@ int main(){
 		
 	
 	
-}
+}*/
