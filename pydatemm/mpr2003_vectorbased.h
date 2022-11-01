@@ -138,7 +138,6 @@ vector<double> mpr2003_optim(const vector<double> &mic_ntde_raw, const double &c
 	Rs_12 = solve_eqn_22(a, b);
     // substitute Rs into eqn. 19
     xs = choose_correct_mpr_solutions(mic_ntde_vx_raw, Rs_12, a,b);
-	//NEED TO CALCULATE TDOA RESIDUAL OUT HERE!!
 	xs_res.head(3) = xs.head(3);
 	xs_res(seq(4,6)) = xs.tail(3);
 	arraygeom = mic_ntde_vx_raw(seq(0,3*nmics - 1)).reshaped(3,nmics).transpose();
@@ -152,8 +151,6 @@ vector<double> mpr2003_optim(const vector<double> &mic_ntde_raw, const double &c
 	return out;
 }
 
-
-
 vector<vector<double>> many_mpr2003_optim(const vector<vector<double>> &all_inputs, double c=343.0){
 	/*
 	The multi-input version of mpr2003_optim.
@@ -164,7 +161,7 @@ vector<vector<double>> many_mpr2003_optim(const vector<vector<double>> &all_inpu
 	*/
 	vector<double> output(8);
 	vector<double> sub_vect(4);
-	
+
 	vector<vector<double>> flattened_output;
 	for (int i = 0; i < all_inputs.size(); i++){
 		output = mpr2003_optim(all_inputs[i], c);

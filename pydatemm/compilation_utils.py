@@ -48,9 +48,13 @@ def get_libiomp5_path():
             return only_libiomp5
     else:
         #TODO : User needs to have added an environmental variable 
-        # for LIBIOMP5_PATH or something like that so Python can pick it up easily. 
+        # for LIBIOMP5PATH 
         # Maybe this is the best default solution actually?
-        raise NotImplementedError(f"{sys.platform} OS not handled currently")
+        if sys.platform == 'win32':
+            only_libiomp5 = [os.environ['LIBIOMP5PATH']]
+            return only_libiomp5
+        else:
+            raise NotImplementedError(f"{sys.platform} OS not handled currently")
 
 def get_eigen_path():
     current_module_path = os.path.abspath(__file__)
@@ -60,7 +64,9 @@ def get_eigen_path():
 def get_cpp_modules():
     current_module_path = os.path.abspath(__file__)
     current_folder = os.path.split(current_module_path)[0]
-    cpp_modules = ['sw2002_vectorbased.h',
+    cpp_modules = ['eigen_utils.h',
+                   ' mpr2003_vectorbased.h',
+                   'sw2002_vectorbased.h',
                    'combineall_cpp/ui_combineall.cpp',
                    'graph_manip_ccp.cpp']
     cpp_files = [os.path.join(current_folder, each) for each in cpp_modules]
