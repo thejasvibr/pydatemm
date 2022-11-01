@@ -153,31 +153,78 @@ vector<double> mpr2003_optim(const vector<double> &mic_ntde_raw, const double &c
 }
 
 
+
+vector<vector<double>> many_mpr2003_optim(const vector<vector<double>> &all_inputs, double c=343.0){
+	/*
+	The multi-input version of mpr2003_optim.
+	@param all_inputs Vector of vectors containing various mic-array xyz and range-differences
+	@param c Optional. Speed of sound in m/s, defaults to 343.0 m/s.
+	@return flattened_output vector of vectors holding 4 entries: x, y, z, TDOA-residual
+	@see mpr2003_optim
+	*/
+	vector<double> output(8);
+	vector<double> sub_vect(4);
+	
+	vector<vector<double>> flattened_output;
+	for (int i = 0; i < all_inputs.size(); i++){
+		output = mpr2003_optim(all_inputs[i], c);
+		if (!isnan(output[0])){
+			for (int i=0; i<4; i++){
+				sub_vect[i] = output[i];
+			}
+		flattened_output.push_back(sub_vect);
+		}
+		if (!isnan(output[4])){
+			for (int i=0; i<4; i++){
+				sub_vect[i] = output[i+4];
+			}
+		flattened_output.push_back(sub_vect);			
+		}
+
+	}
+	return flattened_output;
+	}
+
 /*int main(){
 	
-	VectorXd mic_array(15);
-	mic_array << 0,0,1.0,
+	VectorXd input1(15), input2(15);
+	input1 << 0,0,1.0,
 						  0,1.0,0,
 						  1.0,0,0,
 						  1.0,1.2,0,
 						   -0.8959416468645998,
 						  0.0,
 						-1.1891568622830988;
-	vector<double> mvect;
 	
-	for (auto i : mic_array){
-		mvect.push_back(i);
-	}
+	input2 << 0,0,1.0,
+						  0,1.0,0,
+						  1.0,0,0,
+						  1.0,1.2,0,
+						   0.2279981273412348,
+						  0.9481513817965102,
+						0.36372892194093875;
+	vector<double> mvect = to_vectdouble(input1);
+	vector<double> mvect2 = to_vectdouble(input2);
+	vector<vector<double>> multi_input;
+	multi_input.push_back(mvect);
+	multi_input.push_back(mvect2);
+	
+	
+	
 	//cout << "mic array \n " << mic_array.transpose() << endl;
-	MatrixXd qq(3,4);
-	qq = mic_array(seq(0,11)).reshaped(3,4).transpose();
 	vector<double> oo;
 	oo = mpr2003_optim(mvect);
 	for (auto ii : oo){
 		cout << ii << ", " ;
 	}
 	cout << "" << endl;
-		
 	
-	
+	vector<vector<double>> many_out  = many_mpr2003_optim(multi_input);
+	for (auto ii:many_out){
+		for (auto kk : ii){
+			cout << kk << ", " ;
+			}
+		cout << "" << endl;
+	}
+
 }*/

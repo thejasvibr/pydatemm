@@ -149,7 +149,7 @@ def solve_eqn_22(a,b):
 
 if __name__ == "__main__":
     np.random.seed(82319)
-    source = np.array([10,100,10])
+    source = np.array([-0.5,3,4])
     ndim = source.size
     num_mics = 4
     mic_array = np.array([[0,0,1],
