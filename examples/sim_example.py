@@ -57,7 +57,7 @@ kwargs['num_cores'] = 8
 #%%
 
 sim_audio = array_audio[start_sample:end_sample]
-#position_data, cfl_ids, tdedata = generate_candidate_sources_v2(audio_chunk, **kwargs)
+#position_data, cfl_ids, tdedata = generate_candidate_sources_v2(sim_audio, **kwargs)
 #%load_ext line_profiler
 #%lprun -f CCG_solutions generate_candidate_sources_v2(sim_audio, **kwargs)
 #%lprun -f generate_candidate_sources_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)

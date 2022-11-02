@@ -254,7 +254,7 @@ def generate_candidate_sources_hybrid(sim_audio, **kwargs):
     multich_cc = timediff.generate_multich_crosscorr(sim_audio, **kwargs )
     cc_peaks = timediff.get_multich_tdoas(multich_cc, **kwargs)
 
-    K = kwargs.get('K',5) # number of peaks per channel CC to consider
+    K = kwargs.get('K',7) # number of peaks per channel CC to consider
     top_K_tdes = {}
     for ch_pair, tdes in cc_peaks.items():
         descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
@@ -278,7 +278,8 @@ def generate_candidate_sources_hybrid(sim_audio, **kwargs):
     solns_cpp = lo.CCG_solutions_cpp(ccg_matrix)
     print('Found solutions')
     print(f'Doing tracking: {len(solns_cpp)}')
-    sources, cfl_ids, tdedata = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)
+    ag = cpp_make_array_geom(**kwargs)
+    data_struct = cpy.gbl.localise_sounds_v21(3, ag, solns_cpp, cfls_from_tdes)
     print('Done with tracking.')
     return sources, cfl_ids, tdedata
 

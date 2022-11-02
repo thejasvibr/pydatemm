@@ -1,11 +1,14 @@
+#pragma once
 #include <iostream>
 #include <cmath>
 #include <vector>
 #include <set>
+#define EIGEN_INITIALIZE_MATRICES_BY_NAN
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include "graph_manip_ccp.cpp"
 #include "sw2002_vectorbased.h"
+#include "mpr2003_vectorbased.h"
 using namespace std;
 
 struct summary_data{
@@ -21,12 +24,30 @@ summary_data localise_sounds_v21(int num_cores, MatrixXd array_geom,
     tde_data processed_tde;
     processed_tde = chunk_create_tde_data(compatible_solutions, array_geom, all_cfls);
     vector<vector<double>> sources;
+    vector<vector<double>> inputdata;
+    cout << "what?" << endl;
+    vector<double> onesoln;
+    
     for (auto x : processed_tde.tde_in){
         if (x.first>4){
-            final_output.sources[x.first] = pll_sw_optim(x.second, num_cores, c);
+            cout << "Nchannels: "<< x.first << endl;
+            //final_output.sources[x.first] = pll_sw_optim(x.second, num_cores, c);
+            inputdata = x.second;
+            cout << "x.second[0].size: " << x.second[0].size() << endl;
+            //onesoln = sw_matrix_optim(x.second[0], c);
+            cout << "x.second[0] entries: " << endl;
+            for (auto ii:x.second[0]){
+                cout << ii << ", ";
+                }
+            cout << endl;
+            
+            
+            //pll_sw_optim(inputdata, num_cores, c);
             }
         else if(x.first==4){
             // 
+            cout << "bow!!" << endl;
+            //final_output.sources[x.first] = many_mpr2003_optim(x.second, c);
             }
 
         }
@@ -35,7 +56,6 @@ summary_data localise_sounds_v21(int num_cores, MatrixXd array_geom,
     //final_output.tde_in = processed_tde.tde_in;
     //final_output.tde_in.merge(processed_tde.tde_in);
     //final_output.cfl_ids.merge( processed_tde.cfl_ids);
-     
        return final_output;
        }
     

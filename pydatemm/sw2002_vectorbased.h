@@ -1,7 +1,7 @@
+#pragma once
 #include <omp.h>
 #include <iostream>
 #include <chrono>
-//#define EIGEN_DONT_PARALLELIZE
 #define EIGEN_INITIALIZE_MATRICES_BY_NAN
 #include <Eigen/Core>
 #include <Eigen/Dense>

@@ -118,8 +118,10 @@ def make_consistent_fls_cpp(multich_tdes, **kwargs):
             if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
                 this_cfl = cpy.gbl.Eigen.MatrixXd(kwargs['nchannels'], kwargs['nchannels'])
                 for e, tde in zip(edges, [tde1, tde2, tde3]):
-                    this_cfl[e[0],e[1]] = tde[1]
-                    this_cfl[e[1],e[0]] = tde[1]
+                    if e[0] != e[1]:
+                        print(i, e[0], e[1])
+                        this_cfl[e[0],e[1]] = tde[1]
+                        this_cfl[e[1],e[0]] = tde[1]
                 k += 1 
                 all_cfls.append(this_cfl)
     return all_cfls

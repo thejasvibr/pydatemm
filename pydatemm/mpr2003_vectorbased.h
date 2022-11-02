@@ -1,3 +1,4 @@
+#pragma once
 #include <omp.h>
 #include <iostream>
 #include <chrono>
@@ -11,6 +12,7 @@
 #include <stdexcept>
 #include "eigen_utils.h"
 #include "tdoa_residual.h"
+
 
 using Eigen::MatrixXd;
 using Eigen::ArrayXXd;

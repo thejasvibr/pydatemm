@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <vector>
 #include <set>
@@ -8,6 +9,9 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include "eigen_utils.h"
+
+
+
 
 using Eigen::MatrixXd;
 using namespace std;
@@ -138,8 +142,10 @@ MatrixXd combine_graphs(const set<int> &solution, const vector<MatrixXd> &all_cf
     for (auto graph_id : solution){
         nonan_inds = get_nonans(all_cfls[graph_id]);
         for (auto each :  nonan_inds){
+                if (!each[0]==each[1]){
                 joint_graphs(each[0], each[1]) = all_cfls[graph_id](each[0], each[1]);
-                }                
+                    }
+            }                
         
         }
     return joint_graphs;

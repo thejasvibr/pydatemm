@@ -65,7 +65,8 @@ def get_cpp_modules():
     current_module_path = os.path.abspath(__file__)
     current_folder = os.path.split(current_module_path)[0]
     cpp_modules = ['eigen_utils.h',
-                   ' mpr2003_vectorbased.h',
+                   'fast_localiser.cpp',
+                   'mpr2003_vectorbased.h',
                    'sw2002_vectorbased.h',
                    'combineall_cpp/ui_combineall.cpp',
                    'graph_manip_ccp.cpp']
