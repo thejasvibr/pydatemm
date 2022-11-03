@@ -269,20 +269,16 @@ def generate_candidate_sources_hybrid(sim_audio, **kwargs):
     print(f'len of cfls: {len(cfls_from_tdes)}')
 
     print('Making CCG matrix')
-    if len(cfls_from_tdes) > 200:
-        ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
-        
-    else:
-        ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes, **kwargs)
+    ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
+ 
     print('Finding solutions')
     solns_cpp = lo.CCG_solutions_cpp(ccg_matrix)
     print('Found solutions')
     print(f'Doing tracking: {len(solns_cpp)}')
     ag = cpp_make_array_geom(**kwargs)
-    data_struct = cpy.gbl.localise_sounds_v21(3, ag, solns_cpp, cfls_from_tdes)
+    data_struct = cpy.gbl.localise_sounds_v2(3, ag, solns_cpp, cfls_from_tdes)
     print('Done with tracking.')
-    return sources, cfl_ids, tdedata
-
+    return data_struct
 
 
 

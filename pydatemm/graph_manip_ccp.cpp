@@ -159,7 +159,7 @@ struct tde_w_channels{
     set<int> channels;
     };
 
-tde_w_channels get_tde(MatrixXd array_geom, MatrixXd X, const double c=343.0){
+tde_w_channels get_tde(const MatrixXd &array_geom, const MatrixXd &X, const double c=343.0){
     /* outputs a struct with 
      vector of tde_out 
      and channels
@@ -199,8 +199,8 @@ struct tde_data{
     
     };
 
-tde_data chunk_create_tde_data(vector<set<int>> comp_solns, MatrixXd array_geom,
-                                                     vector<MatrixXd> all_cfls, double c=343.0){
+tde_data chunk_create_tde_data(const vector<set<int>> &comp_solns, const MatrixXd &array_geom,
+                                                     const vector<MatrixXd> &all_cfls, double c=343.0){
     // outputs a struct with 2 maps formatted by tde-vector and cfl-ids.
     tde_data formatted_tde;
     int num_solns = comp_solns.size();
