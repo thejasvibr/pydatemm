@@ -31,15 +31,15 @@ summary_data localise_sounds_v21(int num_cores, MatrixXd array_geom,
     for (auto x : processed_tde.tde_in){
         if (x.first>4){
             cout << "Nchannels: "<< x.first << endl;
-            //final_output.sources[x.first] = pll_sw_optim(x.second, num_cores, c);
-            inputdata = x.second;
+            final_output.sources[x.first] = pll_sw_optim(x.second, num_cores, c);
+            /*inputdata = x.second;
             cout << "x.second[0].size: " << x.second[0].size() << endl;
-            //onesoln = sw_matrix_optim(x.second[0], c);
-            cout << "x.second[0] entries: " << endl;
-            for (auto ii:x.second[0]){
+            onesoln = sw_matrix_optim(x.second[0], c);
+            cout << "XYZ soln " << endl;
+            for (auto ii:onesoln){
                 cout << ii << ", ";
                 }
-            cout << endl;
+            cout << endl;*/
             
             
             //pll_sw_optim(inputdata, num_cores, c);
@@ -47,7 +47,7 @@ summary_data localise_sounds_v21(int num_cores, MatrixXd array_geom,
         else if(x.first==4){
             // 
             cout << "bow!!" << endl;
-            //final_output.sources[x.first] = many_mpr2003_optim(x.second, c);
+            final_output.sources[x.first] = many_mpr2003_optim(x.second, c);
             }
 
         }

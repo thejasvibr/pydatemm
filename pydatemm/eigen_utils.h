@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#define EIGEN_INITIALIZE_MATRICES_BY_NAN
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <stdexcept>

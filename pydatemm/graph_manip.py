@@ -100,6 +100,14 @@ def make_consistent_fls(multich_tdes, **kwargs):
                 all_cfls.append(this_cfl)
     return all_cfls
 
+def make_all_entries_nan(EigenXd):
+    '''Assigns all values in an Eigen Matrix to NaN
+    '''
+    for i in range(EigenXd.rows()):
+        for j in range(EigenXd.cols()):
+            EigenXd[i,j] = np.nan
+    return EigenXd
+
 def make_consistent_fls_cpp(multich_tdes, **kwargs):
     '''The C++-Python hybrid version. 
     '''
@@ -117,9 +125,10 @@ def make_consistent_fls_cpp(multich_tdes, **kwargs):
         for i, (tde1, tde2, tde3) in enumerate(abc_combinations):
             if abs(tde1[1]-tde2[1]+tde3[1]) < max_loop_residual:
                 this_cfl = cpy.gbl.Eigen.MatrixXd(kwargs['nchannels'], kwargs['nchannels'])
+                make_all_entries_nan(this_cfl)
                 for e, tde in zip(edges, [tde1, tde2, tde3]):
                     if e[0] != e[1]:
-                        print(i, e[0], e[1])
+                        #print(i, e[0], e[1])
                         this_cfl[e[0],e[1]] = tde[1]
                         this_cfl[e[1],e[0]] = tde[1]
                 k += 1 

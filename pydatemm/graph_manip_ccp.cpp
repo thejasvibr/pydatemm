@@ -14,21 +14,22 @@
 
 
 using Eigen::MatrixXd;
+using Eigen::all;
 using namespace std;
 
 
 set<int> get_nodes(const MatrixXd &X){
     // gets nodes in graph by looking at non-NaN indices
-    vector<int> nodes;
     set<int> final_nodes;
-
+    
     for (int i=0; i<X.rows();i++){
         for (int j=0; j<X.cols(); j++){
             if (!isnan(X(i,j))){
                 final_nodes.insert(j);
+                final_nodes.insert(i);
                 }
             }
-        }
+        }        
     return final_nodes;
     }
 
@@ -144,6 +145,7 @@ MatrixXd combine_graphs(const set<int> &solution, const vector<MatrixXd> &all_cf
         for (auto each :  nonan_inds){
                 if (!each[0]==each[1]){
                 joint_graphs(each[0], each[1]) = all_cfls[graph_id](each[0], each[1]);
+                joint_graphs(each[1], each[0]) = joint_graphs(each[0], each[1]);
                     }
             }                
         
@@ -154,7 +156,7 @@ MatrixXd combine_graphs(const set<int> &solution, const vector<MatrixXd> &all_cf
 
 struct tde_w_channels{
     vector<double> tde_data;
-    vector<int> channels;
+    set<int> channels;
     };
 
 tde_w_channels get_tde(MatrixXd array_geom, MatrixXd X, const double c=343.0){
@@ -173,18 +175,11 @@ tde_w_channels get_tde(MatrixXd array_geom, MatrixXd X, const double c=343.0){
     tde_w_channels output;
     
     int num_rows = X.rows();
-    output.channels.push_back(0);
-    for (auto each : array_geom.row(0)){
-        output.tde_data.push_back(each);
-        }
-    for (int j=0; j<num_rows; j++){
-        if (!isnan(X(0,j)))
-            {
-            output.channels.push_back(j);
-            // mic xyz of that channel
-            for (auto each : array_geom.row(j)){
-                output.tde_data.push_back(each);
-                }
+    output.channels = get_nodes(X);
+    
+    for (auto i : output.channels){
+        for (auto each : array_geom.row(i)){
+            output.tde_data.push_back(each);
             }
         }
     
@@ -210,6 +205,7 @@ tde_data chunk_create_tde_data(vector<set<int>> comp_solns, MatrixXd array_geom,
     tde_data formatted_tde;
     int num_solns = comp_solns.size();
     int n_channels = all_cfls[0].rows();
+    
     MatrixXd combined_tdemat(n_channels, n_channels);
     tde_w_channels tde_out;
     bool key_not_in_map;

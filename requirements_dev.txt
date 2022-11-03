@@ -1,7 +1,10 @@
+joblib
 recommonmark 
 sphinx==4.4.0
 sphinx_gallery==0.10.1
 sphinx_rtd_theme
 numpy
+pyroomacoustics
 scipy
+scikit-learn
 matplotlib
