@@ -8,11 +8,6 @@ import pandas as pd
 import soundfile as sf
 from scipy.spatial import distance_matrix
 import time
-from pydatemm.source_generation import generate_candidate_sources_v2, localise_sounds_v2, create_tde_data
-from pydatemm.source_generation import chunk_create_tde_data, pll_create_tde_data, get_tde
-from pydatemm.localiser import CCG_solutions
-#import multibatsimulation as multibat
-#from memory_profiler import profile
 
 filename = '3-bats_trajectory_simulation_1-order-reflections.wav'
 try:
@@ -46,26 +41,6 @@ end_time = start_time  + max_delay
 start_sample, end_sample = int(fs*start_time), int(fs*end_time)
 
 kwargs['num_cores'] = 8
-
-# for num_cores in [8]:
-    
-#     sta = time.perf_counter()
-    
-#     sto = time.perf_counter()
-#     print(f'{num_cores} Cores: {sto-sta} s taken')
-
-#%%
-
 sim_audio = array_audio[start_sample:end_sample]
-#position_data, cfl_ids, tdedata = generate_candidate_sources_v2(sim_audio, **kwargs)
-#%load_ext line_profiler
-#%lprun -f CCG_solutions generate_candidate_sources_v2(sim_audio, **kwargs)
-#%lprun -f generate_candidate_sources_v2 generate_candidate_sources_v2(audio_chunk, **kwargs)
 
-#%% Write the data out into a txt file
-# import csv
-
-# with open("out.csv", "w") as f:
-#     wr = csv.writer(f)
-#     wr.writerows(tdedata[-500000:])
 

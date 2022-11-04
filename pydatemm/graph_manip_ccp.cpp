@@ -3,7 +3,6 @@
 #include <vector>
 #include <set>
 #include <cmath>
-#include <algorithm>
 #include <stdexcept>
 #define EIGEN_INITIALIZE_MATRICES_BY_NAN
 #include <Eigen/Core>
@@ -138,7 +137,7 @@ MatrixXd combine_graphs(const set<int> &solution, const vector<MatrixXd> &all_cf
     for (auto graph_id : solution){
         nonan_inds = get_nonans(all_cfls[graph_id]);
         for (auto each :  nonan_inds){
-                if (!each[0]==each[1]){
+                if (!(each[0]==each[1])){
                 joint_graphs(each[0], each[1]) = all_cfls[graph_id](each[0], each[1]);
                 joint_graphs(each[1], each[0]) = joint_graphs(each[0], each[1]);
                     }
