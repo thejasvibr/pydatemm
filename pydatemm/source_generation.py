@@ -13,6 +13,7 @@ Created on Tue Oct 18 15:17:29 2022
 """
 import numpy as np 
 from itertools import chain
+import time
 import joblib
 from joblib import Parallel, delayed
 import pydatemm.localiser as lo
@@ -224,20 +225,20 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
     cfls_from_tdes = gramanip.make_consistent_fls(top_K_tdes, **kwargs)
     print(f'len of cfls: {len(cfls_from_tdes)}')
     # put all consistent loops into fundamental loop 'bins'
-    all_fls = gramanip.make_fundamental_loops(kwargs['nchannels'])
-    cfls_by_fl = {}
-    for fl in all_fls:
-        cfls_by_fl[fl] = []
-    
-    for i,each in enumerate(cfls_from_tdes):
-        for fl in all_fls:
-            if set(each.vs['name']) == set(fl):
-                cfls_by_fl[fl].append(i)
+    #all_fls = gramanip.make_fundamental_loops(kwargs['nchannels'])
+#    cfls_by_fl = {}
+#    for fl in all_fls:
+#        cfls_by_fl[fl] = []
+#    
+#    for i,each in enumerate(cfls_from_tdes):
+#        for fl in all_fls:
+#            if set(each.vs['name']) == set(fl):
+#                cfls_by_fl[fl].append(i)
     print('Making CCG matrix')
-    if len(cfls_from_tdes) > 200:
-        ccg_matrix = gramanip.make_ccg_matrix(cfls_from_tdes, **kwargs)
-    else:
-        ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes, **kwargs)
+
+    ccg_matrix = gramanip.make_ccg_matrix(cfls_from_tdes, **kwargs)
+#    else:
+#        ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes, **kwargs)
     print('Finding solutions')
     solns_cpp = lo.CCG_solutions(ccg_matrix)
     print('Found solutions')
@@ -251,6 +252,8 @@ def generate_candidate_sources_hybrid(sim_audio, **kwargs):
     '''
     generate_candidate_sources_v2 but with C++ graphs as Eigen Matrices
     '''
+    a = time.perf_counter_ns()/1e9
+    num_cores = kwargs.get('num_cores', joblib.cpu_count())
     multich_cc = timediff.generate_multich_crosscorr(sim_audio, **kwargs )
     cc_peaks = timediff.get_multich_tdoas(multich_cc, **kwargs)
 
@@ -265,19 +268,23 @@ def generate_candidate_sources_hybrid(sim_audio, **kwargs):
             except:
                 pass
     print('making the cfls...')
+    b = time.perf_counter_ns()/1e9
     cfls_from_tdes = gramanip.make_consistent_fls_cpp(top_K_tdes, **kwargs)
     print(f'len of cfls: {len(cfls_from_tdes)}')
 
+    c = time.perf_counter_ns()/1e9
     print('Making CCG matrix')
     ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
- 
+    d = time.perf_counter_ns()/1e9
     print('Finding solutions')
     solns_cpp = lo.CCG_solutions_cpp(ccg_matrix)
     print('Found solutions')
     print(f'Doing tracking: {len(solns_cpp)}')
+    e = time.perf_counter_ns()/1e9
     ag = cpp_make_array_geom(**kwargs)
-    data_struct = cpy.gbl.localise_sounds_v2(3, ag, solns_cpp, cfls_from_tdes)
+    data_struct = cpy.gbl.localise_sounds_v2(num_cores, ag, solns_cpp, cfls_from_tdes)
     print('Done with tracking.')
+    f = time.perf_counter_ns()/1e9
     return data_struct
 
 

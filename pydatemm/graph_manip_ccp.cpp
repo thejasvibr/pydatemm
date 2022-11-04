@@ -10,9 +10,6 @@
 #include <Eigen/Dense>
 #include "eigen_utils.h"
 
-
-
-
 using Eigen::MatrixXd;
 using Eigen::all;
 using namespace std;
@@ -116,7 +113,6 @@ MatrixXd make_ccg_matrix(const vector<MatrixXd> &all_cfls){
     }
 
 vector<vector<int>> mat2d_to_vector(MatrixXd X){
-    cout << "Here we are.." << endl;
     int num_cfls = X.rows();
     vector<int> vec_data(num_cfls);
     vector<vector<int>> to_vect (num_cfls);
@@ -132,7 +128,6 @@ vector<vector<int>> mat2d_to_vector(MatrixXd X){
             }
         to_vect[i] = vec_data;
         }
-    cout << "Done we are.." << endl;
     return to_vect;
     }
 
@@ -217,7 +212,7 @@ tde_data chunk_create_tde_data(const vector<set<int>> &comp_solns, const MatrixX
         key_not_in_map = formatted_tde.tde_in.find(n_channels)==formatted_tde.tde_in.end();
         if (key_not_in_map)
             {
-            cout << "initialising: " << n_channels << "at index: " << i<<  endl;
+            //cout << "initialising: " << n_channels << "at index: " << i<<  endl;
             formatted_tde.tde_in[n_channels] = {};
             formatted_tde.tde_in.at(n_channels).push_back(tde_out.tde_data);
             formatted_tde.cfl_ids[n_channels] = {};
@@ -231,96 +226,3 @@ tde_data chunk_create_tde_data(const vector<set<int>> &comp_solns, const MatrixX
 
     return formatted_tde;
     }
-
-/*
-def chunk_create_tde_data(compatible_solutions, all_cfls, **kwargs):
-    raw_tde_by_channelnum = {}
-    cfl_ids = {} # for troubleshooting and error tracing
-    for i, compat_cfl in enumerate(compatible_solutions):
-        source_tde, channels = get_tde([all_cfls[j] for j in compat_cfl])
-        d = source_tde[1:,0]*kwargs['vsound']
-        numchannels = len(channels)
-        tde_data = np.concatenate((kwargs['array_geom'][channels,:].flatten(), d))
-        if raw_tde_by_channelnum.get(numchannels) is None:
-            raw_tde_by_channelnum[numchannels] = []
-            raw_tde_by_channelnum[numchannels].append(tde_data)
-            cfl_ids[numchannels] = []
-            cfl_ids[numchannels].append(compat_cfl)
-        else:
-            raw_tde_by_channelnum[numchannels].append(tde_data)
-            cfl_ids[numchannels].append(compat_cfl)
-    tde_by_channelnum = {}
-    for nchannels, tde_data in raw_tde_by_channelnum.items():
-        tde_by_channelnum[nchannels] = np.row_stack(tde_data)
-    return tde_by_channelnum, cfl_ids
-*/
-
-
-
-/*int main(){
-    MatrixXd x(4,4);
-    MatrixXd y(4,4);
-    x(1,0) = 1.5; x(0,1) = 1.5;
-    
-    x(1,2) = 3; x(2,1) = x(1,2);
-    // 2 nodes
-    x(2,0) = 1.5; x(0,2) = 1.5;
-    y(2,0) = x(2,0); y(0,2) = y(2,0);
-    
-    y(2,3) = 1.5; y(3,2) = y(2,3);
-    y(0,3) = 1.5; y(3,0) = y(0,3);
-    
-    set<int> xnodes = get_nodes(x);
-    set<int> ynodes = get_nodes(y);
-    
-    std::cout << x << std::endl;
-    
-    std::cout << "x nodes " << std::endl;
-    for (auto i : xnodes){
-        std::cout << i << ", ";
-        }
-    
-    std::cout << "\n y nodes " << std::endl;
-    for (auto i : ynodes){
-        std::cout << i << ", ";
-        }
-    set<int> commonnodes  = get_common_nodes(x,y);
-    cout << " \n common nodes " << endl;
-    for (auto k: commonnodes){
-        cout << k << ", " ;
-        }
-    // check for common edges
-    int common = check_for_one_common_edge(commonnodes, x, y);
-    cout << "common edge check output " << common << endl;
-    cout << "CCG definer output" << endl;
-    
-    int ccg_relation = ccg_definer(y,y);
-    cout << "\n " << ccg_relation << endl;
-    
-    vector<MatrixXd> all_cfls(4);
-    all_cfls[0] = x;
-    all_cfls[1] = x;
-    all_cfls[2] = y;
-    all_cfls[3] = y;
-     
-    MatrixXd abc = make_ccg_matrix(all_cfls);
-    cout << "abc \n \n" << abc;
-    
-    vector<vector<int>> mm = mat2d_to_vector(abc);
-    
-    cout << "\n " << endl;
-    vector<vector<int>> ii = get_nonans(y);
-    for (auto a : ii){
-        cout << "\n " << endl;
-        for (auto i : a){
-            cout << i << ", ";
-            }
-        cout << endl;
-        }
-        
-    set<int> combined = {0,2};
-    MatrixXd uu = combine_graphs(combined, all_cfls);
-    cout << uu << endl;
-    
-    return 0;
-    }*/
