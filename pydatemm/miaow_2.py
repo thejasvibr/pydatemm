@@ -19,15 +19,16 @@ from pydatemm.source_generation import generate_candidate_sources_hybrid
 
 #%%
 kwargs['num_cores'] = 4
-kwargs['K'] = 3
+kwargs['K'] = 7
 for i in range(1):
     a = nstime()
     dcpp = generate_candidate_sources_hybrid(sim_audio, **kwargs)
     b = nstime()
     print(f'C++: {b-a}')
+cpp_sources = np.array([each for each in dcpp.sources])
 #%%
 a = nstime()
-dpy = generate_candidate_sources_v2(sim_audio, **kwargs)
+py_sources, py_cfls, py_tdein = generate_candidate_sources_v2(sim_audio, **kwargs)
 b = nstime()
 print(f'Python-based: {b-a}')
 
@@ -38,7 +39,15 @@ print(f'Python-based: {b-a}')
 cpp_nchannels = [ (each.size()+1)/4 for each in dcpp.tde_in]
 cpp_nch, cpp_counts = np.unique(cpp_nchannels, return_counts=True)
 
-py_nchannels = [ (len(each)+1)/4 for each in dpy[2]]
+py_nchannels = [ (len(each)+1)/4 for each in py_tdein]
 py_nch, py_counts = np.unique(py_nchannels, return_counts=True)
+
+
+#%% Check that each cpp source is also present in the numpy output
+each = cpp_sources[55222,:]
+residual = np.sqrt(np.sum((each[:3]-py_sources[:,:3])**2,1))
+print(np.argwhere(residual<1e-25))
+
+
 
 
