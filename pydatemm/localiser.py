@@ -16,12 +16,16 @@ from sklearn import cluster
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from pydatemm.tdoa_quality import residual_tdoa_error_nongraph
 from pydatemm.compilation_utils import load_and_compile_with_own_flags
+
 load_and_compile_with_own_flags()
-import cppyy
+
+    
+
 from time import perf_counter_ns as pcn
 time_s = lambda : pcn()/1e9
 
 try:
+    import cppyy
     vector_cpp = cppyy.gbl.std.vector
     set_cpp = cppyy.gbl.std.set
 except ImportError:

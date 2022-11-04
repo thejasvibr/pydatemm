@@ -25,6 +25,7 @@ vector<vector<int>> get_nonans(const MatrixXd &X){
     return all_inds;
     }
 
+
 //vector<int> get_nonans1d()
 
 int get_nmics(const vector<double> tde_data){

@@ -79,7 +79,6 @@ def pll_create_tde_data(compatible_solutions,
                            all_cfls, **kwargs):
     parts = kwargs.get('num_cores', joblib.cpu_count())
     #split data into parts
-    print(f'Num parts: {parts}')
     split_solns = (compatible_solutions[i::parts] for i in range(parts))
     results = Parallel(n_jobs=parts)(delayed(chunk_create_tde_data)(chunk, all_cfls, **kwargs) for chunk in split_solns)
     # join split data into single dictionaries
@@ -101,11 +100,11 @@ def pll_create_tde_data(compatible_solutions,
 
 
 
-def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
+def localise_sounds_v2(compatible_solutions, all_in_cfls, **kwargs):
     '''
     '''
     num_cores = kwargs.get('num_cores', joblib.cpu_count())
-    tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
+    tde_data, cfl_ids = create_tde_data(compatible_solutions, all_in_cfls, **kwargs)
     all_sources = []
     all_cfls = []
     all_tdedata = []
@@ -117,6 +116,8 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
             all_cfls.append(cfl_ids[nchannels])
             all_tdedata.append(tde_input.tolist())
         elif nchannels == 4:
+            print("4CHANNEL SOLUTIONS ARE: ", tde_input.shape, " in number" )
+            miaow = 0
             fourchannel_cflids= []
             fourchannel_tdedata = []
             for i in range(tde_input.shape[0]):
@@ -134,6 +135,7 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
                     fourchannel_cflids.append(cfl_ids[nchannels][i])
                     fourchannel_tdedata.append(tde_input[i,:].tolist())
                 elif nrows == 0:
+                    miaow += 1
                     pass                
             all_cfls.append(fourchannel_cflids)
             all_tdedata.append(fourchannel_tdedata)
@@ -147,12 +149,12 @@ def localise_sounds_v2(compatible_solutions, all_cfls, **kwargs):
 
 
 
-def localise_sounds_cpp_v2(compatible_solutions, all_cfls, **kwargs):
+def localise_sounds_cpp_v2(compatible_solutions, all_in_cfls, **kwargs):
     '''
     C++ version with compatible_solutions having 
     '''
     num_cores = kwargs.get('num_cores', joblib.cpu_count())
-    tde_data, cfl_ids = create_tde_data(compatible_solutions, all_cfls, **kwargs)
+    tde_data, cfl_ids = create_tde_data(compatible_solutions, all_in_cfls, **kwargs)
     all_sources = []
     all_cfls = []
     all_tdedata = []

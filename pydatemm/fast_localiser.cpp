@@ -12,6 +12,19 @@
 #include "mpr2003_vectorbased.h"
 using namespace std;
 
+
+bool nans_in_vector(const vector<double> &v){
+    bool nans_present = false;
+    for (auto part : v){
+        if (isnan(part)){
+            nans_present = true;
+            return nans_present;
+            }
+        }
+    
+    return nans_present;
+    }
+
 struct summary_data{
     map<int, vector<vector<double>> > sources;
     map<int, vector<vector<double>> > tde_in;
@@ -25,9 +38,6 @@ struct output_lists{
     vector<set<int>> cfl_ids;
     };
 
-
-
- 
 
 output_lists localise_sounds_v3(const int &num_cores, const MatrixXd &array_geom,
                          const vector<set<int>> &compatible_solutions, const vector<MatrixXd> &all_cfls,
@@ -62,27 +72,31 @@ output_lists localise_sounds_v3(const int &num_cores, const MatrixXd &array_geom
                 final_output.sources.push_back(temp_sources[i]);
                 final_output.tde_in.push_back(x.second[i]);
                 final_output.cfl_ids.push_back(processed_tde.cfl_ids[x.first][i]);
-                }
             }
+        }
         else if(x.first==4){
             for (int i=0; i<x.second.size(); i++){
                 // with 4 channels there's always upto 2 valid solutions.
                 temp_4ch_sources = mpr2003_optim(x.second[i], c);
-                // first source
+                // first source (even if -999)
                 copy(temp_4ch_sources.begin(), temp_4ch_sources.begin()+4, temp_one_source.begin());
-                final_output.sources.push_back(temp_one_source);
-                final_output.tde_in.push_back(x.second[i]);
-                final_output.cfl_ids.push_back(processed_tde.cfl_ids[x.first][i]);
-                
-                // second source
+                if (!nans_in_vector(temp_one_source)){
+                    final_output.sources.push_back(temp_one_source);
+                    final_output.tde_in.push_back(x.second[i]);
+                    final_output.cfl_ids.push_back(processed_tde.cfl_ids[x.first][i]);
+                }
+                    
+                // second source (even if -999)
                 copy(temp_4ch_sources.begin()+4, temp_4ch_sources.end(), temp_one_source.begin());
-                final_output.sources.push_back(temp_one_source);
-                final_output.tde_in.push_back(x.second[i]);
-                final_output.cfl_ids.push_back(processed_tde.cfl_ids[x.first][i]);
+                if (!nans_in_vector(temp_one_source)){
+                    final_output.sources.push_back(temp_one_source);
+                    final_output.tde_in.push_back(x.second[i]);
+                    final_output.cfl_ids.push_back(processed_tde.cfl_ids[x.first][i]);
                 }
             }
 
         }
+    }
        return final_output;
    }
 
