@@ -4,6 +4,15 @@
 Installation
 ============
 
+Local editable install
+----------------------
+Clone the git repo, :code:`cd` to the main directory and :code:`pip install -e ./`. Then install all of the 
+other dependencies needed to run development with :code:`pip install -r requirements_dev.txt`.
+
+
+
+
+`EVERYTHING BELOW IS DEFAULT COOKIECUTTER TEXT - PLEASE IGNORE.`
 
 Stable release
 --------------

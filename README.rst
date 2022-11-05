@@ -16,9 +16,7 @@ pydatemm
         :alt: Documentation Status
 
 
-
-
-DATEMM and CombineALL implementation to localise multi-source sounds with reverberation
+A package to perform acoustic localisation in audio with overlapping sounds. 
 
 References
 ----------

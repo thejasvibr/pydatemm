@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Making sure the C++ and Python outputs are the same
+===================================================
+"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Thu Oct 20 16:43:39 2022
 
 @author: thejasvi
@@ -10,25 +16,22 @@ import sys
 sys.path.append("../examples/")
 sys.path.append("tests/igraph_implementation/")
 from igraph_based_functions import generate_candidate_sources_v2
-
-import time 
-nstime = lambda : time.perf_counter_ns()/1e9
 from sim_example import sim_audio, kwargs
 
-from pydatemm.source_generation import generate_candidate_sources
+from pydatemm.source_generation import generate_candidate_sources_hybrid
 
 #%%
 kwargs['num_cores'] = 4
 kwargs['K'] = 2
 for i in range(1):
     a = nstime()
-    dcpp = generate_candidate_sources(sim_audio, **kwargs)
+    dcpp = generate_candidate_sources_hybrid(sim_audio, **kwargs)
     b = nstime()
     print(f'C++: {b-a}')
 cpp_sources = np.array([each for each in dcpp.sources])
 #%%
 a = nstime()
-py_sources, py_cfls, py_tdein = generate_candidate_sources_v2(sim_audio, **kwargs)
+py_sources, py_cfls, py_tdein = generate_candidate_sources_v2.(sim_audio, **kwargs)
 b = nstime()
 print(f'Python-based: {b-a}')
 
@@ -72,6 +75,7 @@ for each in py_tdein:
         difference.append(np.sqrt(np.sum((py_out-cpp_out)**2)))
         
 difference = np.array(difference)        
+
 
 
 
