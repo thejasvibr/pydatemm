@@ -62,7 +62,6 @@ def chunk_create_tde_data(compatible_solutions, all_cfls, **kwargs):
         numchannels = len(channels)
         tde_data = np.concatenate((kwargs['array_geom'][channels,:].flatten(), d))
         if raw_tde_by_channelnum.get(numchannels) is None:
-            print(f"Initialising {numchannels} at i:{i}")
             raw_tde_by_channelnum[numchannels] = []
             raw_tde_by_channelnum[numchannels].append(tde_data)
             cfl_ids[numchannels] = []
@@ -109,14 +108,12 @@ def localise_sounds_v2(compatible_solutions, all_in_cfls, **kwargs):
     all_cfls = []
     all_tdedata = []
     for (nchannels, tde_input) in tde_data.items():
-        print('In For Loop', nchannels, tde_input.shape)
         if nchannels > 4:
             calc_sources = lo.pll_cppyy_sw2002(tde_input, num_cores, kwargs['vsound'])
             all_sources.append(calc_sources)
             all_cfls.append(cfl_ids[nchannels])
             all_tdedata.append(tde_input.tolist())
         elif nchannels == 4:
-            print("4CHANNEL SOLUTIONS ARE: ", tde_input.shape, " in number" )
             miaow = 0
             fourchannel_cflids= []
             fourchannel_tdedata = []
@@ -159,7 +156,6 @@ def localise_sounds_cpp_v2(compatible_solutions, all_in_cfls, **kwargs):
     all_cfls = []
     all_tdedata = []
     for (nchannels, tde_input) in tde_data.items():
-        print('In For Loop', nchannels, tde_input.shape)
         if nchannels > 4:
             calc_sources = lo.pll_cppyy_sw2002(tde_input, num_cores, kwargs['vsound'])
             all_sources.append(calc_sources)
@@ -207,28 +203,9 @@ def generate_candidate_sources_v2(sim_audio, **kwargs):
                 top_K_tdes[ch_pair].append(descending_quality[i])
             except:
                 pass
-    print('making the cfls...')
     cfls_from_tdes = gramanip.make_consistent_fls(top_K_tdes, **kwargs)
-    print(f'len of cfls: {len(cfls_from_tdes)}')
-    # put all consistent loops into fundamental loop 'bins'
-    #all_fls = gramanip.make_fundamental_loops(kwargs['nchannels'])
-#    cfls_by_fl = {}
-#    for fl in all_fls:
-#        cfls_by_fl[fl] = []
-#    
-#    for i,each in enumerate(cfls_from_tdes):
-#        for fl in all_fls:
-#            if set(each.vs['name']) == set(fl):
-#                cfls_by_fl[fl].append(i)
-    print('Making CCG matrix')
 
     ccg_matrix = gramanip.make_ccg_matrix(cfls_from_tdes, **kwargs)
-#    else:
-#        ccg_matrix = gramanip.make_ccg_pll(cfls_from_tdes, **kwargs)
-    print('Finding solutions')
     solns_cpp = lo.CCG_solutions(ccg_matrix)
-    print('Found solutions')
-    print(f'Doing tracking: {len(solns_cpp)}')
     sources, cfl_ids, tdedata = localise_sounds_v2(solns_cpp, cfls_from_tdes, **kwargs)
-    print('Done with tracking.')
     return sources, cfl_ids, tdedata

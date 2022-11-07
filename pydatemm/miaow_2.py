@@ -37,6 +37,7 @@ print(f'Python-based: {b-a}')
 #%% Check to see where the difference in output length appears
 cpp_nchannels = [ (each.size()+1)/4 for each in dcpp.tde_in]
 cpp_nch, cpp_counts = np.unique(cpp_nchannels, return_counts=True)
+print(cpp_nch, cpp_counts)
 
 py_nchannels = [ (len(each)+1)/4 for each in py_tdein]
 py_nch, py_counts = np.unique(py_nchannels, return_counts=True)
