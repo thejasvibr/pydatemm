@@ -4,9 +4,6 @@
 Graph manipulations
 ===================
 
-Created on Tue Oct 18 14:06:06 2022
-
-@author: thejasvi
 """
 from itertools import product, combinations
 import igraph as ig
@@ -109,7 +106,27 @@ def make_all_entries_nan(EigenXd):
     return EigenXd
 
 def make_consistent_fls_cpp(multich_tdes, **kwargs):
-    '''The C++-Python hybrid version. 
+    '''The C++-Python hybrid version that makes cFLs
+    which are Eigen::MatrixXd objects. 
+    
+    Parameters
+    ----------
+    multich_tdes : dict
+        Dictionary with channel pairs as keys, and time-difference peaks 
+        as entries. 
+    
+    Keyword Arguments 
+    -----------------
+    max_loop_residual : float, optional 
+        Defaults to 1e-6 s
+    nchannels : int>0
+        Number of channels in the original audio. 
+    
+    Returns 
+    -------
+    all_cfls : list 
+        List with Eigen::MatrixXd matrices. Each matrix is one cFL
+        graph. 
     '''
     max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
     all_edges_fls = make_edges_for_fundamental_loops(kwargs['nchannels'])

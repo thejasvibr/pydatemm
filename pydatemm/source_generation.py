@@ -4,6 +4,7 @@
 Source generation
 =================
 Calculates all possible sources that generate consistent graphs.
+
 """
 import os 
 import pydatemm.localiser as lo
@@ -32,6 +33,32 @@ def cpp_make_array_geom(**kwargs):
         for j in range(ncols):
             cpp_array_geom[i,j] = kwargs['array_geom'][i,j]
     return cpp_array_geom
+
+
+def  localiser_sounds_v3(num_cores, ag, solns_cpp, cfls_from_tdes):
+    '''
+    Thin wrappper around C++ localise_sounds_v3, mainly here for documentation
+    purposes. 
+    
+    Parameters
+    ----------
+    num_cores : int, optional
+        Number of CPUs to use while parallelising source calculations when 
+        channels >4. 
+    ag : (Nchannels, 3) Eigen::MatrixXd
+        Array geometry - xyz positions of mics. 
+    cfls_from_tdes :  list with Eigen::MatrixXd
+
+    Returns 
+    -------
+    sources_and_data : C++ struct
+    
+    See Also
+    --------
+    pydatemm.source_generation.generate_candidate_sources
+    
+    '''
+    return cpy.gbl.localise_sounds_v3(num_cores, ag, solns_cpp, cfls_from_tdes)
 
 def generate_candidate_sources(sim_audio, **kwargs):
     '''
@@ -101,7 +128,7 @@ def generate_candidate_sources(sim_audio, **kwargs):
     ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
     solns_cpp = lo.CCG_solutions_cpp(ccg_matrix)
     ag = cpp_make_array_geom(**kwargs)
-    sources_and_data = cpy.gbl.localise_sounds_v3(num_cores, ag, solns_cpp, cfls_from_tdes)
+    sources_and_data = localiser_sounds_v3(num_cores, ag, solns_cpp, cfls_from_tdes)
     return sources_and_data
 
 

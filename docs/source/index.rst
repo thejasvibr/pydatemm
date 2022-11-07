@@ -12,9 +12,6 @@ Welcome to pydatemm's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
-
-
    gallery_examples/index.rst
    modules
    contributing
@@ -24,9 +21,6 @@ Welcome to pydatemm's documentation!
 .. toctree::
    :maxdepth:1
    :caption: API reference:
-
-   timediff_docs.rst
-
 
 Indices and tables
 ==================

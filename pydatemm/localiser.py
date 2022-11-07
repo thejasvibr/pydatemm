@@ -5,9 +5,6 @@ CCG Localiser
 =============
 Functions to localise sounds from CCG solutions. 
 
-Created on Thu Sep 15 16:38:31 2022
-
-@author: thejasvi
 """
 import numpy as np 
 from scipy.spatial import distance
@@ -101,18 +98,29 @@ def CCG_solutions_cpp(eigen_ccg_matrix):
     '''
     Receives Eigen CCG matrix and outputs a vector<vector<int>> with
     solutions. 
+    
+    Parameters
+    ----------
+    eigen_ccg_matrix : Eigen::MatrixXd (Ncfls, Ncfls)  C++ object
+        2D square matrix indicating compatibility of all formed
+        cFLs. 
+
+    Returns 
+    -------
+    solns_cpp : vector<set<int>> C++ object
+        The indices for all the compatible cFLS that can be combined
+        to make a bigger graph.
     '''
     a = time_s();
     n_rows = int(eigen_ccg_matrix.rows());
     ac_cpp = cppyy.gbl.mat2d_to_vector(eigen_ccg_matrix)
-    print(type(ac_cpp), ac_cpp.size())
     v_cpp = set_cpp[int](list(range(n_rows)))
     l_cpp = set_cpp[int]([])
     x_cpp = set_cpp[int]([])
     b = time_s();
     solns_cpp = cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
     c = time_s();
-    print(f'{b-a}, {c-b}, {c-a} s ')
+    print(f'CGCG times: {b-a}, {c-b}, {c-a} s ')
     return solns_cpp
 
 def refine_candidates_to_room_dims(candidates, max_tdoa_res, room_dims):

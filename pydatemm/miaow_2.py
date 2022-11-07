@@ -20,11 +20,10 @@ from pydatemm.source_generation import generate_candidate_sources
 #%%
 kwargs['num_cores'] = 4
 kwargs['K'] = 2
-for i in range(1):
-    a = nstime()
-    dcpp = generate_candidate_sources(sim_audio, **kwargs)
-    b = nstime()
-    print(f'C++: {b-a}')
+a = nstime()
+dcpp = generate_candidate_sources(sim_audio, **kwargs)
+b = nstime()
+print(f'C++: {b-a}')
 cpp_sources = np.array([each for each in dcpp.sources])
 #%%
 a = nstime()
