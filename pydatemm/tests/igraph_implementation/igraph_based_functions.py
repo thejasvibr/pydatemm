@@ -9,11 +9,80 @@ import numpy as np
 import joblib
 from joblib import Parallel, delayed
 from itertools import chain
-import pydatemm.localiser as lo
+from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
+from pydatemm.tdoa_quality import residual_tdoa_error_nongraph
+#import pydatemm.localiser as lo
 import pydatemm.timediffestim as timediff
 import  pydatemm.graph_manip as gramanip
 
 
+try:
+    import cppyy
+    vector_cpp = cppyy.gbl.std.vector
+    set_cpp = cppyy.gbl.std.set
+except ImportError:
+    vector_cpp = cppyy.gbl.std.vector
+    set_cpp = cppyy.gbl.std.set
+    pass
+
+get_nmics = lambda X: int((X.size+1)/4)
+
+
+def CCG_solutions(ccg_matrix):
+    n_rows = ccg_matrix.shape[0]
+    ac_cpp = vector_cpp[vector_cpp[int]]([ccg_matrix[i,:].tolist() for i in range(n_rows)])
+    print(type(ac_cpp), ac_cpp.size())
+    v_cpp = set_cpp[int](range(n_rows))
+    l_cpp = set_cpp[int]([])
+    x_cpp = set_cpp[int]([])
+
+    solns_cpp = cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
+    comp_cfls = list([]*len(solns_cpp))
+    comp_cfls = [list(each) for each in solns_cpp]
+    return comp_cfls
+
+
+
+def cppyy_sw2002(micntde):
+    as_Vxd = cppyy.gbl.sw_matrix_optim(vector_cpp['double'](micntde),
+                                       )
+    return np.array(as_Vxd, dtype=np.float64)
+
+
+def row_based_mpr2003(tde_data):
+    nmics = get_nmics(tde_data)
+    sources = mellen_pachter_raquet_2003(tde_data[:nmics*3].reshape(-1,3), tde_data[-(nmics-1):])
+    
+    if sources.size ==3:
+        output = sources.reshape(1,3)
+        residual = np.zeros((1,1))
+        residual[0] = residual_tdoa_error_nongraph(tde_data[-(nmics-1):], sources,
+                                                tde_data[:nmics*3].reshape(-1,3))
+        return np.column_stack((output, residual))
+    elif sources.size==6:
+        output = np.zeros((sources.shape[0], sources.shape[1]))
+        output[:,:3] = sources
+        residual = np.zeros((2,1))
+        for i in range(2):
+            residual[i,:] = residual_tdoa_error_nongraph(tde_data[-(nmics-1):], sources[i,:],
+                                                tde_data[:nmics*3].reshape(-1,3))
+        return np.column_stack((output, residual))
+    else:
+        return np.array([])
+
+
+
+def make_vect_vect_double(X):
+    data = vector_cpp[vector_cpp['double']](X.shape[0])
+    for i in range(X.shape[0]):
+        data.push_back(X[i,:])
+    return data[X.shape[0]:]
+
+
+def pll_cppyy_sw2002(many_micntde, num_cores, c):
+    block_in = make_vect_vect_double(many_micntde)
+    block_out = cppyy.gbl.pll_sw_optim(block_in, num_cores, c)
+    return np.array([each for each in block_out])
 
 
 def get_numrows(X):
@@ -109,7 +178,7 @@ def localise_sounds_v2(compatible_solutions, all_in_cfls, **kwargs):
     all_tdedata = []
     for (nchannels, tde_input) in tde_data.items():
         if nchannels > 4:
-            calc_sources = lo.pll_cppyy_sw2002(tde_input, num_cores, kwargs['vsound'])
+            calc_sources = pll_cppyy_sw2002(tde_input, num_cores, kwargs['vsound'])
             all_sources.append(calc_sources)
             all_cfls.append(cfl_ids[nchannels])
             all_tdedata.append(tde_input.tolist())

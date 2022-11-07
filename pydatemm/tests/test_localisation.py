@@ -2,10 +2,7 @@
 """
 Localisation Tests
 ==================
-
-Created on Tue Jun  7 13:54:36 2022
-
-@author: theja
+Python localisation algorithm tests
 """
 from scipy.spatial import distance, distance_matrix 
 import unittest

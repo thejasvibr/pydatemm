@@ -10,13 +10,12 @@ import numpy as np
 from scipy.spatial import distance
 euclidean = distance.euclidean
 from sklearn import cluster
-from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
-from pydatemm.tdoa_quality import residual_tdoa_error_nongraph
-from pydatemm.compilation_utils import load_and_compile_with_own_flags
-
-load_and_compile_with_own_flags()
-
+try:
+    from pydatemm.compilation_utils import load_and_compile_with_own_flags
     
+    load_and_compile_with_own_flags()
+except ImportError:
+    pass  
 
 from time import perf_counter_ns as pcn
 time_s = lambda : pcn()/1e9
@@ -30,69 +29,34 @@ except ImportError:
     set_cpp = cppyy.gbl.std.set
     pass
 
-get_nmics = lambda X: int((X.size+1)/4)
-
-def make_vect_vect_double(X):
-    data = vector_cpp[vector_cpp['double']](X.shape[0])
-    for i in range(X.shape[0]):
-        data.push_back(X[i,:])
-    return data[X.shape[0]:]
-
-def cppyy_sw2002(micntde):
-    as_Vxd = cppyy.gbl.sw_matrix_optim(vector_cpp['double'](micntde),
-                                       )
-    return np.array(as_Vxd, dtype=np.float64)
-
-def pll_cppyy_sw2002(many_micntde, num_cores, c):
-    aa = time_s()
-    # block_in = vector_cpp[vector_cpp['double']](many_micntde.shape[0])
-    # for i in range(many_micntde.shape[0]):
-    #     block_in[i] = vector_cpp['double'](many_micntde[i,:])
-    block_in = make_vect_vect_double(many_micntde)
-    bb = time_s()
-    print(f'Assigning takes: {bb-aa} s ')
-    sta = time_s()
-    block_out = cppyy.gbl.pll_sw_optim(block_in, num_cores, c)
-    sto = time_s()
-    print(f'Cpp code time: {sto-sta} s ')
-    return np.array([each for each in block_out])
-
-def row_based_mpr2003(tde_data):
-    nmics = get_nmics(tde_data)
-    sources = mellen_pachter_raquet_2003(tde_data[:nmics*3].reshape(-1,3), tde_data[-(nmics-1):])
+def combine_all(ac_cpp, v_cpp, l_cpp, x_cpp):
+    '''
+    A thin wrapper around the C++ combine_all - only here for documentation
+    purposes. 
     
-    if sources.size ==3:
-        output = sources.reshape(1,3)
-        residual = np.zeros((1,1))
-        residual[0] = residual_tdoa_error_nongraph(tde_data[-(nmics-1):], sources,
-                                                tde_data[:nmics*3].reshape(-1,3))
-        return np.column_stack((output, residual))
-    elif sources.size==6:
-        output = np.zeros((sources.shape[0], sources.shape[1]))
-        output[:,:3] = sources
-        residual = np.zeros((2,1))
-        for i in range(2):
-            residual[i,:] = residual_tdoa_error_nongraph(tde_data[-(nmics-1):], sources[i,:],
-                                                tde_data[:nmics*3].reshape(-1,3))
-        return np.column_stack((output, residual))
-    else:
-        return np.array([])
-
-def CCG_solutions(ccg_matrix):
-    a = time_s();
-    n_rows = ccg_matrix.shape[0]
-    ac_cpp = vector_cpp[vector_cpp[int]]([ccg_matrix[i,:].tolist() for i in range(n_rows)])
-    print(type(ac_cpp), ac_cpp.size())
-    v_cpp = set_cpp[int](range(n_rows))
-    l_cpp = set_cpp[int]([])
-    x_cpp = set_cpp[int]([])
-    b = time_s();
-    solns_cpp = cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
-    comp_cfls = list([]*len(solns_cpp))
-    comp_cfls = [list(each) for each in solns_cpp]
-    c = time_s();
-    print(f'{b-a}, {c-b}, {c-a} s ')
-    return comp_cfls
+    Parameters
+    ----------
+    ac_cpp : vector<vector<int>> 
+        The compatibility-conflict graph.
+    v_cpp : set<int>
+        Set of available vertices. 
+    l_cpp : set<int>
+        The current solution set
+    x_cpp : set<int>
+        Already visited vertices. 
+    
+    Returns
+    -------
+    vector<set<int>> 
+        All possible solutions of compatible graphs. 
+   
+    See Also
+    --------
+    cppyy.gbl.combine_all
+    
+    '''    
+    return cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
+    
 
 def CCG_solutions_cpp(eigen_ccg_matrix):
     '''
@@ -111,16 +75,12 @@ def CCG_solutions_cpp(eigen_ccg_matrix):
         The indices for all the compatible cFLS that can be combined
         to make a bigger graph.
     '''
-    a = time_s();
     n_rows = int(eigen_ccg_matrix.rows());
     ac_cpp = cppyy.gbl.mat2d_to_vector(eigen_ccg_matrix)
     v_cpp = set_cpp[int](list(range(n_rows)))
     l_cpp = set_cpp[int]([])
     x_cpp = set_cpp[int]([])
-    b = time_s();
-    solns_cpp = cppyy.gbl.combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
-    c = time_s();
-    print(f'CGCG times: {b-a}, {c-b}, {c-a} s ')
+    solns_cpp = combine_all(ac_cpp, v_cpp, l_cpp, x_cpp)
     return solns_cpp
 
 def refine_candidates_to_room_dims(candidates, max_tdoa_res, room_dims):
