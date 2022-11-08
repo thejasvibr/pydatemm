@@ -27,12 +27,10 @@ class TestSourceGeneration(unittest.TestCase):
     
     def test_empty_audio_noerror(self):
         output = generate_candidate_sources(self.empty_audio, **self.kwargs)
-        self.assertEqual(output, [])
+        self.assertEqual(output.sources, [])
     
     def test_normal_audio_noerror(self):
         output = generate_candidate_sources(self.random_audio, **self.kwargs)
-        for each in output.sources:
-            print(f"Source: {each})")
 
 
 if __name__ == "__main__":

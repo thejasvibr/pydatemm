@@ -15,6 +15,10 @@ try:
 except:
     pass
 
+class empty:
+    pass
+
+
 def cpp_make_array_geom(**kwargs):
     ''' Takes the np.array array_geom & converts it 
     into a Eigen::MatrixXd 
@@ -132,7 +136,11 @@ def generate_candidate_sources(sim_audio, **kwargs):
         sources_and_data = localiser_sounds_v3(num_cores, ag, solns_cpp, cfls_from_tdes)
         return sources_and_data
     else:
-        return []
+        empty_out = empty()
+        empty_out.sources = []
+        empty_out.tde_in = []
+        empty_out.cfl_ids = []
+        return empty_out
 
 
 
