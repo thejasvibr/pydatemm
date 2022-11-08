@@ -1,6 +1,7 @@
 """
-Something something here
-========================
+The bat example: loading Ushichka dataset multichannel audio
+============================================================
+`Not fully ready here`
 """
 import matplotlib.pyplot as plt
 import pandas as pd

@@ -1,19 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 Simulating what is recorded in the cave by the microphone array
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+===============================================================
 Here I will simulate 1-N bats flying around the cave and emitting 
-calls at ~10 Hz call rate.
+calls at =10 Hz call rate.
 
 Simulation setup
-================
-N bats flying in the space with a ~0.1 s IPI (with variation). The bats fly
+~~~~~~~~~~~~~~~~
+N bats flying in the space with a =0.1 s IPI (with variation). The bats fly
 with a curving trajectory towards the microphone array. 
 
-
-Created on Sun Sep 11 09:47:41 2022
-
-@author: theja
 """
 import pandas as pd
 import pyroomacoustics as pra

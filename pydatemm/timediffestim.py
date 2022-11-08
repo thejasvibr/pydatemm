@@ -297,12 +297,11 @@ def get_peaks(X,  **kwargs):
     can't be used in the same function call.
     '''
     Y = X.copy()
-    abs_and_relative_thresh = [each in kwargs.keys() for each in ['min_height','pctile_thresh']]
-    if np.sum(abs_and_relative_thresh)==2:
-        raise ValueError('Both absolute and percentile thresholds given!')
+    abs_and_relative_thresh = [kwargs.get(each) for each in ['min_height','pctile_thresh']]
+    both_not_none = [True for each in abs_and_relative_thresh if each is not None]
+    if len(both_not_none)==2:
+        raise ValueError(f'min_heigh and pctile_thresh cannot be defined at the same time \n {abs_and_relative_thresh}, {kwargs.get("min_height")} {kwargs["pctile_thresh"]}')
     min_peak_diff = kwargs['min_peak_diff']
-    if kwargs['no_neg']:
-        Y[Y<=0] = np.mean(Y)
     if abs_and_relative_thresh[1]:
         min_height = np.nanpercentile(Y, kwargs['pctile_thresh'])
     elif abs_and_relative_thresh[0]:

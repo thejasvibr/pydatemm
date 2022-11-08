@@ -104,7 +104,6 @@ def generate_candidate_sources(sim_audio, **kwargs):
     Also load the microphone positions into ```mic_xyz```
     >>> parameters = {'fs' : 192000, 
                       'max_loop_residual' : 1e-5,
-                      'nchannels' : 8,
                       'K' : 6,
                       'array_geom': mic_xyz,
                       'min_peak_diff' : 0.35e-4,
@@ -113,6 +112,7 @@ def generate_candidate_sources(sim_audio, **kwargs):
     '''
     num_cores = kwargs.get('num_cores', os.cpu_count())
     multich_cc = timediff.generate_multich_crosscorr(sim_audio, **kwargs )
+    kwargs['nchannels'] = sim_audio.shape[1]
     cc_peaks = timediff.get_multich_tdoas(multich_cc, **kwargs)
     K = kwargs.get('K',5) # number of peaks per channel CC to consider
     top_K_tdes = {}
@@ -125,11 +125,14 @@ def generate_candidate_sources(sim_audio, **kwargs):
             except:
                 pass
     cfls_from_tdes = gramanip.make_consistent_fls_cpp(top_K_tdes, **kwargs)
-    ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
-    solns_cpp = lo.CCG_solutions_cpp(ccg_matrix)
-    ag = cpp_make_array_geom(**kwargs)
-    sources_and_data = localiser_sounds_v3(num_cores, ag, solns_cpp, cfls_from_tdes)
-    return sources_and_data
+    if len(cfls_from_tdes)>0:
+        ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
+        solns_cpp = lo.CCG_solutions_cpp(ccg_matrix)
+        ag = cpp_make_array_geom(**kwargs)
+        sources_and_data = localiser_sounds_v3(num_cores, ag, solns_cpp, cfls_from_tdes)
+        return sources_and_data
+    else:
+        return []
 
 
 
