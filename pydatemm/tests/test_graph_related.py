@@ -6,8 +6,9 @@ Tests for Graph Synthesis
 
 Created on Wed May 18 08:34:11 2022
 @author: thejasvi beleyur
-"""
-
+    """
+from itertools import combinations
+import numpy as np 
 import unittest
 from pydatemm.compilation_utils import load_and_compile_with_own_flags
 load_and_compile_with_own_flags()
@@ -58,15 +59,24 @@ class GraphMerging(unittest.TestCase):
         self.graph_c[0,2] = -0.5; self.graph_c[2,0] = -0.5;
         
         self.all_cfls = []
-        self.ccg_solution = cpp_set[int]
+        self.ccg_solution = set()
         for i, each in enumerate([self.graph_a, self.graph_b, self.graph_c]):
             self.all_cfls.append(each)
-            self.ccg_solution.insert(i)
+            self.ccg_solution.add(i)
         
     def test_merging(self):
-        merged = cpy.gbl.combine_graph(self.ccg_solution, self.all_cfls)
-        
-        
-        
+        merged = cpy.gbl.combine_graphs(self.ccg_solution, self.all_cfls)
+        expected = Eigen.MatrixXd(4,4)
+        expected[0,1] = 0.5; expected[1,0] = 0.5; 
+        expected[0,2] = -0.5; expected[2,0] = -0.5;
+        expected[0,3] = 0.25; expected[3,0] = 0.25;
+        values_equal = []
+        for (i,j) in combinations(range(4),2):
+            values_nan = np.logical_or(np.isnan(merged[i,j]), np.isnan(expected[i,j]))
+            if not values_nan:
+                values_equal.append(merged[i,j]==expected[i,j])
+
+        self.assertTrue(np.all(values_equal))
+
 if __name__ == '__main__':
     unittest.main()
