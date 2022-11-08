@@ -348,7 +348,7 @@ def geometrically_valid(multich_tdoas:dict, **kwargs):
     array_geom: (Mmics,3) np.array
         XYZ coordinates of M microphones
     v_sound: float, optional 
-        speed of sound in m/s. Default is 340 m/s.
+        speed of sound in m/s. Default is 343.0 m/s.
 
     Returns
     -------
@@ -360,7 +360,7 @@ def geometrically_valid(multich_tdoas:dict, **kwargs):
     --------
     get_multich_tdoas
     '''
-    v_sound = kwargs.get('v_sound', 340)
+    v_sound = kwargs.get('v_sound', 343.0)
     distmat = spatial.distance_matrix(kwargs['array_geom'], kwargs['array_geom'])
     delaymat = distmat/v_sound
     geom_valid_tdoas = {}

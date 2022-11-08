@@ -37,7 +37,7 @@ class TestGeomValidTDES(unittest.TestCase):
             for i in range(2):
                 invlid_tdes = np.linspace(-(maxdelay+1), maxdelay+1, 20)
                 self.tdes[pair].append(np.random.choice(invlid_tdes,3))
-# 
+
     def test_tristar_case(self):
         self.check_tdes_are_valid()
 
@@ -57,7 +57,6 @@ class TestGeomValidTDES(unittest.TestCase):
             all_leq = np.all(abs(np.array(tdes))<=maxdelay)
             leq_maxdelay.append(all_leq)
         self.assertTrue(np.all(leq_maxdelay))
-        
 
 if __name__ == '__main__':
     unittest.main()
