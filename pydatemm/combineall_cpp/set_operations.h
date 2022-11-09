@@ -1,5 +1,6 @@
 /*Wrapper that implements set operations.
 */
+#pragma once
 #include <algorithm>
 #include <set>
 #include <vector>

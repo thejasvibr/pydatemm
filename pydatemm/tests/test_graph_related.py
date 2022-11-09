@@ -77,6 +77,9 @@ class GraphMerging(unittest.TestCase):
                 values_equal.append(merged[i,j]==expected[i,j])
 
         self.assertTrue(np.all(values_equal))
+        
+    
+
 
 if __name__ == '__main__':
     unittest.main()

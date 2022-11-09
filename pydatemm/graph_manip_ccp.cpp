@@ -112,6 +112,8 @@ MatrixXd make_ccg_matrix(const vector<MatrixXd> &all_cfls){
     }
 
 vector<vector<int>> mat2d_to_vector(MatrixXd X){
+    //Convert 2D MatrixXd into a vector<vector<int>>
+    // replaces all NaNs with a -1.
     int num_cfls = X.rows();
     vector<int> vec_data(num_cfls);
     vector<vector<int>> to_vect (num_cfls);

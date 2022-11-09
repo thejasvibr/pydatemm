@@ -11,7 +11,7 @@ Reference
 * Kreissig & Yang 2013, Fast and reliable TDOA assignment in multi-source reverberant environments, ICASSP 2013
   https://ieeexplore.ieee.org/abstract/document/6637668?casa_token=3oKOQUJRuWQAAAAA:JNbwI-gf0m0ozfAKbAQJzblq8qE-NPTJ49hgJILMxG_2ZM9MJOt4PQOvPEQn9TXJZSzD_ON6YA
 */
-
+#pragma once
 #include <iostream>
 #include <set>
 #include <vector>

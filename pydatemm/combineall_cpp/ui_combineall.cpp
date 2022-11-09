@@ -1,4 +1,5 @@
 // Reads a csv file and begins performing the CombineAll routine. 
+#pragma once
 #include <iostream> 
 #include <fstream>
 #include <vector>
