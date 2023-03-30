@@ -20,21 +20,6 @@ import soundfile as sf
 choose = np.random.choice
 np.random.seed(78464)
 
-# def make_emission_times(nbats, ncalls, **kwargs):    
-#     ipi_range = kwargs.get('ipi_range', np.linspace(0.07,0.1,50))
-#     ipi_variation = kwargs.get('ipi_variation', np.linspace(0,0.01,50))
-#     possible_start_times = kwargs.get('possible_start_times', np.linspace(0,0.05,50))
-    
-#     call_emission_times = []
-#     for each in range(nbats):
-#         start = choose(possible_start_times, 1)
-#         ipi_range = choose(ipi_range, ncalls-1)
-#         emission_times = np.concatenate(([0],ipi_range.copy()))
-#         emission_times[0] += start
-#         emission_times = np.cumsum(emission_times)
-#         call_emission_times.append(emission_times)
-#     return call_emission_times
-
 nbats = 3
 ncalls = 3
 room_dims = [4,9,3]
@@ -56,32 +41,32 @@ def choose_emission_times(timepoints, nbats, ncalls, **kwargs):
                 bat_emission_times.append(emission_times)
     return bat_emission_times
                 
-emission_times = choose_emission_times(full_timespan, nbats, ncalls, ipi=0.08)
+emission_times = choose_emission_times(full_timespan, nbats, ncalls, ipi=0.05)
 trajectories = []
-f = 1
+f = 0.7
 height = np.linspace(1, 2.0, 50)
-bat1xyz = 4*np.sin(2*np.pi*f*full_timespan)+0.2, 7*np.cos(2*np.pi*full_timespan), np.tile(choose(height,1), full_timespan.size)
-bat2xyz = 4*np.sin(2*np.pi*f*full_timespan)+0.2, 3*np.cos(2*np.pi*full_timespan), np.tile(choose(height,1), full_timespan.size)
+bat1xyz = 4*np.sin(2*np.pi*f*full_timespan)+0.2, 6*np.cos(2*np.pi*full_timespan) + 1.5, np.tile(choose(height,1), full_timespan.size)
+bat2xyz = 4*np.sin(2*np.pi*f*full_timespan)+0.2, 3*np.cos(2*np.pi*full_timespan) + 1, np.tile(choose(height,1), full_timespan.size)
 bat3xyz = 4*np.sin(2*np.pi*f* full_timespan)+0.5, 3+3*np.cos(2*np.pi* full_timespan),  np.tile(choose(height,1), full_timespan.size)
 
 #%%
+plt.figure()
+a0  = plt.subplot(111, projection='3d')
+plt.plot(bat1xyz[0], bat1xyz[1], bat1xyz[2], )
+plt.plot(bat2xyz[0], bat2xyz[1], bat2xyz[2], )
+plt.plot(bat3xyz[0], bat3xyz[1], bat3xyz[2], )
+a0.set_xlim(0,4); a0.set_ylim(0,9); a0.set_zlim(0,3)
+a0.set_xlabel('x'); a0.set_ylabel('y'); a0.set_zlabel('z')
+#%%
 
-bat_xyz = []
+batxyz_dfs = [pd.DataFrame(each).T for each in [bat1xyz, bat2xyz, bat3xyz]]
+for i, each in enumerate(batxyz_dfs):
+    each.columns = ['x', 'y', 'z']
+    each['t'] = full_timespan
+    each['batnum'] = i+1
+    each['emission_point'] = each['t'].isin(emission_times[i])
 
-for xy in [ [bat1x,bat1y], [bat2x,bat2y], [bat3x, bat3y]]:
-    bat_height = choose(height,1 )
-    bat_heights = np.tile(bat_height, ncalls) + choose([0,0.1,0.2],ncalls)
-    xy_arr = np.column_stack(xy)
-    xyz_arr = np.column_stack([xy_arr, bat_heights])
-    bat_xyz.append(xyz_arr)
-
-batxyz_df = pd.DataFrame(data = np.array(bat_xyz).reshape(-1,3), columns=['x','y','z'])
-batxyz_df['t'] = [ every for each in emission_times for every in each]
-batxyz_df['batnum'] = [ batnum for batnum in range(nbats) for ee in range(ncalls)]
-
-
-raise NotImplementedError('UNDER CONSTRUCTION - NEED A CLEAN IMPLEMENTATION TO CHOOSE EMISSION POINTS AND TIMES')
-
+allbat_xyz = pd.concat(batxyz_dfs)
 #%%
 
 
@@ -109,65 +94,43 @@ array_geom = np.array(([3, 8.9, 1.5],
                       [0.01, 7, 2.0],
                       )
                       )
+# add some noise to the array - this is so that none of the mics are 
+# co-planar.
 array_geom += np.random.choice(np.linspace(-0.01,0.01,20), array_geom.size).reshape(array_geom.shape)
-num_sources = int(np.random.choice(range(5,7),1)) # or overruled by the lines below.
-random = False
 
 #%%
+# Go crazy and make each call emission the same type of call.
+call_points = allbat_xyz[allbat_xyz['emission_point']]
 
-all_calldurns = []
-for batnum in range(nbats):
-    call_durn = float(choose(np.linspace(5e-3,7e-3,5),1))
-    minf, maxf = float(choose([15000,20000,22000],1)), float(choose([88000, 89000, 92000],1))
-    t_call = np.linspace(0,call_durn, int(fs*call_durn))
-    call_type = str(choose(['logarithmic','linear','hyperbolic'], 1)[0])
-    batcall = signal.chirp(t_call, maxf, t_call[-1], minf,call_type)
-    batcall *= signal.hamming(batcall.size)
-    batcall *= 1/nbats
-    for each, emission_delay in zip(bat_xyz[batnum], emission_times[batnum]):
-        room.add_source(position=each, signal=batcall, delay=emission_delay)
-        all_calldurns.append(call_durn)
+# design the synthetic bat call
+call_durn = float(choose(np.linspace(5e-3,7e-3,5),1))
+minf, maxf = float(choose([15000,20000,22000],1)), float(choose([88000, 89000, 92000],1))
+t_call = np.linspace(0,call_durn, int(fs*call_durn))
+call_type = str(choose(['logarithmic','linear','hyperbolic'], 1)[0])
+batcall = signal.chirp(t_call, maxf, t_call[-1], minf,call_type)
+batcall *= signal.hamming(batcall.size)
+batcall *= 1/nbats
+
+for rownum, row in call_points.iterrows():
+    x,y,z,t,_,_ = row
+    call_position = np.array([x, y, z])
+    room.add_source(position=call_position, signal=batcall, delay=t)
 
 room.add_microphone_array(array_geom.T)
+print('...computing RIR...')
 room.compute_rir()
 print('room simultation started...')
 room.simulate()
 print('room simultation ended...')
 sim_audio = room.mic_array.signals.T
 
-
-
-
 #%%
+# Write down the data
 if ray_tracing:
     sf.write(f'{nbats}-bats_trajectory_simulation_raytracing-{ref_order}.wav', sim_audio, fs)
 else:
     sf.write(f'{nbats}-bats_trajectory_simulation_{ref_order}-order-reflections.wav', sim_audio, fs)
 
-batxyz_df['call_durn'] = all_calldurns
-batxyz_df.to_csv('multibat_xyz_emissiontime.csv')
 
-pd.DataFrame(array_geom, columns=['x','y','z']).to_csv('multibat_sim_micarray.csv')
-
-if __name__ == "__main__":
-   
-    plt.figure()
-    plt.plot(bat1x, bat1y, 'r*')
-    plt.plot(bat2x, bat2y, 'g*')
-    plt.plot(bat3x, bat3y, 'k*')
-    plt.plot(array_geom[:,0],array_geom[:,1],'^')
-    plt.ylim(0,10)
-    plt.xlim(0,6)
-
-    pass
-    #%% 
-    # plt.figure()
-    # a0 = plt.subplot(111, projection='3d')
-    # plt.plot(array_geom[:,0], array_geom[:,1], array_geom[:,2], '*')
-    # for each in bat_xyz:
-    #     plt.plot(each[:,0], each[:,1], each[:,2], '*')
-
-    # plt.xlim(0,room_dims[0])
-    # plt.ylim(0,room_dims[1])
-
-    # a0.set_zlim(0,room_dims[2])
+pd.DataFrame(array_geom, columns=['x','y','z']).to_csv('mic_xyz_multibatsim.csv')
+allbat_xyz.to_csv('multibatsim_xyz_calling.csv')
