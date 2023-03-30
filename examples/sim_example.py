@@ -38,7 +38,8 @@ kwargs = {'nchannels':nchannels,
           'vsound' : 343.0}
 kwargs['max_loop_residual'] = 0.5e-4
 
-max_delay = np.max(distance_matrix(array_geom, array_geom))/343  
+
+max_delay = np.max(distance_matrix(array_geom, array_geom))/kwargs['vsound']  
 kwargs['K'] = 4
 kwargs['num_cores'] = 2
 
@@ -46,54 +47,85 @@ kwargs['num_cores'] = 2
 # i = 110 -- tricky one , 120 even worse
 # start_time = 0.030
 
-time_pts = np.arange(0, 0.095, 10e-3)
+time_pts = np.arange(0, 0.21, 10e-3)
 
 results = {}
 for start_time in tqdm.tqdm(time_pts):    
     end_time = start_time  + max_delay
     print(f'Now handling audio between: {(start_time,end_time)}')
     start_sample, end_sample = int(fs*start_time), int(fs*end_time)  
-    sim_audio = array_audio[start_sample:end_sample]
-    output = generate_candidate_sources(sim_audio, **kwargs)
-    results[start_time] = output.sources
+    try:
+        sim_audio = array_audio[start_sample:end_sample]
+        output = generate_candidate_sources(sim_audio, **kwargs)
+        results[start_time] = output.sources
+    except:
+        pass
 
 #%%
 def conv_to_numpy(pydatemm_out):
     return np.array([np.array(each) for each in pydatemm_out]).reshape(-1,4)
-xmax, ymax, zmax = [4,9,3]
+
+tdoa_resid_threshold = 0.1e-3
+filtered_results = {}
+
 for key, entry in results.items():
     print(key, len(entry))
     if len(entry)>0:
         posns = conv_to_numpy(entry)
         # get rid of -999 entries
         no_999 = np.logical_and(posns[:,0]!=-999, posns[:,1]!=-999)
-        geq_0 = np.logical_and(posns[:,0]>=0, posns[:,1]>=0)
-        geq_0 = np.logical_and(geq_0, posns[:,2]>=0)
-        leq_xymax = np.logical_and(posns[:,0]<=xmax, posns[:,1]<=ymax)
-        leq_xyzmax = np.logical_and(leq_xymax, posns[:,2]<=zmax)
-        no999_geq0 = np.logical_and(no_999, geq_0)
-        no999geq0_leqxyz = np.logical_and(no999_geq0, leq_xyzmax)
-        posns_filt = posns[no999geq0_leqxyz,:]
-        posns_filt = posns_filt[posns_filt[:,-1]<1e-3]
+        posns_filt = posns[no_999,:]
+        posns_filt = posns_filt[posns_filt[:,-1]<tdoa_resid_threshold]
+        filtered_results[key] = posns_filt
+    else:
+        filtered_results[key] = np.array([])
         
-#%%
-plt.figure()
-plt.subplot(311)            
-plt.violinplot(posns_filt[:,0], vert=False)
-plt.subplot(312)            
-plt.violinplot(posns_filt[:,1], vert=False)
-plt.subplot(313)            
-plt.violinplot(posns_filt[:,2], vert=False)
+#%% 
+# Account for time-of-flight
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~
+# The sound received at the microphones is a signal from the 'past'. The mock video
+# trajectory data is 'real-time' data. Choose one of the mics are the reference, and 
+# calculate an estimated time-of-flight, to get the ~ time of emission. 
+import scipy.spatial as spatial
 
-plt.figure()
-a0 = plt.subplot(111, projection='3d')
-plt.plot(posns_filt[:,0], posns_filt[:,1], posns_filt[:,2],'*')
-a0.set_xlim(0,4); a0.set_ylim(0,9); a0.set_zlim(0,3)
-a0.set_xlabel('x'); a0.set_ylabel('y'); a0.set_zlabel('z')
+max_tof = 15/kwargs['vsound']
+
+for t_focal, tfocal_sources in filtered_results.items():
+    print(t_focal)
+    if len(tfocal_sources)>0:
+        potential_sources = tfocal_sources[:,:3]
+        
+        tof = spatial.distance_matrix(potential_sources, array_geom[0,:].reshape(-1,3))/kwargs['vsound']
+        
+        
+        tof = tof[tof<=max_tof]
+        potential_toe = t_focal - tof
+        potential_toe = potential_toe[np.logical_and(potential_toe>=0, potential_toe<=t_focal)]
+
+        toe_range = np.percentile(potential_toe, [0,100])
+        timelim_xyz = simdata[np.logical_and(simdata['t']>=toe_range[0], simdata['t']<=toe_range[1])].reset_index(drop=True)
+        if timelim_xyz.shape[0]>0:
+            traj_xyz = timelim_xyz.loc[:,'x':'z'].to_numpy()
+            
+            
+            dist_mat_tfocal = spatial.distance_matrix(potential_sources, traj_xyz)
+            # set a video-audio mismatch threshold
+            mismatch_threshold = 0.3
+            good_matches = np.argwhere(dist_mat_tfocal<=mismatch_threshold)
+            
+            best_traj_inds = np.unique(good_matches[:,1])
+            best_traj_posns = traj_xyz[best_traj_inds,:]
+            
+            print('Best positions for call: ',best_traj_posns)
+            #print(timelim_xyz.loc[best_traj_inds,:'batnum'])
+            
+        else:
+            pass
+    else:
+        pass
+        
     
-#%% When can we expect to detect a call emitted at 0.002 s
-source_to_mic = []
-for each in array_geom:
-    source_to_mic.append(euclidean(each, emission_point))
+    
+    
 
-arrival_times = 0.007 + np.array(source_to_mic)/343.0
+
