@@ -98,7 +98,7 @@ if len(output.sources)>0:
 
 if posns_filt.shape[0]>0:
     print(f'Running DBSCAN for {timewindow}...Num candidates sources: {posns_filt.shape[0]}')
-    clustered = DBSCAN(eps=0.3, min_samples=20).fit(posns_filt)
+    clustered = DBSCAN(eps=0.3, min_samples=20, algorithm='ball_tree', metric='haversine').fit(posns_filt)
     print('Done running DBSCAN for {timewindow}...')
     labels = clustered.labels_
     valid_labels = np.unique(labels[labels!=-1])
