@@ -128,9 +128,11 @@ def generate_candidate_sources(sim_audio, **kwargs):
                 top_K_tdes[ch_pair].append(descending_quality[i])
             except:
                 pass
+
     cfls_from_tdes = gramanip.make_consistent_fls_cpp(top_K_tdes, **kwargs)
     if len(cfls_from_tdes)>0:
         ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
+
         solns_cpp = lo.CCG_solutions_cpp(ccg_matrix)
         ag = cpp_make_array_geom(**kwargs)
         sources_and_data = localiser_sounds_v3(num_cores, ag, solns_cpp, cfls_from_tdes)
