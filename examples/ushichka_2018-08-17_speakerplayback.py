@@ -44,16 +44,24 @@ parser.add_argument('-audiopath', type=pathlib.Path,
                     help="Path to the multichannel audio wav file",
                     default="ushichka_data/frame-synced_multichirp_2018-08-18_09-15-06_spkrplayback_ff802_10mic_snkn9_origin.wav")
 parser.add_argument('-arraygeompath', type=pathlib.Path,
-                    help="Path to array xyz csv file",
+                    help="Path to array xyz csv file. Defaults to an arbit file in the ushichka_data folder.",
                     default="ushichka_data/2018-08-17_ff802_10mic_xyz.csv")
 parser.add_argument('-timewindow', type=str,
                     default="0.18,0.20",
-                    help="start and end time in seconds separated by a commat e.g. -timewindow 0.1,0.2")
-parser.add_argument('-remove_lastchannel', type=bool, default=True, help="Whether to remove the last channel or not. The last channel in the Ushichka data is the camera sync\
-square wave")
-parser.add_argument('-thresh_tdoaresidual', type=float, default=0.1e-3, help="Threshold in seconds to filter out positions with higher TDOA residual. Defaults to 0.1 ms")
-parser.add_argument('-dest_folder', type=pathlib.Path, default='./', help='Destination folder. Even if folder doesnt exist, it will be created.')
-parser.add_argument('-K', type=int, default=4, help="Number of peaks to choose per channel pair. ")
+                    help="start and end time in seconds separated by a commat e.g. -timewindow 0.1,0.2. \
+                        Defaults arbitrarilto to 0.18,0.2")
+parser.add_argument('-remove_lastchannel', type=bool, default=True, help="Whether to remove the last channel or not. \
+                    The last channel in the Ushichka data is the camera sync square wave.\
+                        Defaults to True")
+parser.add_argument('-thresh_tdoaresidual', type=float, default=0.1e-3, help="Threshold in seconds to filter out localisations with higher TDOA residual.\
+                    Defaults to 0.1 ms")
+parser.add_argument('-dest_folder', type=pathlib.Path, default='./', help='Destination folder. Even if folder doesnt exist, it will be created.\
+                    Defaults to current folder.')
+parser.add_argument('-K', type=int, default=4, help="Number of peaks to choose per channel pair. \
+                    Defaults to K=4")
+parser.add_argument('-maxloopres', type=float, default=0.5e-4, help="Max cFL loop residual in seconds. Defaults to 0.5e-4 seconds")
+parser.add_argument('-channels', type=str, default='-1', help="Which channels to use for tracking (0-index). Include numbers without spaces, separated by \
+commas. Defaults to using all channels. usage: 0,1,2,3,4,5")
 
 args = parser.parse_args()
 
@@ -61,6 +69,8 @@ if not os.path.exists(args.dest_folder):
     os.mkdir(args.dest_folder)
 
 now = dt.datetime.now()
+
+
 #%%
 # Utility functions
 def conv_to_numpy(pydatemm_out):
@@ -70,6 +80,7 @@ def get_3d_median_location(xyz):
     return np.apply_along_axis(np.median, 0, xyz)
 #%%
 # Setting up tracking
+array_geom = pd.read_csv(args.arraygeompath).loc[:,'x':'z'].to_numpy()
 vsound = 343.0 # m/s
 timewindow = list(map(lambda X: float(X), args.timewindow.split(",")))
 fs = sf.info(args.audiopath).samplerate
@@ -80,9 +91,17 @@ if args.remove_lastchannel:
 	mic_audio = audio[:,:-1]
 else:
     mic_audio = audio.copy()
+	
+#%% parse channels to use
+if args.channels != "-1":
+	channels = [int(each) for each in args.channels.split(',')]
+	mic_audio = mic_audio[:,channels]
+	array_geom = array_geom[channels,:]
+
 b,a = signal.butter(2, 10000/(2*fs), 'highpass')
-mic_audio = np.apply_along_axis(lambda X: signal.filtfilt(b,a,X), 1, mic_audio)
-array_geom = pd.read_csv(args.arraygeompath).loc[:,'x':'z'].to_numpy()
+mic_audio = np.apply_along_axis(lambda X: signal.filtfilt(b,a,X), 0, mic_audio)
+
+
 
 #%%
 # 
@@ -95,7 +114,7 @@ kwargs = {'nchannels':nchannels,
           'gcc_variant':'phat', 
           'min_peak_diff':0.35e-4, 
           'vsound' : 343.0}
-kwargs['max_loop_residual'] = 0.5e-4
+kwargs['max_loop_residual'] = args.maxloopres #0.5e-4
 tdoa_resid_threshold = args.thresh_tdoaresidual
 
 max_delay = np.max(distance_matrix(array_geom, array_geom))/kwargs['vsound']  

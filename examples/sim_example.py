@@ -6,6 +6,8 @@ Localising overlapping calls: simulated audio case
 import matplotlib.pyplot as plt
 import numpy as np 
 import pandas as pd
+import pyvista as pv
+
 import soundfile as sf
 from scipy.spatial import distance_matrix, distance
 euclidean = distance.euclidean
@@ -16,7 +18,7 @@ from pydatemm import generate_candidate_sources
 filename = '3-bats_trajectory_simulation_1-order-reflections.wav'
 try:
     fs = sf.info(filename).samplerate
-    array_audio, fs = sf.read(filename, stop=int(0.2*fs))
+    array_audio, fs = sf.read(filename)
 except:
     import multibatsimulation as multibat
     fs = sf.info(filename).samplerate
@@ -36,26 +38,26 @@ kwargs = {'nchannels':nchannels,
           'gcc_variant':'phat', 
           'min_peak_diff':0.35e-4, 
           'vsound' : 343.0}
-kwargs['max_loop_residual'] = 0.5e-4
+kwargs['max_loop_residual'] = 1e-4
 
 
 max_delay = np.max(distance_matrix(array_geom, array_geom))/kwargs['vsound']  
-kwargs['K'] = 4
+kwargs['K'] = 3
 kwargs['num_cores'] = 2
 
 #%%
 # i = 110 -- tricky one , 120 even worse
 # start_time = 0.030
-
-time_pts = np.arange(0, 0.21, 10e-3)
+step_size = 0.015
+time_pts = np.arange(0, 0.25, step_size)
 
 results = {}
 for start_time in tqdm.tqdm(time_pts):    
-    end_time = start_time  + max_delay
+    end_time = start_time  + step_size #max_delay
     print(f'Now handling audio between: {(start_time,end_time)}')
     start_sample, end_sample = int(fs*start_time), int(fs*end_time)  
     try:
-        sim_audio = array_audio[start_sample:end_sample]
+        sim_audio = array_audio[start_sample:end_sample,:]
         output = generate_candidate_sources(sim_audio, **kwargs)
         results[start_time] = output.sources
     except:
@@ -79,7 +81,55 @@ for key, entry in results.items():
         filtered_results[key] = posns_filt
     else:
         filtered_results[key] = np.array([])
-        
+                                                       
+#%%
+unique_posns = []
+for key, posns_filt in filtered_results.items():
+    if len(posns_filt)>0:
+     posns_filt_str = np.char.array(posns_filt)
+     spacer = np.char.array(np.tile(-999,posns_filt.shape[0]))
+     all_rows_combined = posns_filt_str[:,0] +spacer+ posns_filt_str[:,1] + spacer+posns_filt_str[:,2] + spacer+posns_filt_str[:,3]
+    
+     unique_elements, unique_inds, counts= np.unique(all_rows_combined, return_index=True, return_counts=True)
+     unique_posns_filt = posns_filt[unique_inds,:]
+     unique_posns_filt = np.column_stack((unique_posns_filt,
+                                          np.tile(key, unique_posns_filt.shape[0])))
+     unique_posns.append(unique_posns_filt)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+all_posns = np.row_stack(unique_posns)
+
+#%%
+flight_traj = pd.read_csv('multibatsim_xyz_calling.csv')
+call_positions = flight_traj[flight_traj['emission_point']]
+
+dist_mat = distance_matrix(all_posns[:,:3], call_positions.loc[:,'x':'z'].to_numpy())
+
+#%% Filter out those points that are within ~2  meters of the known flight
+# trajectories
+distmat_flighttraj = distance_matrix(all_posns[:,:3], flight_traj.loc[:,'x':'z'].to_numpy())
+sensible_posns = np.argwhere(distmat_flighttraj<=0.05)
+all_sensible_posns = all_posns[sensible_posns[:,0],:].reshape(-1,5)
+#%%
+box = pv.Box(bounds=(0,4,0,9,0,3))
+plotter = pv.Plotter()
+plotter.add_mesh(box, opacity=0.3)
+colors = ['r', 'b', 'k']
+
+# plot the flight trajectories and call emission points
+for key, subdf in flight_traj.groupby('batnum'):
+    for each in subdf.loc[:,'x':'z'].to_numpy():
+        plotter.add_mesh(pv.Sphere(0.05, center=each), color=colors[key-1])
+for key, subdf in call_positions.groupby('batnum'):
+    for each in subdf.loc[:,'x':'z'].to_numpy():
+        plotter.add_mesh(pv.Sphere(0.1, center=each), color=colors[key-1])
+# include the mic array
+for each in array_geom:
+    plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
+
+for every in all_sensible_posns:
+    plotter.add_mesh(pv.Sphere(0.2, center=every[:3]), color='white', opacity=0.5)
+
+plotter.show()
+
 #%% 
 # Account for time-of-flight
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~

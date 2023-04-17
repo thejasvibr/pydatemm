@@ -29,11 +29,11 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     description="DATEMM implementation to localise multi-source sounds with reverberation",
-    entry_points={
-        'console_scripts': [
-            'pydatemm=pydatemm.cli:main',
-        ],
-    },
+    # entry_points={
+    #     'console_scripts': [
+    #         'cli-ccg=pydatemm:cli_ccg.main',
+    #     ],
+    # },
     install_requires=requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
