@@ -87,7 +87,7 @@ def main():
     if hp_order is not None:
         order, cutoff = [float(each) for each in hp_order.split(',')]
         order = int(order)
-        b,a = signal.butter(hp_order, cutoff/(2*fs), 'highpass')
+        b,a = signal.butter(order, cutoff/(2*fs), 'highpass')
         mic_audio = np.apply_along_axis(lambda X: signal.filtfilt(b,a,X), 0, mic_audio)
     
     #%%
@@ -104,7 +104,6 @@ def main():
     kwargs['max_loop_residual'] = float(params['maxloopres']) #0.5e-4
     tdoa_resid_threshold = float(params['thresh_tdoaresidual'])
     
-    max_delay = np.max(distance_matrix(array_geom, array_geom))/params.get('vsound', 343.0)
     kwargs['K'] = params['K']
     kwargs['num_cores'] = params.get('num_cores', 2)
     #%%

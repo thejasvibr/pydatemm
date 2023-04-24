@@ -56,6 +56,18 @@ def get_libiomp5_path():
         else:
             raise NotImplementedError(f"{sys.platform} OS not handled currently")
 
+def custom_libiomp5_path():
+    '''
+    Looks to find the libiomp5.so or .dll through the 
+    environmental variable 'LIBIOMP5PATH'
+    '''
+    try:
+        only_libiomp5 = [os.environ['LIBIOMP5PATH']]
+        return only_libiomp5
+    except:
+        raise ValueError('Unable to find environmental variable LIBIOMP5PATH')
+        
+
 def get_eigen_path():
     current_module_path = os.path.abspath(__file__)
     current_folder = os.path.split(current_module_path)[0]

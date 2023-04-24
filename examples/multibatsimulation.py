@@ -17,6 +17,7 @@ import scipy.signal as signal
 import matplotlib.pyplot as plt
 import numpy as np 
 import soundfile as sf
+from scipy.spatial import distance
 choose = np.random.choice
 np.random.seed(78464)
 
@@ -134,3 +135,31 @@ else:
 
 pd.DataFrame(array_geom, columns=['x','y','z']).to_csv('mic_xyz_multibatsim.csv')
 allbat_xyz.to_csv('multibatsim_xyz_calling.csv')
+#%%
+# also create a 'noisy' mic xyz file to mimic the effect of having array geom data
+# with noise in it (e.g. from camera reconstruction)
+overall_euclidean_error = [0.05, 0.08, 0.1] # m
+def generate_noisy_micgeom(micxyz, overall_error):
+    noisy_xyz = micxyz.copy()
+    for i,each in enumerate(micxyz):
+        not_achieved = True
+        while not_achieved:
+            noise = np.random.normal(0,overall_euclidean_error,3)
+            xyz = each.copy()
+            xyz+= noise
+            if distance.euclidean(xyz, each) <= overall_error:
+                noisy_xyz[i,:] = xyz
+                not_achieved = False
+            
+    return noisy_xyz
+for error_level in overall_euclidean_error:
+    noisy_micarray = generate_noisy_micgeom(array_geom, error_level)
+    pd.DataFrame(noisy_micarray, columns=['x','y','z']).to_csv(f'mic_xyz_multibatsim_noisy{error_level}m.csv')
+                
+        
+        
+        
+    
+
+
+

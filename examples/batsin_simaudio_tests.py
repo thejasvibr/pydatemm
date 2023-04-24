@@ -1,6 +1,8 @@
 '''
 Localising overlapping calls: simulated audio case
 ==================================================
+Here we'll run the 
+
 
 '''
 import glob
@@ -20,10 +22,11 @@ import yaml
 
 common_parameters = {}
 common_parameters['audiopath'] = '3-bats_trajectory_simulation_1-order-reflections.wav'
-common_parameters['arraygeompath'] = 'mic_xyz_multibatsim.csv'
+#common_parameters['arraygeompath'] = 'mic_xyz_multibatsim.csv'
+common_parameters['arraygeompath'] = 'mic_xyz_multibatsim_noisy0.05m.csv'
 common_parameters['dest_folder'] = 'multibatsim_results'
 common_parameters['K'] = 3
-common_parameters['maxloopres'] = 0.5e-4
+common_parameters['maxloopres'] = 1e-4
 common_parameters['thresh_tdoaresidual'] = 1e-10 # s
 common_parameters['remove_lastchannel'] = "False"
 
@@ -72,8 +75,7 @@ else:
     raise IndexError('Num result files dont match the time poitns')
 all_sources = pd.concat(all_results).reset_index(drop=True)
 all_posns = all_sources.loc[:,['x','y','z','tdoa_res']].to_numpy()
-
-                                                       
+                                                        
 #%%
 flight_traj = pd.read_csv('multibatsim_xyz_calling.csv')
 call_positions = flight_traj[flight_traj['emission_point']]
@@ -83,7 +85,7 @@ dist_mat = distance_matrix(all_posns[:,:3], call_positions.loc[:,'x':'z'].to_num
 #%% Filter out those points that are within ~2  meters of the known flight
 # trajectories
 distmat_flighttraj = distance_matrix(all_posns[:,:3], flight_traj.loc[:,'x':'z'].to_numpy())
-sensible_posns = np.argwhere(distmat_flighttraj<=0.1)
+sensible_posns = np.argwhere(distmat_flighttraj<=0.3)
 all_sensible_posns = all_posns[sensible_posns[:,0],:3]
 #%%
 box = pv.Box(bounds=(0,4,0,9,0,3))
