@@ -55,7 +55,7 @@ now = dt.datetime.now()
 
 def main():
 
-
+    print('Entering main() function....')
     #%%
     # Utility functions
     def conv_to_numpy(pydatemm_out):

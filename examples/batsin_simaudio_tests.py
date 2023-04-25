@@ -38,7 +38,7 @@ array_geom = pd.read_csv(common_parameters['arraygeompath']).loc[:,'x':'z'].to_n
 #%% Make the yaml file for the various time points
 step_size = 0.010
 window_size = 0.010
-time_pts = np.arange(0, 0.25, step_size)
+time_pts = np.arange(0, 0.05, step_size)
 
 if not os.path.exists(common_parameters['dest_folder']):
     os.mkdir(common_parameters['dest_folder'])
