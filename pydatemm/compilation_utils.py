@@ -9,12 +9,15 @@ Finds libiomp5 library and runs cppyy based compilation.
 """
 import subprocess
 import sys
+import warnings
 import os 
 import glob
 import cppyy_backend.loader as l
 
 def get_libiomp5_path():
     '''
+    DEPRECATED.
+    
     Tries to find the first found libiomp5 DLL and returns
     the path
 
@@ -30,7 +33,7 @@ def get_libiomp5_path():
     str
         Path to the libiomp5 DLL
     '''
-    
+    warnings.warn('Deprecated function! - now replaced by get_libiomp5_path_from_environment')
     if sys.platform == "linux":
         output = subprocess.check_output(["locate", "libiomp5"])
         # parse the output 
@@ -56,17 +59,16 @@ def get_libiomp5_path():
         else:
             raise NotImplementedError(f"{sys.platform} OS not handled currently")
 
-def custom_libiomp5_path():
+def get_libiomp5_path_from_environment():
     '''
     Looks to find the libiomp5.so or .dll through the 
-    environmental variable 'LIBIOMP5PATH'
+    environmental variable 'LIBIOMP5_PATH'
     '''
     try:
-        only_libiomp5 = [os.environ['LIBIOMP5PATH']]
+        only_libiomp5 = [os.environ['LIBIOMP5_PATH']]
         return only_libiomp5
     except:
         raise ValueError('Unable to find environmental variable LIBIOMP5PATH')
-        
 
 def get_eigen_path():
     current_module_path = os.path.abspath(__file__)
@@ -85,11 +87,6 @@ def get_cpp_modules():
     cpp_files = [os.path.join(current_folder, each) for each in cpp_modules]
     return cpp_files
 
-
-
-    
-
-
 def load_and_compile_with_own_flags():
     os.environ['EXTRA_CLING_ARGS'] = '-fopenmp -O2 -g'
     current_folder = os.path.split(os.getcwd())[0]
@@ -102,7 +99,7 @@ def load_and_compile_with_own_flags():
     
     import cppyy
     try:
-        cppyy.load_library(get_libiomp5_path()[0])
+        cppyy.load_library(get_libiomp5_path_from_environment()[0])
     except:
         raise ValueError(f'Could not load libiomp5 with {get_libiomp5_path()[0]}')
     cppyy.add_include_path(get_eigen_path())

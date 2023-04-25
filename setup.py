@@ -12,6 +12,8 @@ with open('HISTORY.rst') as history_file:
 
 requirements = ['numpy','scipy','matplotlib','soundfile','tqdm']
 
+version_number = str()
+
 test_requirements = [ ]
 
 setup(
@@ -44,6 +46,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/thejasvibr/pydatemm',
-    version='0.0.1',
+    version='0.0.2',
     zip_safe=False,
 )
