@@ -25,10 +25,12 @@ common_parameters['audiopath'] = '3-bats_trajectory_simulation_1-order-reflectio
 #common_parameters['arraygeompath'] = 'mic_xyz_multibatsim.csv'
 common_parameters['arraygeompath'] = 'mic_xyz_multibatsim_noisy0.05m.csv'
 common_parameters['dest_folder'] = 'multibatsim_results'
-common_parameters['K'] = 3
+common_parameters['K'] = 4
 common_parameters['maxloopres'] = 1e-4
 common_parameters['thresh_tdoaresidual'] = 1e-10 # s
 common_parameters['remove_lastchannel'] = "False"
+common_parameters['min_peak_dist'] = 0.35e-4 # s
+common_parameters['window_size'] = 0.010 # s
 
 simdata = pd.read_csv('multibatsim_xyz_calling.csv').loc[:,'x':]
 simdata_callpoints = simdata[simdata['emission_point']]
@@ -36,23 +38,26 @@ simdata_callpoints = simdata[simdata['emission_point']]
 array_geom = pd.read_csv(common_parameters['arraygeompath']).loc[:,'x':'z'].to_numpy()
 
 #%% Make the yaml file for the various time points
-step_size = 0.010
+step_size = 0.003
 window_size = 0.010
-time_pts = np.arange(0, 0.05, step_size)
+time_starts = np.arange(0, 0.5, step_size)
 
 if not os.path.exists(common_parameters['dest_folder']):
     os.mkdir(common_parameters['dest_folder'])
 
-results = {}
-for i,start in enumerate(time_pts):   
-    end = start + window_size 
-    if end <= 0.25:
-        startstop = f'{round(start,3)},{round(end,3)}'
-        common_parameters['timewindow'] = startstop
-        fname = os.path.join(common_parameters['dest_folder'], 
-                             f'paramset_startime{start}.yaml')
-        ff = open(fname, 'w+')
-        yaml.dump(common_parameters, ff)
+# incoporate the time windows into the parameter file
+relevant_time_windows = np.around(time_starts[time_starts<=0.249], 3)
+# split the time_windows according to the total number of cores to be used.
+split_timepoints = np.array_split(relevant_time_windows, 4)
+
+for i, each in enumerate(split_timepoints):
+    common_parameters['start_time'] = str(each.tolist())[1:-1]
+    
+    fname = os.path.join(common_parameters['dest_folder'], 
+                         f'paramset_multibatsim_{i}.yaml')
+    ff = open(fname, 'w+')
+    yaml.dump(common_parameters, ff)
+
 
 #%%    
 # Now create a bash file which runs each of the parameter sets!
@@ -67,9 +72,9 @@ os.system("bash bats_simaudio_runs.sh")
 # load all the results into a dictionary
 result_files = natsorted(glob.glob(common_parameters['dest_folder']+'/*.csv'))
 all_results = []
-if len(result_files)==time_pts.size:
+if len(result_files)==relevant_time_windows.size-1:
     results = {}
-    for i,start_time in enumerate(time_pts):
+    for i in range(relevant_time_windows.size-1):
         all_results.append(pd.read_csv(result_files[i]))
 else: 
     raise IndexError('Num result files dont match the time poitns')
