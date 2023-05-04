@@ -10,9 +10,9 @@ import numpy as np
 from scipy.spatial import distance
 euclidean = distance.euclidean
 from sklearn import cluster
+print('MIAOW........../')
 try:
     from pydatemm.compilation_utils import load_and_compile_with_own_flags
-    
     load_and_compile_with_own_flags()
 except ImportError:
     pass  
