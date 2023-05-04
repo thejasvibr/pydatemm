@@ -10,7 +10,10 @@ from natsort import natsorted
 import matplotlib.pyplot as plt
 import numpy as np 
 import pandas as pd
-import pyvista as pv
+try:
+    import pyvista as pv
+except:
+    print('Cant import pyvista!')
 import soundfile as sf
 from scipy.spatial import distance_matrix, distance
 euclidean = distance.euclidean
@@ -93,23 +96,26 @@ distmat_flighttraj = distance_matrix(all_posns[:,:3], flight_traj.loc[:,'x':'z']
 sensible_posns = np.argwhere(distmat_flighttraj<=0.3)
 all_sensible_posns = all_posns[sensible_posns[:,0],:3]
 #%%
-box = pv.Box(bounds=(0,4,0,9,0,3))
-plotter = pv.Plotter()
-plotter.add_mesh(box, opacity=0.3)
-colors = ['r', 'b', 'k']
-
-# plot the flight trajectories and call emission points
-for key, subdf in flight_traj.groupby('batnum'):
-    for each in subdf.loc[:,'x':'z'].to_numpy():
-        plotter.add_mesh(pv.Sphere(0.05, center=each), color=colors[key-1])
-for key, subdf in call_positions.groupby('batnum'):
-    for each in subdf.loc[:,'x':'z'].to_numpy():
-        plotter.add_mesh(pv.Sphere(0.1, center=each), color=colors[key-1])
-# include the mic array
-for each in array_geom:
-    plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
-
-for every in all_sensible_posns:
-    plotter.add_mesh(pv.Sphere(0.2, center=every[:3]), color='white', opacity=0.5)
-
-plotter.show()
+try:
+    box = pv.Box(bounds=(0,4,0,9,0,3))
+    plotter = pv.Plotter()
+    plotter.add_mesh(box, opacity=0.3)
+    colors = ['r', 'b', 'k']
+    
+    # plot the flight trajectories and call emission points
+    for key, subdf in flight_traj.groupby('batnum'):
+        for each in subdf.loc[:,'x':'z'].to_numpy():
+            plotter.add_mesh(pv.Sphere(0.05, center=each), color=colors[key-1])
+    for key, subdf in call_positions.groupby('batnum'):
+        for each in subdf.loc[:,'x':'z'].to_numpy():
+            plotter.add_mesh(pv.Sphere(0.1, center=each), color=colors[key-1])
+    # include the mic array
+    for each in array_geom:
+        plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
+    
+    for every in all_sensible_posns:
+        plotter.add_mesh(pv.Sphere(0.2, center=every[:3]), color='white', opacity=0.5)
+    
+    plotter.show()
+except:
+    print('Cant execute pyvista visualisation')
