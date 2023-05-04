@@ -12,7 +12,7 @@ import sys
 import warnings
 import os 
 import glob
-import cppyy_backend.loader as l
+#import cppyy_backend.loader as l
 
 def get_libiomp5_path():
     '''
