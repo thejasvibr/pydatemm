@@ -49,8 +49,8 @@ if not os.path.exists(common_parameters['dest_folder']):
 
 # incoporate the time windows into the parameter file
 relevant_time_windows = np.around(time_starts, 3)
-# split the time_windows according to the total number of cores to be used.
-split_timepoints = np.array_split(relevant_time_windows, 4)
+# split the time_windows according to the total number of paramsets to be generated
+split_timepoints = np.array_split(relevant_time_windows, 50)
 #%%
 for i, each in enumerate(split_timepoints):
     common_parameters['start_time'] = str(each.tolist())[1:-1]
