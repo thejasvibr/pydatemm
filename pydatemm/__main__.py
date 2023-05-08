@@ -21,6 +21,7 @@ from pydatemm import generate_candidate_sources
 import scipy.signal as signal 
 import soundfile as sf
 from scipy.spatial import distance_matrix
+import traceback
 import yaml 
 from sklearn.cluster import DBSCAN
 
@@ -179,8 +180,10 @@ def main():
                 print(f'No sources found in {start_t, stop_t}...')
             df.to_csv(csv_fname)
             stop = dt.datetime.now()
-        except:
+        except Exception:
             print(f'CANT PROCESS AUDIO FOR {start_t, stop_t}')
+            print(traceback.format_exc())
+            # or
             pass
 
 if __name__ == "__main__":

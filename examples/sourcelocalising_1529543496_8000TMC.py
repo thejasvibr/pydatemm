@@ -30,6 +30,7 @@ common_parameters['arraygeompath'] = '1529543496_input/Sanken9_centred_mic_total
 common_parameters['dest_folder'] = '1529543496_output'
 common_parameters['K'] = 3
 common_parameters['maxloopres'] = 1e-4
+common_parameters['min_peak_dist'] = 0.35e-4 # s
 common_parameters['thresh_tdoaresidual'] = 1e-8 # s
 common_parameters['remove_lastchannel'] = "False"
 common_parameters['highpass_order'] = "2,20000"
@@ -54,7 +55,7 @@ split_timepoints = np.array_split(relevant_time_windows, 50)
 #%%
 for i, each in enumerate(split_timepoints):
     common_parameters['start_time'] = str(each.tolist())[1:-1]
-    
+    common_parameters['window_size'] = window_size
     fname = os.path.join(common_parameters['dest_folder'], 
                          f'paramset_1529543496_{i}.yaml')
     ff = open(fname, 'w+')
