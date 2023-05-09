@@ -5,9 +5,9 @@
 #SBATCH --time 00:10:00
 #SBATCH --mem 10G
 #SBATCH --array=0-49
-#SBATCH -o output_batchlocalise-rd3_%a.out
-#SBATCH -e error_batchlocalise-rd3_%a.err
-#SBATCH --job-name=batchlocalise_rd3
+#SBATCH -o origxyz_%a.out
+#SBATCH -e origxyz_%a.err
+#SBATCH --job-name=origxyz
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=thejasvi.beleyur@bi.mpg.de
 
@@ -23,7 +23,7 @@ conda activate /u/tbeleyur/conda-envs/fresh/
 # and now run the file 
 cd /u/tbeleyur/pydatemm/examples/
 # setup the parameter files 
-python sourcelocalising_1529543496_8000TMC.py
+python preparing_parametersets_1529543496_8000TMC.py
 # run one of the parameter files
-python -m pydatemm -paramfile 1529543496_output/paramset_1529543496_$SLURM_ARRAY_TASK_ID.yaml
+python -m pydatemm -paramfile 1529543496_output/params_originalmicxyz_1529543496_$SLURM_ARRAY_TASK_ID.yaml
 
