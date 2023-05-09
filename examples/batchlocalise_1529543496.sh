@@ -1,10 +1,13 @@
 #!/bin/bash 
-#SBATCH -n 2
-#SBATCH -t 0-00:10
-#SBATCH --mem 5G
-#SBATCH -o batchlocalise_%A_%a.out
-#SBATCH -e batchlocalise_%A_%a.err
-#SBATCH --job-name=batchlocalise
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=2
+#SBATCH --time 00:20:00
+#SBATCH --mem 20G
+#SBATCH --array=7,11,13,14,16,18,19,22,24,25,29,32,36,39,40,41,43
+#SBATCH -o output_batchlocalise-rd3_%a.out
+#SBATCH -e error_batchlocalise-rd3_%a.err
+#SBATCH --job-name=batchlocalise_rd3
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=thejasvi.beleyur@bi.mpg.de
 
@@ -22,5 +25,5 @@ cd /u/tbeleyur/pydatemm/examples/
 # setup the parameter files 
 python sourcelocalising_1529543496_8000TMC.py
 # run one of the parameter files
-python -m pydatemm -paramfile paramset_1529543496_$SLURM_ARRAY_TASK_ID.yaml
+python -m pydatemm -paramfile 1529543496_output/paramset_1529543496_$SLURM_ARRAY_TASK_ID.yaml
 
