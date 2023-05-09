@@ -44,6 +44,7 @@ help_text = """Run generate_candidate_sources for a given time snippet of an aud
         * vsound : float>0. Speed of sound in m/s. Defaults to 343 m/s
         * num_cores : int. Number of cores to use per run to perform the candidate source
             localisations calculations after TDOA graphs are generated. Defaults to 2.
+        * run_name : str. Name of the run. Defaults to the wav-file name.
         * highpass_ : str. If provided then the audio snippet will be highpassed
             with the given Butterworth filter order and at the given cutoff frequency
             in Hz.
@@ -127,7 +128,8 @@ def main():
             output = generate_candidate_sources(audio, **kwargs)
             wavfilename = os.path.split(params['audiopath'])[-1].split('.')[0]
             
-            csv_fname = os.path.join(params['dest_folder'], f'{wavfilename}_{start_t}-{stop_t}.csv')
+            run_name = params.get('run_name', wavfilename)
+            csv_fname = os.path.join(params['dest_folder'], f'{run_name}_{start_t}-{stop_t}.csv')
             
             if len(output.sources)>0:
                 posns = conv_to_numpy(output.sources)
