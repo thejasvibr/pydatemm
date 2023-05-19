@@ -30,13 +30,13 @@ common_parameters = {}
 common_parameters['audiopath'] = '1529543496_input/video_synced10channel_first15sec_1529543496.WAV'
 common_parameters['arraygeompath'] = '1529543496_input/Sanken9_centred_mic_totalstationxyz.csv'
 common_parameters['dest_folder'] = '1529543496_output'
-common_parameters['K'] = 3
-common_parameters['maxloopres'] = 1e-4
+common_parameters['K'] = 4
+common_parameters['maxloopres'] = 0.5e-4
 common_parameters['min_peak_dist'] = 0.35e-4 # s
 common_parameters['thresh_tdoaresidual'] = 1e-8 # s
 common_parameters['remove_lastchannel'] = "False"
 common_parameters['highpass_order'] = "2,20000"
-common_parameters['run_name'] = 'params_originalmicxyz'
+common_parameters['run_name'] = 'originalmicxyz_4K-and-lowloopres'
 
 array_geom = pd.read_csv(common_parameters['arraygeompath']).loc[:,'x':'z'].to_numpy()
 
