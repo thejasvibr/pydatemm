@@ -36,16 +36,16 @@ common_parameters['arraygeompath'] = f'{posix_timestamp}_input/Sanken9_centred_m
 common_parameters['dest_folder'] = f'{posix_timestamp}_output'
 common_parameters['K'] = 3
 common_parameters['maxloopres'] = 1e-4
-common_parameters['min_peak_dist'] = 0.35e-4 # s
+common_parameters['min_peak_dist'] = 0.3e-3 # s
 common_parameters['thresh_tdoaresidual'] = 1e-8 # s
 common_parameters['remove_lastchannel'] = "False"
 common_parameters['highpass_order'] = "2,20000"
-common_parameters['run_name'] = f'origxyz_'# the posix timestamp will be added later!
+common_parameters['run_name'] = f'hightempres_'# the posix timestamp will be added later!
 
 array_geom = pd.read_csv(common_parameters['arraygeompath']).loc[:,'x':'z'].to_numpy()
 
 #%% Make the yaml file for the various time points
-step_size = 0.003
+step_size = 0.001
 window_size = 0.016
 common_parameters['window_size'] = window_size
 time_starts = np.arange(0, 1.5, step_size)
