@@ -1,9 +1,10 @@
 #!/bin/bash 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time 00:10:00
-#SBATCH --mem 10G
-#SBATCH --array=14,16,19,20,21,23
+#SBATCH --nodes=1
+#SBATCH --time=00:10:00
+#SBATCH --mem=10G
+#SBATCH --array=0-24
 #SBATCH -o 46136_%a.out
 #SBATCH -e 46136_%a.err
 #SBATCH --job-name=46136
