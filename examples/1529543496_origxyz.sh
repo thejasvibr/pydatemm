@@ -1,10 +1,13 @@
 #!/bin/bash 
-#SBATCH -n 2
-#SBATCH -t 0-00:2 
-#SBATCH --mem 2000
-#SBATCH -o output_miaow.txt
-#SBATCH -e error_miaow.txt
-#SBATCH --job-name=tng1
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=2
+#SBATCH --time 00:10:00
+#SBATCH --mem 10G
+#SBATCH --array=0-49
+#SBATCH -o origxyz_%a.out
+#SBATCH -e origxyz_%a.err
+#SBATCH --job-name=origxyz
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=thejasvi.beleyur@bi.mpg.de
 
@@ -20,7 +23,7 @@ conda activate /u/tbeleyur/conda-envs/fresh/
 # and now run the file 
 cd /u/tbeleyur/pydatemm/examples/
 # setup the parameter files 
-python batsin_simaudio_tests.py
+python preparing_parametersets_1529543496_8000TMC.py
 # run one of the parameter files
-python -m pydatemm -paramfile paramset_multibatsim_0.yaml
+python -m pydatemm -paramfile 1529543496_output/hightempres__1529543496_$SLURM_ARRAY_TASK_ID.yaml
 
