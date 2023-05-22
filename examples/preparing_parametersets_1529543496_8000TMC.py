@@ -30,7 +30,7 @@ posix_timestamp = '1529543496'
 
 
 common_parameters = {}
-common_parameters['audiopath'] = f'{posix_timestamp}_input/video_synced10channel_first15sec_1529546136.WAV'
+common_parameters['audiopath'] = f'{posix_timestamp}_input/video_synced10channel_first15sec_1529543496.WAV'
 common_parameters['arraygeompath'] = f'{posix_timestamp}_input/Sanken9_centred_mic_totalstationxyz.csv'
 common_parameters['dest_folder'] = f'{posix_timestamp}_output'
 common_parameters['K'] = 3
