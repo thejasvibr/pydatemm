@@ -25,5 +25,5 @@ cd /u/tbeleyur/pydatemm/examples/
 # setup the parameter files 
 python preparing_parametersets_1529543496_8000TMC.py
 # run one of the parameter files
-python -m pydatemm -paramfile 1529543496_output/hightempres__1529543496_$SLURM_ARRAY_TASK_ID.yaml
+python -m pydatemm -paramfile 1529543496_output/hightempres_1529543496_$SLURM_ARRAY_TASK_ID.yaml
 
