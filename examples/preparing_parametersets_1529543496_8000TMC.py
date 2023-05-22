@@ -39,7 +39,7 @@ common_parameters['min_peak_dist'] = 0.25e-3 # s
 common_parameters['thresh_tdoaresidual'] = 1e-8 # s
 common_parameters['remove_lastchannel'] = "False"
 common_parameters['highpass_order'] = "2,20000"
-common_parameters['run_name'] = f'origxyz_'# the posix timestamp will be added later!
+common_parameters['run_name'] = f'hightempres'# the posix timestamp will be added later!
 
 array_geom = pd.read_csv(common_parameters['arraygeompath']).loc[:,'x':'z'].to_numpy()
 
