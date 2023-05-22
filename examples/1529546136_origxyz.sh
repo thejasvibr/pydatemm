@@ -1,10 +1,10 @@
 #!/bin/bash 
 #SBATCH --ntasks=1
-#SBATCH --nodes=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time 00:10:00
-#SBATCH --mem 10G
-#SBATCH --array=0-1
+#SBATCH --nodes=1
+#SBATCH --time=00:10:00
+#SBATCH --mem=10G
+#SBATCH --array=0-24
 #SBATCH -o 46136_%a.out
 #SBATCH -e 46136_%a.err
 #SBATCH --job-name=46136
@@ -25,5 +25,5 @@ cd /u/tbeleyur/pydatemm/examples/
 # setup the parameter files 
 python preparing_parametersets_1529546136_22000TMC.py
 # run one of the parameter files
-python -m pydatemm -paramfile 1529543496_output/origxyz__1529546136_$SLURM_ARRAY_TASK_ID.yaml
+python -m pydatemm -paramfile 1529546136_output/origxyz__1529546136_$SLURM_ARRAY_TASK_ID.yaml
 
