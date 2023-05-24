@@ -9,20 +9,26 @@ Created on Tue May  9 12:33:20 2023
 import glob
 import matplotlib
 from natsort import natsorted
+import matplotlib.pyplot as plt
+from matplotlib.backend_bases import MouseButton
 import numpy as np 
 import pandas as pd
 import pyvista as pv
+import soundfile as sf
 from scipy.spatial import distance_matrix, distance
+import scipy.signal as signal 
 euclidean = distance.euclidean
 import scipy.interpolate as si
+import time
 
-output_folder = '1529543496_output/'
-arraygeom_file = '1529543496_input/Sanken9_centred_mic_totalstationxyz.csv'
-audiofile = '1529543496_input/video_synced10channel_first15sec_1529543496.WAV'
+posix = '1529543496'
+output_folder = f'{posix}_output/'
+arraygeom_file = f'{posix}_input/Sanken9_centred_mic_totalstationxyz.csv'
+audiofile = f'{posix}_input/video_synced10channel_first15sec_{posix}.WAV'
 array_geom = pd.read_csv(arraygeom_file).loc[:,'x':'z'].to_numpy()
 #%%
 # load all the results into a dictionary
-result_files = natsorted(glob.glob(output_folder+'/*.csv'))
+result_files = natsorted(glob.glob(output_folder+'/hightem*.csv'))
 # keep only those with the relevant time-window size
 def get_start_stop_times(file_name):
     times = file_name.split('_')[-1].split('.csv')[0]
@@ -36,14 +42,13 @@ def window_length_is_correct(file_name, expected, tolerance=1e-15):
     else:
         return False
     
-    
 all_results = []
 for i,fname in enumerate(result_files):
     if window_length_is_correct(fname, 0.016):
         all_results.append(pd.read_csv(fname))
 
 all_sources = pd.concat(all_results).reset_index(drop=True)
-all_posns = all_sources.loc[:,['x','y','z','tdoa_res']].to_numpy()
+all_posns = all_sources.loc[:,['x','y','z','tdoa_res','t_start','t_end']].to_numpy()
 
 #%%
 # Now load the video flight trajectories and transform them from the 
@@ -79,24 +84,37 @@ timewindow_rows = np.logical_and(flight_traj_conv['time'] >= start_time,
                                         flight_traj_conv['time'] <= end_time) 
 flighttraj_conv_window = flight_traj_conv.loc[timewindow_rows,:].dropna()
 
-#%% Keep only those that are within a few meters of any bat trajectory positions
-distmat = distance_matrix(flighttraj_conv_window.loc[:,'x':'z'].to_numpy(), all_posns[:,:-1])
-nearish_posns = np.where(distmat<0.30) # all points that are at most 8 metres from any mic
-sources_nearish = all_posns[np.unique(nearish_posns[1]),:]
+#%% Now upsample the trajectories
+upsampled_flighttraj = []
+for batid, batdf in flighttraj_conv_window.groupby('batid'):
+    upsampled_df = pd.DataFrame(data=[], columns=['t','batid','x','y','z'])    
+    t_raw = batdf['time'].to_numpy()
+    t_highres = np.arange(t_raw.min(), t_raw.max(), 1e-3)
+    upsampled_df['t'] = t_highres
+    upsampled_df['batid'] = batid
+    traj_splines = {i : si.interp1d(t_raw, batdf.loc[:,i], 'quadratic') for i in ['x','y','z']}
+    traj_interp = { i: traj_splines[i](t_highres) for i in ['x','y','z']}
 
-# find the start and end times of the positions that are nearby. 
-sources_w_time  = all_sources.loc[np.unique(nearish_posns[1]),['x','y','z','t_start','t_end']].reset_index(drop=True)
+    for axis in ['x','y','z']:
+        upsampled_df[axis] = traj_interp[axis]
+    upsampled_flighttraj.append(upsampled_df)
+upsampled_flighttraj = pd.concat(upsampled_flighttraj)    
+
+#%% Keep only those that are within a few meters of any bat trajectory positions
+distmat = distance_matrix(upsampled_flighttraj.loc[:,'x':'z'].to_numpy(), all_posns[:,:3])
+nearish_posns = np.where(distmat<15) # all points that are at most 8 metres from any mic
+sources_nearish = all_posns[np.unique(nearish_posns[1]),:]
 
 #%%
 # Run a DBSCAN on the nearish sources to get call centres
 from sklearn.cluster import DBSCAN
-clusters = DBSCAN(eps=0.1).fit(sources_nearish[:,:-1])
+clusters = DBSCAN(eps=0.1).fit(sources_nearish[:,:3])
 
 cluster_centres = []
 for lab in np.unique(clusters.labels_):
     if not lab == -1:
         inds = np.where(clusters.labels_==lab)
-        cluster_points = sources_nearish[inds, :-1].reshape(-1,3)
+        cluster_points = sources_nearish[inds, :3].reshape(-1,3)
         centroid = np.median(cluster_points,axis=0)
         #print(lab, centroid)
         cluster_centres.append(centroid)
@@ -176,22 +194,6 @@ for each in cluster_centres:
         index += 1
         timewindows.append(toa_minmax)
         print(toa_minmax, np.around(distmat.min(),3), flighttraj_conv_window.loc[row, 'batid'])  
-#%%
-import matplotlib.pyplot as plt
-import soundfile as sf
-fs = sf.info(audiofile).samplerate
-
-for j, row in emission_data.iterrows():
-    fig, axs = plt.subplots(10, 1, sharex='col', sharey='row', figsize=(2,6))
-    batid, t_emit, toa_min, toa_max = row
-    snippet, _ = sf.read(audiofile, start=int(toa_min*fs), stop=int(toa_max*fs))   
-    for i in range(10):
-        axs[i].specgram(snippet[:,i], Fs=fs, NFFT=192, noverlap=190)
-        axs[i].set_yticks([])
-        axs[i].set_xticks([0, toa_max-toa_min],[toa_min, toa_max])
-    axs[0].set_title(f'batid_{batid}_toa-min_{toa_min}')
-    plt.savefig(f'batid_{batid}_toa-min_{toa_min}_index{j}.png')
-    plt.close()
         
 #%%
 camera_positions = np.array([[-1.0, -8.18, 2.08],
@@ -252,4 +254,195 @@ plotter.show(auto_close=True)
 plotter.close()    
     
 
+
 #%%
+# Get the timestamps for the flight trajs closest to the valid clusters
+
+counts_by_batid = {}
+
+for batid, batdf in upsampled_flighttraj.groupby('batid'):
+    t_em = np.zeros(batdf.shape[0])
+    counts_by_batid[batid] = np.zeros(t_em.size)
+    print('bow')
+    points_to_traj = distance_matrix(sources_nearish[:,:3],
+                                     batdf.loc[:,'x':'z'].to_numpy())
+    print('miaow')
+    close_point_inds = np.where(points_to_traj<0.5)
+    close_points = sources_nearish[np.unique(close_point_inds[0]),:]
+    
+    topx = 5
+    for candidate in close_points:
+        xyz = candidate[:3]
+        timewindow = np.logical_and(batdf['t']>=candidate[-2]-0.03, 
+                                    batdf['t']<=candidate[-1])
+        
+        subdf = batdf.loc[timewindow,:]
+        dist_to_clust = distance_matrix(xyz.reshape(-1,3),
+                                        subdf.loc[:,'x':'z'].to_numpy()).flatten()
+        inds_close = np.where(dist_to_clust<0.3)[0]
+        all_close = dist_to_clust[inds_close]
+        if len(all_close)>0:
+            counts_by_batid[batid][sorted_inds] += 1 
+            
+            closest_ind = np.argmin(dist_to_clust) # choose the closest
+            counts_by_batid[batid][closest_ind] +=1 
+            # choose the top 5 points that are closest
+            top_x_inds = np.argsort(dist_to_clust).flatten()[:topx]
+            for min_ind in top_x_inds:
+                if dist_to_clust[min_ind] <= 0.3:
+                    counts_by_batid[batid][min_ind] += 1   
+    
+#%%
+fs = sf.info(audiofile).samplerate
+audio, fs = sf.read(audiofile, start=int(fs*12.4), stop=int(fs*13.4))
+num_bats = len(counts_by_batid.keys())
+
+
+    
+# def calculate_toa_across_mics(time_click, array_geom):
+#     closest_traj_point = 
+#     tof_mat = distance_matric(time_cli)
+    
+
+audio_channels = [0,5,9]
+
+fig, axs = plt.subplots(ncols=1, nrows=num_bats+len(audio_channels),
+                        figsize=(5, 10.0),
+                        layout="tight", sharex=True)
+traj_data = upsampled_flighttraj.groupby('batid')
+
+# here I'll also establish an interactive workflow to get the bat calls 
+
+def get_clicked_point_location(event):
+    if event.button is MouseButton.LEFT:
+        event_axes = [ax.in_axes(event) for ax in axs ]
+        if sum(event_axes) == 0:
+            return None, None
+        else:
+            axes_id = int(np.where(event_axes)[0])
+            
+            tclick, _ =  event.xdata, event.ydata
+            curr_plot = axs[axes_id]
+            num_lines = len(curr_plot.lines)
+            plt.sca(curr_plot)
+            if num_lines >2:
+                for i in range(2,num_lines)[::-1]:
+                    curr_plot.lines[i].remove()
+            
+            plt.plot(event.xdata, event.ydata,'r*')
+#            plt.vlines(event.xdata-0.008, 0, 50, colors=colors[axes_id])
+            return tclick, int(axes_id)
+    else:
+        return None, None
+
+def calculate_toa_channels(t_source, sourceid, array_geom):
+    flight_traj = traj_data.get_group(sourceid)
+    # get closest point in time 
+    nearest_ind = abs(flight_traj['t']-t_source).argmin()
+    emission_point = flight_traj.loc[nearest_ind, 'x':'z'].to_numpy().reshape(-1,3)
+    tof = distance_matrix(emission_point, array_geom)/343.0 
+    toa = t_source + tof
+    return toa
+
+def draw_expected_toa(event, target_channels, window_halfwidth):
+    start = time.time()
+    t_emission, ax_id = get_clicked_point_location(event)
+    if t_emission is not None:
+        batid = ax_id + 1 
+        toa = calculate_toa_channels(t_emission, batid, 
+                                     array_geom[target_channels,:]).flatten()
+        toa_2 = calculate_toa_channels(t_emission-window_halfwidth, batid, 
+                                     array_geom[target_channels,:]).flatten()
+
+
+        # get last few axes - that have specgrams
+        specgram_axes = axs[-len(target_channels):]
+        for channel_toa,channel_toa2, axid in zip(toa, toa_2, specgram_axes):
+            plt.sca(axid)
+            plt.vlines(channel_toa, 20000,96000, linestyle='dotted', color=colors[ax_id])
+            plt.vlines(channel_toa2, 20000,96000, linestyle='dotted', color=colors[ax_id])
+            
+        fig.canvas.draw()
+        #fig.canvas.draw_idle()
+
+
+
+proximity_peaks = {}
+
+for i,(batid, source_prof) in enumerate(counts_by_batid.items()):
+    t_batid = upsampled_flighttraj.groupby('batid').get_group(batid)['t']
+    
+    plt.sca(axs[i])
+    plt.plot(t_batid, source_prof, label='bat id ' + str(batid), color=colors[int(batid)-1])
+    plt.xticks([])
+    plt.legend()
+    
+    pks, _ = signal.find_peaks(source_prof, distance=15)
+    proximity_peaks[batid] = t_batid[pks]
+    plt.plot(t_batid[pks], source_prof[pks],'g*')
+
+
+for i, ch in enumerate(audio_channels):
+    plt.sca(axs[num_bats+i])
+    plt.specgram(audio[:,ch], Fs=fs, xextent=[12.4, 13.4])
+
+
+def plotted_toa_from_peaks(specgram_axes, batid, peak_times, target_channels, window_halfwidth):
+    start = time.time()
+    for t_emission in peak_times:
+        toa = calculate_toa_channels(t_emission, batid, 
+                                     array_geom[target_channels,:]).flatten()
+        toa_2 = calculate_toa_channels(t_emission-window_halfwidth, batid, 
+                                     array_geom[target_channels,:]).flatten()
+    
+
+        for channel_toa,channel_toa2, axid in zip(toa, toa_2, specgram_axes):
+            plt.sca(axid)
+            plt.vlines(channel_toa, 20000,96000, linestyle='dotted', color=colors[batid-1])
+            plt.vlines(channel_toa2, 20000,96000, linestyle='dotted', color=colors[batid-1])
+    fig.canvas.draw()
+
+nchannels = len(audio_channels)
+for batid in range(1,7):
+    plotted_toa_from_peaks(axs[-nchannels:], batid, proximity_peaks[batid], audio_channels, 16e-3)
+
+plt.gca().set_xticks(np.arange(12.4,13.4,0.05))
+plt.gca().set_xticks(np.linspace(12.4,13.4,100), minor=True)
+
+# fig.canvas.mpl_connect('button_press_event',
+#                        lambda event: draw_expected_toa(event, audio_channels, 8e-3))
+
+#%%
+
+
+
+
+time_tem = np.linspace(0,1.5,t_em.size)
+fs = sf.info(audiofile).samplerate
+audio_clip, fs = sf.read(audiofile, stop=int(fs*time_tem.max()))
+
+def fwdbkwd_avg(X, customwin=signal.windows.tukey(5)):
+    fwd_pass = signal.convolve(X,customwin,'same')
+    bkwd_pass = signal.convolve(X[::-1],customwin,'same')
+    avg = (fwd_pass+bkwd_pass[::-1])/2
+    return avg
+
+peak_dist = 20
+counts_smooth_trans = np.sqrt(fwdbkwd_avg(counts))
+peaks_counts = signal.find_peaks(counts_smooth_trans, distance=peak_dist)[0]
+counts_topx_smooth_trans = np.sqrt(fwdbkwd_avg(counts_cons))
+peaks_counts_cons = signal.find_peaks(counts_topx_smooth_trans, distance=peak_dist)[0]
+
+plt.figure()
+a0 = plt.subplot(411)
+plt.plot(time_tem, counts_smooth_trans)
+plt.plot(time_tem[peaks_counts], counts_smooth_trans[peaks_counts], '*')
+
+a01 = plt.subplot(412, sharex=a0)
+plt.plot(time_tem, counts_topx_smooth_trans)
+plt.plot(time_tem[peaks_counts_cons], counts_topx_smooth_trans[peaks_counts_cons], '*')
+
+a1 = plt.subplot(413, sharex=a0)
+plt.specgram(audio_clip[:,0], Fs=fs)
+a1 = plt.subplot(414, sharex=a0)
+plt.specgram(audio_clip[:,3], Fs=fs)

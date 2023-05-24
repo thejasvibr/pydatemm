@@ -39,7 +39,7 @@ def window_length_is_correct(file_name, expected, tolerance=1e-15):
         return True
     else:
         return False
-    
+
     
 all_results = []
 for i,fname in enumerate(result_files):
@@ -47,7 +47,7 @@ for i,fname in enumerate(result_files):
         all_results.append(pd.read_csv(fname))
 
 all_sources = pd.concat(all_results).reset_index(drop=True)
-all_posns = all_sources.loc[:,['x','y','z','tdoa_res']].to_numpy()
+all_posns = all_sources.loc[:,['x','y','z','tdoa_res','t_start','t_end']].to_numpy()
 
 #%%
 # Now load the video flight trajectories and transform them from the 
@@ -81,23 +81,20 @@ flighttraj_interp['time'] = t_highres
 flighttraj_interp['batid'] = 1
 
 #%% Keep only those that are within a few meters of any bat trajectory positions
-distmat = distance_matrix(flighttraj_interp.loc[:,'x':'z'].to_numpy(), all_posns[:,:-1])
+distmat = distance_matrix(flighttraj_interp.loc[:,'x':'z'].to_numpy(), all_posns[:,:3])
 nearish_posns = np.where(distmat<10) # all points that are at most 8 metres from any mic
 sources_nearish = all_posns[np.unique(nearish_posns[1]),:]
-
-# find the start and end times of the positions that are nearby. 
-sources_w_time  = all_sources.loc[np.unique(nearish_posns[1]),['x','y','z','t_start','t_end']].reset_index(drop=True)
 
 #%%
 # Run a DBSCAN on the nearish sources to get call centres
 from sklearn.cluster import DBSCAN
-clusters = DBSCAN(eps=0.1).fit(sources_nearish[:,:-1])
+clusters = DBSCAN(eps=0.1).fit(sources_nearish[:,:3])
 
 cluster_centres = []
 for lab in np.unique(clusters.labels_):
     if not lab == -1:
         inds = np.where(clusters.labels_==lab)
-        cluster_points = sources_nearish[inds, :-1].reshape(-1,3)
+        cluster_points = sources_nearish[inds, :3].reshape(-1,3)
         centroid = np.median(cluster_points,axis=0)
         #print(lab, centroid)
         cluster_centres.append(centroid)
@@ -127,9 +124,9 @@ for i in [1,2,3]:
     plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
 plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
 
-points_to_traj = distance_matrix(all_posns[:,:3], flighttraj_interp.loc[:,'x':'z'].to_numpy())
+points_to_traj = distance_matrix(sources_nearish[:,:3], flighttraj_interp.loc[:,'x':'z'].to_numpy())
 close_point_inds = np.where(points_to_traj<0.5)
-close_points = all_posns[np.unique(close_point_inds[0]),:3]
+close_points = sources_nearish[np.unique(close_point_inds[0]),:3]
 
 plotter.add_points(close_points, render_points_as_spheres=True, point_size=10)
 
@@ -297,12 +294,11 @@ def fwdbkwd_avg(X, customwin=signal.windows.tukey(5)):
     avg = (fwd_pass+bkwd_pass[::-1])/2
     return avg
 
+peak_dist = 20
 counts_smooth_trans = np.sqrt(fwdbkwd_avg(counts))
-peaks_counts = signal.find_peaks(counts_smooth_trans, distance=10)[0]
+peaks_counts = signal.find_peaks(counts_smooth_trans, distance=peak_dist)[0]
 counts_topx_smooth_trans = np.sqrt(fwdbkwd_avg(counts_cons))
-peaks_counts_cons = signal.find_peaks(counts_topx_smooth_trans, distance=10)[0]
-
-
+peaks_counts_cons = signal.find_peaks(counts_topx_smooth_trans, distance=peak_dist)[0]
 
 plt.figure()
 a0 = plt.subplot(411)
@@ -317,8 +313,3 @@ a1 = plt.subplot(413, sharex=a0)
 plt.specgram(audio_clip[:,0], Fs=fs)
 a1 = plt.subplot(414, sharex=a0)
 plt.specgram(audio_clip[:,3], Fs=fs)
-
-#%%
-
-plt.figure()
-plt.plot(counts)
