@@ -12,6 +12,7 @@ from natsort import natsorted
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 import numpy as np 
+import open3d as o3d
 import pandas as pd
 import pyvista as pv
 import soundfile as sf
@@ -26,6 +27,7 @@ output_folder = f'{posix}_output/'
 arraygeom_file = f'{posix}_input/Sanken9_centred_mic_totalstationxyz.csv'
 audiofile = f'{posix}_input/video_synced10channel_first15sec_{posix}.WAV'
 array_geom = pd.read_csv(arraygeom_file).loc[:,'x':'z'].to_numpy()
+vsound = 340.0 # m/s
 #%%
 # load all the results into a dictionary
 result_files = natsorted(glob.glob(output_folder+'/hightem*.csv'))
@@ -84,6 +86,11 @@ timewindow_rows = np.logical_and(flight_traj_conv['time'] >= start_time,
                                         flight_traj_conv['time'] <= end_time) 
 flighttraj_conv_window = flight_traj_conv.loc[timewindow_rows,:].dropna()
 
+
+#%%
+cmap = matplotlib.cm.get_cmap('viridis')
+fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
+colors = [cmap(frac)[:-1] for frac in fractions]
 #%% Now upsample the trajectories
 upsampled_flighttraj = []
 for batid, batdf in flighttraj_conv_window.groupby('batid'):
@@ -98,11 +105,11 @@ for batid, batdf in flighttraj_conv_window.groupby('batid'):
     for axis in ['x','y','z']:
         upsampled_df[axis] = traj_interp[axis]
     upsampled_flighttraj.append(upsampled_df)
-upsampled_flighttraj = pd.concat(upsampled_flighttraj)    
+upsampled_flighttraj = pd.concat(upsampled_flighttraj).reset_index(drop=True)
 
 #%% Keep only those that are within a few meters of any bat trajectory positions
 distmat = distance_matrix(upsampled_flighttraj.loc[:,'x':'z'].to_numpy(), all_posns[:,:3])
-nearish_posns = np.where(distmat<15) # all points that are at most 8 metres from any mic
+nearish_posns = np.where(distmat<0.75) # all points that are at most 1 metres from any mic
 sources_nearish = all_posns[np.unique(nearish_posns[1]),:]
 
 #%%
@@ -142,6 +149,8 @@ for i in [1,2,3]:
     plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
 plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
 
+
+
 # filter out cluster centres based on how far they are from a trajectory
 cluster_centre_traj = distance_matrix(cluster_centres, flighttraj_conv_window.loc[:,'x':'z'].to_numpy())
 valid_centres = np.where(cluster_centre_traj<0.15)
@@ -157,7 +166,7 @@ plotter.camera.view_angle = 30.0
 plotter.camera.focal_point = (0.42, 1.59, 0.68)
 
 
-cmap = matplotlib.cm.get_cmap('Spectral')
+cmap = matplotlib.cm.get_cmap('viridis')
 fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
 colors = [cmap(frac)[:-1] for frac in fractions]
 
@@ -167,33 +176,6 @@ for key, subdf in flighttraj_conv_window.groupby('batid'):
     plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
 
 plotter.show()
-#%%
-# For each cluster centre - let's just say they are all correct. 
-# If a call had been emitted from that point - using the expected TOFs we should
-# recover bat calls at the calculated TOAs... 
-batxyz = flighttraj_conv_window.loc[:,'x':'z'].dropna().to_numpy()
-emission_data = pd.DataFrame(data=[], columns=['batid', 't_emission','toa_min','toa_max'])
-index = 0 
-timewindows = []
-for each in cluster_centres:
-  
-    xyz  = each.reshape(1,3)
-    tof = distance_matrix(xyz, array_geom)/340.0
-    # find closest video point
-    distmat = distance_matrix(xyz, batxyz)
-    if np.min(distmat)<0.3:
-        closest_point = batxyz[np.argmin(distmat)]
-        # get video timestamp of the closest_point
-        ind_closest_point = np.where(flighttraj_conv_window.loc[:,'x':'z']==closest_point)
-        row = flighttraj_conv_window.index[ind_closest_point[0][0]]
-        candidate_emission_time = flighttraj_conv_window.loc[row,'time']    
-        batid = flighttraj_conv_window.loc[row,'batid']
-        potential_toas = candidate_emission_time + tof
-        toa_minmax = np.percentile(np.around(potential_toas,3), [0,100])
-        emission_data.loc[index] = [batid, candidate_emission_time, toa_minmax[0], toa_minmax[1]]
-        index += 1
-        timewindows.append(toa_minmax)
-        print(toa_minmax, np.around(distmat.min(),3), flighttraj_conv_window.loc[row, 'batid'])  
         
 #%%
 camera_positions = np.array([[-1.0, -8.18, 2.08],
@@ -235,7 +217,7 @@ plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
 for row,_ in zip(*valid_centres):
     plotter.add_mesh(pv.Sphere(0.1, center=cluster_centres[row,:]), color='w', opacity=0.9)
 
-cmap = matplotlib.cm.get_cmap('Spectral')
+cmap = matplotlib.cm.get_cmap('viridis')
 fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
 colors = [cmap(frac)[:-1] for frac in fractions]
 
@@ -256,11 +238,81 @@ plotter.close()
 
 
 #%%
-# Get the timestamps for the flight trajs closest to the valid clusters
+# Perform some ICP on the two point clouds to get a better fit temporally. 
+source_pcd = o3d.geometry.PointCloud()
+source_pcd.points = o3d.utility.Vector3dVector(upsampled_flighttraj.loc[:,'x':'z'].to_numpy())
+target_pcd = o3d.geometry.PointCloud()
+target_pcd.points = o3d.utility.Vector3dVector(sources_nearish[:,:3])
+
+
+threshold = 0.3
+trans_init = np.eye(4) # give a 'blank' identity transformation matrix
+
+reg_p2p = o3d.pipelines.registration.registration_icp(
+    source_pcd, target_pcd, threshold, trans_init,
+    o3d.pipelines.registration.TransformationEstimationPointToPoint())
+
+transf_v2 = reg_p2p.transformation
+
+#%% Transform the video trajectories 
+transform_3d = lambda x, transform: np.matmul(transform, np.append(x,1))
+
+def transform_points(X, transform):
+    '''X is a Mrows x Ncol matrix'''
+    
+    return np.apply_along_axis(transform_3d, 1 , X, transform)[:,:-1]
+    
+transf_upsampled = transform_points(upsampled_flighttraj.loc[:,'x':'z'].to_numpy(),
+                                    transf_v2)
+    
+upsampled_transf = upsampled_flighttraj.copy()
+upsampled_transf.loc[:,'x':'z'] = transf_upsampled
+#%%
+# #%%
+# counts_by_batid = {}
+
+# for batid, batdf in upsampled_transf.groupby('batid'):
+#     t_em = np.zeros(batdf.shape[0])
+#     counts_by_batid[batid] = np.zeros(t_em.size)
+#     print('bow')
+#     points_to_traj = distance_matrix(sources_nearish[:,:3],
+#                                      batdf.loc[:,'x':'z'].to_numpy())
+#     print('miaow')
+#     close_point_inds = np.where(points_to_traj<0.5)
+#     close_points = sources_nearish[np.unique(close_point_inds[0]),:]
+    
+#     topx = 5
+#     video_audio_pairs = [[],[]]
+#     i = 0
+#     for candidate in close_points:
+#         xyz = candidate[:3]
+#         # timewindow = np.logical_and(batdf['t']>=candidate[-2]-0.05,
+#         #                             batdf['t']<=candidate[-1]+0.05)
+#         # relevant_traj = batdf.loc[timewindow,:]
+#         dist_to_clust = distance_matrix(xyz.reshape(-1,3),
+#                                         batdf.loc[:,'x':'z'].to_numpy()).flatten()
+#         # dist_to_clust = distance_matrix(xyz.reshape(-1,3),
+#         #                                 relevant_traj.loc[:,'x':'z'].to_numpy()).flatten()
+#         inds_close = np.where(dist_to_clust<0.3)[0]
+#         all_close = dist_to_clust[inds_close]
+        
+#         if len(all_close)>0:
+#             # if i>700:
+#             #     raise ValueError('miaow')
+#             counts_by_batid[batid][np.argmin(dist_to_clust)] += 1 
+            
+#             # closest_ind = np.argmin(dist_to_clust) # choose the closest
+#             # counts_by_batid[batid][closest_ind] +=1 
+#             #choose the top 5 points that are closest
+#             top_x_inds = np.argsort(dist_to_clust).flatten()[:topx]
+#             for min_ind in top_x_inds:
+#                     counts_by_batid[batid][min_ind] += 1   
+#         i += 1 
+
 
 counts_by_batid = {}
 
-for batid, batdf in upsampled_flighttraj.groupby('batid'):
+for batid, batdf in upsampled_transf.groupby('batid'):
     t_em = np.zeros(batdf.shape[0])
     counts_by_batid[batid] = np.zeros(t_em.size)
     print('bow')
@@ -270,28 +322,48 @@ for batid, batdf in upsampled_flighttraj.groupby('batid'):
     close_point_inds = np.where(points_to_traj<0.5)
     close_points = sources_nearish[np.unique(close_point_inds[0]),:]
     
-    topx = 5
-    for candidate in close_points:
-        xyz = candidate[:3]
-        timewindow = np.logical_and(batdf['t']>=candidate[-2]-0.03, 
-                                    batdf['t']<=candidate[-1])
+    topx = 16
+    video_audio_pairs = [[],[]]
+    i = 0
+    for k,candidate in enumerate(close_points):
+        xyz, timewindow = candidate[:3], candidate[-2:]
+        potential_tof = distance_matrix(xyz.reshape(-1,3),
+                                        array_geom)/vsound
+        minmax_tof = np.percentile(potential_tof, [0,100])
+        # get the widest window possible for the video trajs
+        wide_timewindow = [np.min(timewindow[0]-potential_tof), 
+                           np.max(timewindow[1]-potential_tof)]
         
-        subdf = batdf.loc[timewindow,:]
+        rows_inwindow = batdf['t'].between(wide_timewindow[0],
+                                           wide_timewindow[1], inclusive=True)
+        subset_df = batdf.loc[rows_inwindow,:]
+        
         dist_to_clust = distance_matrix(xyz.reshape(-1,3),
-                                        subdf.loc[:,'x':'z'].to_numpy()).flatten()
+                                        subset_df.loc[:,'x':'z'].to_numpy()).flatten()
+        # dist_to_clust = distance_matrix(xyz.reshape(-1,3),
+        #                                 relevant_traj.loc[:,'x':'z'].to_numpy()).flatten()
         inds_close = np.where(dist_to_clust<0.3)[0]
-        all_close = dist_to_clust[inds_close]
-        if len(all_close)>0:
-            counts_by_batid[batid][sorted_inds] += 1 
+        
+        if len(inds_close)>0:
+            # if batid==2:
+            #    raise ValueError('miaow')
+            relevant_inds = subset_df.index[np.argsort(dist_to_clust)][:topx]
+            corrected_inds = relevant_inds - batdf.index[0]
+            counts_by_batid[batid][corrected_inds[0]] += 1 
+            #raise ValueError
+            # closest_ind = np.argmin(dist_to_clust) # choose the closest
+            # counts_by_batid[batid][closest_ind] +=1 
+            #choose the top 5 points that are closest
             
-            closest_ind = np.argmin(dist_to_clust) # choose the closest
-            counts_by_batid[batid][closest_ind] +=1 
-            # choose the top 5 points that are closest
-            top_x_inds = np.argsort(dist_to_clust).flatten()[:topx]
-            for min_ind in top_x_inds:
-                if dist_to_clust[min_ind] <= 0.3:
-                    counts_by_batid[batid][min_ind] += 1   
-    
+            # if batid == 1:
+            #     print(relevant_inds)
+            #top_x_inds = np.argsort(dist_to_clust).flatten()[:topx]
+            counts_by_batid[batid][corrected_inds] += 1   
+            # raise ValueError('')
+            
+                    
+            i += 1 
+        
 #%%
 fs = sf.info(audiofile).samplerate
 audio, fs = sf.read(audiofile, start=int(fs*12.4), stop=int(fs*13.4))
@@ -304,12 +376,12 @@ num_bats = len(counts_by_batid.keys())
 #     tof_mat = distance_matric(time_cli)
     
 
-audio_channels = [0,5,9]
+audio_channels = [0,2,3,4,5]
 
 fig, axs = plt.subplots(ncols=1, nrows=num_bats+len(audio_channels),
                         figsize=(5, 10.0),
                         layout="tight", sharex=True)
-traj_data = upsampled_flighttraj.groupby('batid')
+traj_data = upsampled_transf.groupby('batid')
 
 # here I'll also establish an interactive workflow to get the bat calls 
 
@@ -335,12 +407,12 @@ def get_clicked_point_location(event):
     else:
         return None, None
 
-def calculate_toa_channels(t_source, sourceid, array_geom):
-    flight_traj = traj_data.get_group(sourceid)
+def calculate_toa_channels(t_source, sourceid, arraygeom):
+    flight_traj = traj_data.get_group(sourceid).reset_index(drop=True)
     # get closest point in time 
     nearest_ind = abs(flight_traj['t']-t_source).argmin()
     emission_point = flight_traj.loc[nearest_ind, 'x':'z'].to_numpy().reshape(-1,3)
-    tof = distance_matrix(emission_point, array_geom)/343.0 
+    tof = distance_matrix(emission_point, arraygeom)/343.0 
     toa = t_source + tof
     return toa
 
@@ -360,7 +432,7 @@ def draw_expected_toa(event, target_channels, window_halfwidth):
         for channel_toa,channel_toa2, axid in zip(toa, toa_2, specgram_axes):
             plt.sca(axid)
             plt.vlines(channel_toa, 20000,96000, linestyle='dotted', color=colors[ax_id])
-            plt.vlines(channel_toa2, 20000,96000, linestyle='dotted', color=colors[ax_id])
+            #plt.vlines(channel_toa2, 20000,96000, linestyle='dotted', color=colors[ax_id])
             
         fig.canvas.draw()
         #fig.canvas.draw_idle()
@@ -370,21 +442,21 @@ def draw_expected_toa(event, target_channels, window_halfwidth):
 proximity_peaks = {}
 
 for i,(batid, source_prof) in enumerate(counts_by_batid.items()):
-    t_batid = upsampled_flighttraj.groupby('batid').get_group(batid)['t']
+    t_batid = upsampled_transf.groupby('batid').get_group(batid)['t'].to_numpy()
     
     plt.sca(axs[i])
     plt.plot(t_batid, source_prof, label='bat id ' + str(batid), color=colors[int(batid)-1])
     plt.xticks([])
     plt.legend()
     
-    pks, _ = signal.find_peaks(source_prof, distance=15)
+    pks, _ = signal.find_peaks(source_prof, distance=25,  height=3)
     proximity_peaks[batid] = t_batid[pks]
     plt.plot(t_batid[pks], source_prof[pks],'g*')
 
 
 for i, ch in enumerate(audio_channels):
     plt.sca(axs[num_bats+i])
-    plt.specgram(audio[:,ch], Fs=fs, xextent=[12.4, 13.4])
+    plt.specgram(audio[:,ch], Fs=fs, xextent=[12.4, 13.4], cmap='cividis')
 
 
 def plotted_toa_from_peaks(specgram_axes, batid, peak_times, target_channels, window_halfwidth):
@@ -399,7 +471,7 @@ def plotted_toa_from_peaks(specgram_axes, batid, peak_times, target_channels, wi
         for channel_toa,channel_toa2, axid in zip(toa, toa_2, specgram_axes):
             plt.sca(axid)
             plt.vlines(channel_toa, 20000,96000, linestyle='dotted', color=colors[batid-1])
-            plt.vlines(channel_toa2, 20000,96000, linestyle='dotted', color=colors[batid-1])
+            #plt.vlines(channel_toa2, 20000,96000, linestyle='dashed', color=colors[batid-1])
     fig.canvas.draw()
 
 nchannels = len(audio_channels)
@@ -413,6 +485,47 @@ plt.gca().set_xticks(np.linspace(12.4,13.4,100), minor=True)
 #                        lambda event: draw_expected_toa(event, audio_channels, 8e-3))
 
 #%%
+plotter = pv.Plotter()
+
+#plotter.add_mesh(box, opacity=0.3)
+# include the mic array
+for each in array_geom:
+    plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
+
+for i in [1,2,3]:
+    plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
+plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
+
+
+
+# filter out cluster centres based on how far they are from a trajectory
+cluster_centre_traj = distance_matrix(cluster_centres, flighttraj_conv_window.loc[:,'x':'z'].to_numpy())
+valid_centres = np.where(cluster_centre_traj<0.15)
+
+for row,_ in zip(*valid_centres):
+    plotter.add_mesh(pv.Sphere(0.1, center=cluster_centres[row,:]), color='w', opacity=0.9)
+
+plotter.add_points(sources_nearish[:,:3])
+
+plotter.camera.position = (-2.29, -11.86, 1.50)
+plotter.camera.azimuth = 0.0
+plotter.camera.roll = 50
+plotter.camera.elevation = 0.0
+plotter.camera.view_angle = 30.0
+plotter.camera.focal_point = (0.42, 1.59, 0.68)
+
+
+
+# plot the flight trajectories and call emission points
+for key, subdf in flighttraj_conv_window.groupby('batid'):
+    traj_line = pv.lines_from_points(subdf.loc[:,'x':'z'].to_numpy())
+    plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
+
+plotter.show()
+
+
+#%%
+
 
 
 
