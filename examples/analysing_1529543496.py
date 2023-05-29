@@ -7,6 +7,7 @@ Created on Tue May  9 12:33:20 2023
 @author: thejasvi
 """
 import glob
+from joblib import Parallel, delayed
 import matplotlib
 from natsort import natsorted
 import matplotlib.pyplot as plt
@@ -131,52 +132,6 @@ mic_video_xyz = pd.read_csv('1529543496_input/xyz_data/Sanken9_centred_mic_video
 mic_video_xyz.columns = [0,'x','y','z','micname']
 
 #%%
-box = pv.Box(bounds=(0,5,0,9,0,3))
-plotter = pv.Plotter()
-
-def mouse_callback(x):
-    print(f'camera position: {plotter.camera.position})')
-    print(f'\n az, roll, el: {plotter.camera.azimuth, plotter.camera.roll, plotter.camera.elevation}')
-    print(f'\n view angle, focal point: {plotter.camera.view_angle, plotter.camera.focal_point}')
-plotter.track_click_position(mouse_callback)
-
-#plotter.add_mesh(box, opacity=0.3)
-# include the mic array
-for each in array_geom:
-    plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
-
-for i in [1,2,3]:
-    plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
-plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
-
-
-
-# filter out cluster centres based on how far they are from a trajectory
-cluster_centre_traj = distance_matrix(cluster_centres, flighttraj_conv_window.loc[:,'x':'z'].to_numpy())
-valid_centres = np.where(cluster_centre_traj<0.15)
-
-for row,_ in zip(*valid_centres):
-    plotter.add_mesh(pv.Sphere(0.1, center=cluster_centres[row,:]), color='w', opacity=0.9)
-
-plotter.camera.position = (-2.29, -11.86, 1.50)
-plotter.camera.azimuth = 0.0
-plotter.camera.roll = 50
-plotter.camera.elevation = 0.0
-plotter.camera.view_angle = 30.0
-plotter.camera.focal_point = (0.42, 1.59, 0.68)
-
-
-cmap = matplotlib.cm.get_cmap('viridis')
-fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
-colors = [cmap(frac)[:-1] for frac in fractions]
-
-# plot the flight trajectories and call emission points
-for key, subdf in flighttraj_conv_window.groupby('batid'):
-    traj_line = pv.lines_from_points(subdf.loc[:,'x':'z'].to_numpy())
-    plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
-
-plotter.show()
-        
 #%%
 camera_positions = np.array([[-1.0, -8.18, 2.08],
                     [-5.27, -7.03, 2.24],
@@ -195,45 +150,45 @@ camera_traj = np.column_stack(xyz_interp)
 #%%
 # Now update the camera position 
 
-box = pv.Box(bounds=(0,5,0,9,0,3))
-plotter = pv.Plotter()
+# box = pv.Box(bounds=(0,5,0,9,0,3))
+# plotter = pv.Plotter()
 
-plotter.camera.position = tuple(camera_traj[0,:])
-plotter.camera.azimuth = 0.0
-plotter.camera.roll = roll_values[0]
-plotter.camera.elevation = 0.0
-plotter.camera.view_angle = 30.0
-plotter.camera.focal_point = (-0.8600637284803319, 1.0764831143834046, 0.5677780189761863)
-# include the mic array
-for each in array_geom:
-    plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
+# plotter.camera.position = tuple(camera_traj[0,:])
+# plotter.camera.azimuth = 0.0
+# plotter.camera.roll = roll_values[0]
+# plotter.camera.elevation = 0.0
+# plotter.camera.view_angle = 30.0
+# plotter.camera.focal_point = (-0.8600637284803319, 1.0764831143834046, 0.5677780189761863)
+# # include the mic array
+# for each in array_geom:
+#     plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
 
-for i in [1,2,3]:
-    plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
-plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
+# for i in [1,2,3]:
+#     plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
+# plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
 
-# filter out cluster centres based on how far they are from a trajectory
+# # filter out cluster centres based on how far they are from a trajectory
 
-for row,_ in zip(*valid_centres):
-    plotter.add_mesh(pv.Sphere(0.1, center=cluster_centres[row,:]), color='w', opacity=0.9)
+# for row,_ in zip(*valid_centres):
+#     plotter.add_mesh(pv.Sphere(0.1, center=cluster_centres[row,:]), color='w', opacity=0.9)
 
-cmap = matplotlib.cm.get_cmap('viridis')
-fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
-colors = [cmap(frac)[:-1] for frac in fractions]
+# cmap = matplotlib.cm.get_cmap('viridis')
+# fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
+# colors = [cmap(frac)[:-1] for frac in fractions]
 
-# plot the flight trajectories and call emission points
-for key, subdf in flighttraj_conv_window.groupby('batid'):
-    traj_line = pv.lines_from_points(subdf.loc[:,'x':'z'].to_numpy())
-    plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
+# # plot the flight trajectories and call emission points
+# for key, subdf in flighttraj_conv_window.groupby('batid'):
+#     traj_line = pv.lines_from_points(subdf.loc[:,'x':'z'].to_numpy())
+#     plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
 
-plotter.open_gif('1529543496-12.4-13.4.gif', fps=5, )
+# plotter.open_gif('1529543496-12.4-13.4.gif', fps=5, )
 
-for roll,cam_posn in zip(roll_interp, camera_traj):
-    plotter.camera.position = tuple(cam_posn)
-    plotter.camera.roll = roll
-    plotter.write_frame()
-plotter.show(auto_close=True)  
-plotter.close()    
+# for roll,cam_posn in zip(roll_interp, camera_traj):
+#     plotter.camera.position = tuple(cam_posn)
+#     plotter.camera.roll = roll
+#     plotter.write_frame()
+# plotter.show(auto_close=True)  
+# plotter.close()    
     
 
 
@@ -268,46 +223,7 @@ transf_upsampled = transform_points(upsampled_flighttraj.loc[:,'x':'z'].to_numpy
 upsampled_transf = upsampled_flighttraj.copy()
 upsampled_transf.loc[:,'x':'z'] = transf_upsampled
 #%%
-# #%%
-# counts_by_batid = {}
 
-# for batid, batdf in upsampled_transf.groupby('batid'):
-#     t_em = np.zeros(batdf.shape[0])
-#     counts_by_batid[batid] = np.zeros(t_em.size)
-#     print('bow')
-#     points_to_traj = distance_matrix(sources_nearish[:,:3],
-#                                      batdf.loc[:,'x':'z'].to_numpy())
-#     print('miaow')
-#     close_point_inds = np.where(points_to_traj<0.5)
-#     close_points = sources_nearish[np.unique(close_point_inds[0]),:]
-    
-#     topx = 5
-#     video_audio_pairs = [[],[]]
-#     i = 0
-#     for candidate in close_points:
-#         xyz = candidate[:3]
-#         # timewindow = np.logical_and(batdf['t']>=candidate[-2]-0.05,
-#         #                             batdf['t']<=candidate[-1]+0.05)
-#         # relevant_traj = batdf.loc[timewindow,:]
-#         dist_to_clust = distance_matrix(xyz.reshape(-1,3),
-#                                         batdf.loc[:,'x':'z'].to_numpy()).flatten()
-#         # dist_to_clust = distance_matrix(xyz.reshape(-1,3),
-#         #                                 relevant_traj.loc[:,'x':'z'].to_numpy()).flatten()
-#         inds_close = np.where(dist_to_clust<0.3)[0]
-#         all_close = dist_to_clust[inds_close]
-        
-#         if len(all_close)>0:
-#             # if i>700:
-#             #     raise ValueError('miaow')
-#             counts_by_batid[batid][np.argmin(dist_to_clust)] += 1 
-            
-#             # closest_ind = np.argmin(dist_to_clust) # choose the closest
-#             # counts_by_batid[batid][closest_ind] +=1 
-#             #choose the top 5 points that are closest
-#             top_x_inds = np.argsort(dist_to_clust).flatten()[:topx]
-#             for min_ind in top_x_inds:
-#                     counts_by_batid[batid][min_ind] += 1   
-#         i += 1 
 
 
 counts_by_batid = {}
@@ -363,7 +279,8 @@ for batid, batdf in upsampled_transf.groupby('batid'):
             
                     
             i += 1 
-        
+        if i>0:
+            raise ValueError('')
 #%%
 fs = sf.info(audiofile).samplerate
 audio, fs = sf.read(audiofile, start=int(fs*12.4), stop=int(fs*13.4))
@@ -449,7 +366,7 @@ for i,(batid, source_prof) in enumerate(counts_by_batid.items()):
     plt.xticks([])
     plt.legend()
     
-    pks, _ = signal.find_peaks(source_prof, distance=25,  height=3)
+    pks, _ = signal.find_peaks(source_prof, distance=25,  height=2)
     proximity_peaks[batid] = t_batid[pks]
     plt.plot(t_batid[pks], source_prof[pks],'g*')
 
@@ -507,9 +424,16 @@ for row,_ in zip(*valid_centres):
 
 plotter.add_points(sources_nearish[:,:3])
 
-plotter.camera.position = (-2.29, -11.86, 1.50)
+# plotter.camera.position = (-2.29, -11.86, 1.50)
+# plotter.camera.azimuth = 0.0
+# plotter.camera.roll = 50
+# plotter.camera.elevation = 0.0
+# plotter.camera.view_angle = 30.0
+# plotter.camera.focal_point = (0.42, 1.59, 0.68)
+
+plotter.camera.position = (-10.345021894362883, -3.314417938530406, 7.678570446749055)
 plotter.camera.azimuth = 0.0
-plotter.camera.roll = 50
+plotter.camera.roll = 58
 plotter.camera.elevation = 0.0
 plotter.camera.view_angle = 30.0
 plotter.camera.focal_point = (0.42, 1.59, 0.68)
@@ -520,7 +444,7 @@ plotter.camera.focal_point = (0.42, 1.59, 0.68)
 for key, subdf in flighttraj_conv_window.groupby('batid'):
     traj_line = pv.lines_from_points(subdf.loc[:,'x':'z'].to_numpy())
     plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
-
+plotter.save_graphic('1529543496_points_and_clusters.pdf')
 plotter.show()
 
 
@@ -559,3 +483,48 @@ a1 = plt.subplot(413, sharex=a0)
 plt.specgram(audio_clip[:,0], Fs=fs)
 a1 = plt.subplot(414, sharex=a0)
 plt.specgram(audio_clip[:,3], Fs=fs)
+
+#%%
+
+
+plotter = pv.Plotter()
+
+def mouse_callback(x):
+    print(f'camera position: {plotter.camera.position})')
+    print(f'\n az, roll, el: {plotter.camera.azimuth, plotter.camera.roll, plotter.camera.elevation}')
+    print(f'\n view angle, focal point: {plotter.camera.view_angle, plotter.camera.focal_point}')
+plotter.track_click_position(mouse_callback)
+
+
+plotter.camera.position = (-2.29, -11.86, 1.50)
+plotter.camera.azimuth = 0.0
+plotter.camera.roll = 50
+plotter.camera.elevation = 0.0
+plotter.camera.view_angle = 30.0
+plotter.camera.focal_point = (0.42, 1.59, 0.68)
+# include the mic array
+for each in array_geom:
+    plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
+
+for i in [1,2,3]:
+    plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
+plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
+
+plotter.save_graphic('onlymesh_1529543496.pdf')
+# filter out cluster centres based on how far they are from a trajectory
+
+
+cmap = matplotlib.cm.get_cmap('viridis')
+fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
+colors = [cmap(frac)[:-1] for frac in fractions]
+
+# plot the flight trajectories and call emission points
+for key, subdf in flighttraj_conv_window.groupby('batid'):
+    traj_line = pv.lines_from_points(subdf.loc[:,'x':'z'].to_numpy())
+    plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
+
+plotter.save_graphic('flight_trajs_1529543496.pdf')
+
+plotter.show()
+        
+

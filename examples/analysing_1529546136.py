@@ -194,12 +194,18 @@ camera_traj = np.column_stack(xyz_interp)
 box = pv.Box(bounds=(0,5,0,9,0,3))
 plotter = pv.Plotter()
 
-plotter.camera.position = tuple(camera_traj[0,:])
+def mouse_callback(x):
+    print(f'camera position: {plotter.camera.position})')
+    print(f'\n az, roll, el: {plotter.camera.azimuth, plotter.camera.roll, plotter.camera.elevation}')
+    print(f'\n view angle, focal point: {plotter.camera.view_angle, plotter.camera.focal_point}')
+plotter.track_click_position(mouse_callback)
+
+plotter.camera.position = (-10.345021894362883, -3.314417938530406, 7.678570446749055)
 plotter.camera.azimuth = 0.0
-plotter.camera.roll = roll_values[0]
+plotter.camera.roll = 58
 plotter.camera.elevation = 0.0
 plotter.camera.view_angle = 30.0
-plotter.camera.focal_point = (-0.8600637284803319, 1.0764831143834046, 0.5677780189761863)
+plotter.camera.focal_point = (0.42, 1.59, 0.68)
 # include the mic array
 for each in array_geom:
     plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
@@ -207,21 +213,6 @@ for each in array_geom:
 for i in [1,2,3]:
     plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
 plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
-
-
-# filter out cluster centres based on how far they are from a trajectory
-cluster_centre_traj = distance_matrix(cluster_centres, flighttraj_interp.loc[:,'x':'z'].to_numpy())
-valid_centres = np.where(cluster_centre_traj<0.3)
-
-valid_clusters = cluster_centres[np.unique(valid_centres[0]),:]
-
-#plotter.add_points(valid_clusters)
-for xyz  in valid_clusters:
-    plotter.add_mesh(pv.Sphere(0.1, center=xyz), color='w', opacity=0.9)
-
-for row,_ in zip(*valid_centres):
-    plotter.add_mesh(pv.Sphere(0.1, center=cluster_centres[row,:]), color='w', opacity=0.9)
-
 cmap = matplotlib.cm.get_cmap('Spectral')
 fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
 colors = [cmap(frac)[:-1] for frac in fractions]
@@ -231,12 +222,28 @@ for key, subdf in flighttraj_conv_window.groupby('batid'):
     traj_line = pv.lines_from_points(subdf.loc[:,'x':'z'].to_numpy())
     plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
 
-# plotter.open_gif('1529546136-0-1.5_singlebat.gif', fps=5, )
 
-# for roll,cam_posn in zip(roll_interp, camera_traj):
-#     plotter.camera.position = tuple(cam_posn)
-#     plotter.camera.roll = roll
-#     plotter.write_frame()
+plotter.add_points(close_points[:,:3])
+plotter.save_graphic('flighttraj_sourcecloud_1529546136.pdf')
+# filter out cluster centres based on how far they are from a trajectory
+cluster_centre_traj = distance_matrix(cluster_centres, flighttraj_interp.loc[:,'x':'z'].to_numpy())
+valid_centres = np.where(cluster_centre_traj<0.3)
+
+valid_clusters = cluster_centres[np.unique(valid_centres[0]),:]
+
+
+for xyz  in valid_clusters:
+    plotter.add_mesh(pv.Sphere(0.1, center=xyz), color='w', opacity=0.9)
+
+for row,_ in zip(*valid_centres):
+    plotter.add_mesh(pv.Sphere(0.1, center=cluster_centres[row,:]), color='w', opacity=0.9)
+
+
+
+
+
+plotter.save_graphic('flighttraj_clusters_1529546136.pdf')
+
 plotter.show(auto_close=True)  
 plotter.close()    
 
@@ -401,9 +408,12 @@ def plotted_toa_from_peaks(specgram_axes, batid, peak_times, target_channels, wi
             #plt.vlines(channel_toa2, 20000,96000, linestyle='dashed', color=colors[batid-1])
     fig.canvas.draw()
 
-nchannels = len(audio_channels)
-for batid in range(1,7):
-    plotted_toa_from_peaks(axs[-nchannels:], batid, proximity_peaks[batid], audio_channels, 2e-3)
+# nchannels = len(audio_channels)
+# for batid in range(1,7):
+#     try:
+#         plotted_toa_from_peaks(axs[-nchannels:], batid, proximity_peaks[batid], audio_channels, 2e-3)
+#     except KeyError:
+#         pass
 
 plt.gca().set_xticks(np.arange(0,1.5,0.05))
 plt.gca().set_xticks(np.linspace(0,1.5,100), minor=True)
