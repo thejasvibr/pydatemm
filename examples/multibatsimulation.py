@@ -16,10 +16,17 @@ import pyroomacoustics as pra
 import scipy.signal as signal
 import matplotlib.pyplot as plt
 import numpy as np 
+import os
 import soundfile as sf
 from scipy.spatial import distance
 choose = np.random.choice
 np.random.seed(78464)
+
+# make the folder for all the input files
+input_folder = 'simaudio_input/'
+if not os.path.exists(input_folder):
+	os.mkdir(input_folder)
+
 
 nbats = 3
 ncalls = 3
@@ -128,13 +135,17 @@ sim_audio = room.mic_array.signals.T
 #%%
 # Write down the data
 if ray_tracing:
-    sf.write(f'{nbats}-bats_trajectory_simulation_raytracing-{ref_order}.wav', sim_audio, fs)
+    final_path = os.path.join(input_folder,
+								f'{nbats}-bats_trajectory_simulation_raytracing-{ref_order}.wav')
+    sf.write(final_path, sim_audio, fs)
 else:
-    sf.write(f'{nbats}-bats_trajectory_simulation_{ref_order}-order-reflections.wav', sim_audio, fs)
+    final_path = os.path.join(input_folder,
+							f'{nbats}-bats_trajectory_simulation_{ref_order}-order-reflections.wav')
+    sf.write(final_path, sim_audio, fs)
 
 
-pd.DataFrame(array_geom, columns=['x','y','z']).to_csv('mic_xyz_multibatsim.csv')
-allbat_xyz.to_csv('multibatsim_xyz_calling.csv')
+pd.DataFrame(array_geom, columns=['x','y','z']).to_csv(os.path.join(input_folder,'mic_xyz_multibatsim.csv'))
+allbat_xyz.to_csv(os.path.join(input_folder,'multibatsim_xyz_calling.csv'))
 #%%
 # also create a 'noisy' mic xyz file to mimic the effect of having array geom data
 # with noise in it (e.g. from camera reconstruction)
@@ -154,7 +165,7 @@ def generate_noisy_micgeom(micxyz, overall_error):
     return noisy_xyz
 for error_level in overall_euclidean_error:
     noisy_micarray = generate_noisy_micgeom(array_geom, error_level)
-    pd.DataFrame(noisy_micarray, columns=['x','y','z']).to_csv(f'mic_xyz_multibatsim_noisy{error_level}m.csv')
+    pd.DataFrame(noisy_micarray, columns=['x','y','z']).to_csv(os.path.join(input_folder,f'mic_xyz_multibatsim_noisy{error_level}m.csv'))
                 
         
         

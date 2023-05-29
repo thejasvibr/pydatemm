@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=2
 #SBATCH --time 00:10:00
-#SBATCH --mem 10G
+#SBATCH --mem 2G
 #SBATCH --array=0-9
 #SBATCH -o simaudio_%a.out
 #SBATCH -e simaudio_%a.err
