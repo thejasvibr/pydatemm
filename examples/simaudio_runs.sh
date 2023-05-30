@@ -2,7 +2,7 @@
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time 00:15:00
+#SBATCH --time 00:20:00
 #SBATCH --mem 4G
 #SBATCH --array=0-4
 #SBATCH -o simaudio_%A_%a.out
@@ -22,7 +22,7 @@ conda activate /u/tbeleyur/conda-envs/fresh/
 
 # and now run the file 
 cd /u/tbeleyur/pydatemm/examples/
-# Run the simulated audio first
+# Run the simulated audio first and generate the ground truth audio, arraygeom and flightpath files
 python  multibatsimulation.py
 # setup the parameter files 
 
@@ -39,9 +39,10 @@ python batsin_simaudio_tests.py -audiopath simaudio_input/3-bats_trajectory_simu
 
 
 # run the localisation 
+echo 'orig xyz'
 python -m pydatemm -paramfile simtests/paramset_origxyz_$SLURM_ARRAY_TASK_ID.yaml
-
+echo '5cm xyz'
 python -m pydatemm -paramfile simtests/paramset_5cmxyzerror_$SLURM_ARRAY_TASK_ID.yaml
-
+echo '10cm xyz'
 python -m pydatemm -paramfile simtests/paramset_10cmxyzerror_$SLURM_ARRAY_TASK_ID.yaml
 
