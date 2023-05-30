@@ -11,6 +11,7 @@ import pandas as pd
 import os
 import pathlib
 import yaml
+import soundfile as sf
 
 # thanks Fransisco (https://stackoverflow.com/a/71845536/4955732)
 def namespace_to_dict(namespace):
@@ -58,7 +59,8 @@ for arg in vars(common_parameters):
 # #%% Make the yaml file for the various time points
 step_size = common_parameters.step_size
 window_size = common_parameters.window_size
-time_starts = np.arange(0, 0.5, step_size)
+audio_durn = sf.info(common_parameters.audiopath).duration
+time_starts = np.arange(0, audio_durn, step_size)
 
 if not os.path.exists(common_parameters.dest_folder):
     os.mkdir(common_parameters.dest_folder)
