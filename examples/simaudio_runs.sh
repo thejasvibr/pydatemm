@@ -29,5 +29,4 @@ python batsin_simaudio_tests.py
 # run the parameter files
 python -m pydatemm -paramfile multibatsim_results/paramset_simaudio_$SLURM_ARRAY_TASK_ID.yaml
 
-#python -m pydatemm -paramfile 1529543496_output/hightempres_1529543496_$SLURM_ARRAY_TASK_ID.yaml
 

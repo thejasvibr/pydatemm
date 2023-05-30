@@ -25,9 +25,9 @@ import yaml
 
 common_parameters = {}
 common_parameters['audiopath'] = '3-bats_trajectory_simulation_1-order-reflections.wav'
-#common_parameters['arraygeompath'] = 'mic_xyz_multibatsim.csv'
-common_parameters['arraygeompath'] = 'mic_xyz_multibatsim_noisy0.05m.csv'
-common_parameters['dest_folder'] = 'multibatsim_results'
+common_parameters['arraygeompath'] = 'mic_xyz_multibatsim.csv'
+#common_parameters['arraygeompath'] = 'mic_xyz_multibatsim_noisy0.05m.csv'
+common_parameters['dest_folder'] = 'multibatsim_results_origxyz'
 common_parameters['K'] = 3
 common_parameters['maxloopres'] = 1e-4
 common_parameters['thresh_tdoaresidual'] = 1e-8 # s
