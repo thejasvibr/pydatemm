@@ -87,64 +87,7 @@ sources_nearish = all_posns[np.unique(nearish_posns[1]),:]
 
 mic_video_xyz = pd.read_csv(arraygeom_file)
 
-#%%
-camera_positions = np.array([[-1.0, -8.18, 2.08],
-                    [-5.27, -7.03, 2.24],
-                    [-9.12, -3.12, 2.03],
-                    ])
-t = np.linspace(0,1,camera_positions.shape[0])
-t_interp = np.linspace(0,1,25)
-roll_values = [50, 76, 84]
-roll_spline = si.interp1d(t,roll_values)
-xyz_splines = [ si.interp1d(t, camera_positions[:,i], 'quadratic') for i in range(3)]
-xyz_interp = []
-for i in range(3):
-    xyz_interp.append(xyz_splines[i](t_interp))
-roll_interp = roll_spline(t_interp)
-camera_traj = np.column_stack(xyz_interp)
-#%%
-# Now update the camera position 
 
-# box = pv.Box(bounds=(0,5,0,9,0,3))
-# plotter = pv.Plotter()
-
-# plotter.camera.position = tuple(camera_traj[0,:])
-# plotter.camera.azimuth = 0.0
-# plotter.camera.roll = roll_values[0]
-# plotter.camera.elevation = 0.0
-# plotter.camera.view_angle = 30.0
-# plotter.camera.focal_point = (-0.8600637284803319, 1.0764831143834046, 0.5677780189761863)
-# # include the mic array
-# for each in array_geom:
-#     plotter.add_mesh(pv.Sphere(0.03, center=each), color='g')
-
-# for i in [1,2,3]:
-#     plotter.add_mesh(pv.lines_from_points(array_geom[[0,i],:]), line_width=5)
-# plotter.add_mesh(pv.lines_from_points(array_geom[4:,:]), line_width=5)
-
-# # filter out cluster centres based on how far they are from a trajectory
-
-# for row,_ in zip(*valid_centres):
-#     plotter.add_mesh(pv.Sphere(0.1, center=cluster_centres[row,:]), color='w', opacity=0.9)
-
-# cmap = matplotlib.cm.get_cmap('viridis')
-# fractions = np.linspace(0,1,np.unique(flight_traj_conv['batid']).size)
-# colors = [cmap(frac)[:-1] for frac in fractions]
-
-# # plot the flight trajectories and call emission points
-# for key, subdf in flighttraj_conv_window.groupby('batid'):
-#     traj_line = pv.lines_from_points(subdf.loc[:,'x':'z'].to_numpy())
-#     plotter.add_mesh(traj_line, line_width=7, color=colors[int(key)-1])
-
-# plotter.open_gif('1529543496-12.4-13.4.gif', fps=5, )
-
-# for roll,cam_posn in zip(roll_interp, camera_traj):
-#     plotter.camera.position = tuple(cam_posn)
-#     plotter.camera.roll = roll
-#     plotter.write_frame()
-# plotter.show(auto_close=True)  
-# plotter.close()    
-    
 #%%
 
 
@@ -161,7 +104,7 @@ for batid, batdf in upsampled_flighttraj.groupby('batid'):
     close_point_inds = np.where(points_to_traj<0.5)
     close_points = sources_nearish[np.unique(close_point_inds[0]),:]
     
-    topx = 10
+    topx = 5
     video_audio_pairs = [[],[]]
     i = 0
     for k,candidate in enumerate(close_points):
@@ -288,7 +231,7 @@ for i,(batid, source_prof) in enumerate(counts_by_batid.items()):
     plt.xticks([])
     plt.legend()
     
-    pks, _ = signal.find_peaks(source_prof, distance=25,  height=5)
+    pks, _ = signal.find_peaks(source_prof, distance=25,  height=50)
     proximity_peaks[batid] = t_batid[pks]
     plt.plot(t_batid[pks], source_prof[pks],'g*')
 

@@ -29,33 +29,37 @@ if not os.path.exists(input_folder):
 
 
 nbats = 3
-ncalls = 3
+ncalls = 10
 room_dims = [4,9,3]
 #emission_times = make_emission_times(nbats, ncalls, ipi_range=np.linspace(0.01,0.03,50))
 vbat = choose(np.linspace(2,4,20), nbats)
 
-full_timespan = np.arange(0, 0.3,0.01)
+timestep = 2e-3
+potential_call_times = np.arange(0, 0.25, timestep)
 
 def choose_emission_times(timepoints, nbats, ncalls, **kwargs):
     ipi = kwargs.get('ipi', 0.1)
     bat_emission_times = []
     for bat in range(nbats):
-        match_not_found = True
-        while match_not_found:
-            start = np.random.choice(timepoints, 1)
-            emission_times = np.array([start + i*ipi for i in range(ncalls)]).flatten()
-            if np.all(emission_times<np.max(timepoints)):
-                match_not_found = False
-                bat_emission_times.append(emission_times)
+        #match_not_found = True
+        #while match_not_found:
+        start = np.random.choice(timepoints, 1)
+        emission_times = np.array([start + i*ipi for i in range(ncalls)]).flatten()
+        #if np.all(emission_times<np.max(timepoints)):
+        #match_not_found = False
+        bat_emission_times.append(emission_times)
     return bat_emission_times
                 
-emission_times = choose_emission_times(full_timespan, nbats, ncalls, ipi=0.05)
+emission_times = choose_emission_times(potential_call_times, nbats, ncalls, ipi=0.02)
+max_emission_time = np.concatenate(emission_times).flatten().max() + 0.01
+
+full_timespan = np.arange(0, max_emission_time,timestep)
 trajectories = []
 f = 0.7
 height = np.linspace(1, 2.0, 50)
-bat1xyz = 4*np.sin(2*np.pi*f*full_timespan)+0.2, 6*np.cos(2*np.pi*full_timespan) + 1.5, np.tile(choose(height,1), full_timespan.size)
-bat2xyz = 4*np.sin(2*np.pi*f*full_timespan)+0.2, 3*np.cos(2*np.pi*full_timespan) + 1, np.tile(choose(height,1), full_timespan.size)
-bat3xyz = 4*np.sin(2*np.pi*f* full_timespan)+0.5, 3+3*np.cos(2*np.pi* full_timespan),  np.tile(choose(height,1), full_timespan.size)
+bat1xyz = 2*np.sin(2*np.pi*f*full_timespan)+1.65, 2*np.cos(2*np.pi*full_timespan)+2.5, np.tile(choose(height,1), full_timespan.size)
+bat2xyz = 2*np.sin(2*np.pi*f*full_timespan)+1.65, 1*np.cos(2*np.pi*full_timespan)+2.5, np.tile(choose(height,1), full_timespan.size)
+bat3xyz = 2*np.sin(2*np.pi*f* full_timespan)+1.65, 3.65+1*np.cos(2*np.pi* full_timespan),  np.tile(choose(height,1), full_timespan.size)
 
 #%%
 plt.figure()
@@ -72,7 +76,7 @@ for i, each in enumerate(batxyz_dfs):
     each.columns = ['x', 'y', 'z']
     each['t'] = full_timespan
     each['batnum'] = i+1
-    each['emission_point'] = each['t'].isin(emission_times[i])
+    each['emission_point'] = each['t'].apply(lambda X: np.sum(np.abs(X-emission_times[i])<1e-5)>0)
 
 allbat_xyz = pd.concat(batxyz_dfs)
 #%%
@@ -153,10 +157,14 @@ overall_euclidean_error = [5e-3, 0.01, 0.025, 0.05, 0.1] # m
 
 def generate_noisy_micgeom(micxyz, overall_error):
     noisy_xyz = micxyz.copy()
+    noise_range = np.arange(-overall_error,overall_error+1e-3,1e-3)
     for i,each in enumerate(micxyz):
         not_achieved = True
+        
         while not_achieved:
-            noise = np.random.normal(0,overall_error,3)
+            
+            #noise = np.random.normal(0,overall_error,3)
+            noise = np.random.choice(noise_range, 3)
             xyz = each.copy()
             xyz+= noise
             if distance.euclidean(xyz, each) <= overall_error:

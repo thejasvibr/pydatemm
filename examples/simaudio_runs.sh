@@ -22,7 +22,7 @@ conda activate /u/tbeleyur/conda-envs/fresh/
 
 # and now run the file 
 cd /u/tbeleyur/pydatemm/examples/
-# Run the simulated audio first and generate the ground truth audio, arraygeom and flightpath files
+# Run the simulated audio first and generate the ground truth audio, arraygeom (true and noisy xyz) and flightpath files
 python  multibatsimulation.py
 # setup the parameter files 
 
