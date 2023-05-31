@@ -11,6 +11,7 @@ N bats flying in the space with a =0.1 s IPI (with variation). The bats fly
 with a curving trajectory towards the microphone array. 
 
 """
+import argparse
 import pandas as pd
 import pyroomacoustics as pra
 import scipy.signal as signal
@@ -19,23 +20,41 @@ import numpy as np
 import os
 import soundfile as sf
 from scipy.spatial import distance
+import scipy.interpolate as si
 choose = np.random.choice
-np.random.seed(78464)
+
+def parse_room_dims(roomdims):
+    split = [float(each) for each in roomdims.split(',')]
+    return split 
+
+args = argparse.ArgumentParser()
+args.add_argument('-nbats', type=int)
+args.add_argument('-ncalls', type=int)
+args.add_argument('-all-calls-before', type=float, default=0.1)
+args.add_argument('-ipi', type=float, default=0.05)
+args.add_argument('-room-dim', type=parse_room_dims,)
+args.add_argument('-seed', type=int, default=78464)
+args.add_argument('-input-folder', type=str)
+
+
+
+param = args.parse_args()
+
+np.random.seed(param.seed)
 
 # make the folder for all the input files
-input_folder = 'simaudio_input/'
+input_folder = param.input_folder+'/'
 if not os.path.exists(input_folder):
-	os.mkdir(input_folder)
+ 	os.mkdir(input_folder)
 
 
-nbats = 3
-ncalls = 10
-room_dims = [4,9,3]
-#emission_times = make_emission_times(nbats, ncalls, ipi_range=np.linspace(0.01,0.03,50))
-vbat = choose(np.linspace(2,4,20), nbats)
+nbats = param.nbats
+ncalls = param.ncalls
+room_dims = param.room_dim
+
 
 timestep = 2e-3
-potential_call_times = np.arange(0, 0.25, timestep)
+potential_call_times = np.arange(0,param.all_calls_before, timestep)
 
 def choose_emission_times(timepoints, nbats, ncalls, **kwargs):
     ipi = kwargs.get('ipi', 0.1)
@@ -43,35 +62,56 @@ def choose_emission_times(timepoints, nbats, ncalls, **kwargs):
     for bat in range(nbats):
         #match_not_found = True
         #while match_not_found:
-        start = np.random.choice(timepoints, 1)
+        start = choose(timepoints, 1)
         emission_times = np.array([start + i*ipi for i in range(ncalls)]).flatten()
         #if np.all(emission_times<np.max(timepoints)):
         #match_not_found = False
         bat_emission_times.append(emission_times)
     return bat_emission_times
                 
-emission_times = choose_emission_times(potential_call_times, nbats, ncalls, ipi=0.02)
+emission_times = choose_emission_times(potential_call_times, nbats, ncalls, ipi=param.ipi)
 max_emission_time = np.concatenate(emission_times).flatten().max() + 0.01
 
 full_timespan = np.arange(0, max_emission_time,timestep)
-trajectories = []
-f = 0.7
-height = np.linspace(1, 2.0, 50)
-bat1xyz = 2*np.sin(2*np.pi*f*full_timespan)+1.65, 2*np.cos(2*np.pi*full_timespan)+2.5, np.tile(choose(height,1), full_timespan.size)
-bat2xyz = 2*np.sin(2*np.pi*f*full_timespan)+1.65, 1*np.cos(2*np.pi*full_timespan)+2.5, np.tile(choose(height,1), full_timespan.size)
-bat3xyz = 2*np.sin(2*np.pi*f* full_timespan)+1.65, 3.65+1*np.cos(2*np.pi* full_timespan),  np.tile(choose(height,1), full_timespan.size)
+
+def make_bat_trajectoryv2(time_span, room_dims):
+    all_points_not_in_room = True
+    while all_points_not_in_room:
+        # choose 4 random points in the room
+        seed_xyz = [choose(np.linspace(0.1,axlim-0.1,1000), 6) for axlim in room_dims]
+        seed_xyz = np.array(seed_xyz).T
+        time_inds = np.array(time_span.size*np.linspace(0,1,seed_xyz.shape[0]), dtype=np.int64)
+        time_inds[-1] -= 1 
+        spline = [si.interp1d(time_span[time_inds], seed_xyz[:,i], 'cubic') for i in range(3)]
+        interp_spline = np.zeros((time_span.size, 3))
+        for i in range(3):
+            interp_spline[:,i] = spline[i](time_span)
+        
+        bound_satisfied = []
+        for i,axlim in enumerate(room_dims):
+            in_bounds = np.logical_and(np.all(interp_spline[:,i]>=0.1),
+                                        np.all(interp_spline[:,i]<=axlim-0.1))
+            bound_satisfied.append(in_bounds)
+        if np.all(bound_satisfied):
+            all_points_not_in_room = False
+            
+    return interp_spline
+
+batxyzs = [make_bat_trajectoryv2(full_timespan, room_dims) for i in range(nbats)]
+
 
 #%%
 plt.figure()
 a0  = plt.subplot(111, projection='3d')
-plt.plot(bat1xyz[0], bat1xyz[1], bat1xyz[2], )
-plt.plot(bat2xyz[0], bat2xyz[1], bat2xyz[2], )
-plt.plot(bat3xyz[0], bat3xyz[1], bat3xyz[2], )
-a0.set_xlim(0,4); a0.set_ylim(0,9); a0.set_zlim(0,3)
+for i,batxyz in enumerate(batxyzs):
+    plt.plot(batxyz[:,0], batxyz[:,1], batxyz[:,2], '-', label=str(i))
+a0.set_xlim(0,room_dims[0]); a0.set_ylim(0,room_dims[1]); a0.set_zlim(0,room_dims[2])
 a0.set_xlabel('x'); a0.set_ylabel('y'); a0.set_zlabel('z')
+plt.legend()
+plt.savefig(os.path.join(input_folder,f'{nbats}_{ncalls}_{room_dims}-roomsize.png'))
 #%%
 
-batxyz_dfs = [pd.DataFrame(each).T for each in [bat1xyz, bat2xyz, bat3xyz]]
+batxyz_dfs = [pd.DataFrame(each) for each in batxyzs]
 for i, each in enumerate(batxyz_dfs):
     each.columns = ['x', 'y', 'z']
     each['t'] = full_timespan
@@ -79,6 +119,8 @@ for i, each in enumerate(batxyz_dfs):
     each['emission_point'] = each['t'].apply(lambda X: np.sum(np.abs(X-emission_times[i])<1e-5)>0)
 
 allbat_xyz = pd.concat(batxyz_dfs)
+
+print(allbat_xyz[allbat_xyz['emission_point']])
 #%%
 
 
@@ -108,7 +150,7 @@ array_geom = np.array(([3, 8.9, 1.5],
                       )
 # add some noise to the array - this is so that none of the mics are 
 # co-planar.
-array_geom += np.random.choice(np.linspace(-0.01,0.01,20), array_geom.size).reshape(array_geom.shape)
+array_geom += choose(np.linspace(-0.01,0.01,20), array_geom.size).reshape(array_geom.shape)
 
 #%%
 # Go crazy and make each call emission the same type of call.
@@ -144,9 +186,8 @@ if ray_tracing:
     sf.write(final_path, sim_audio, fs)
 else:
     final_path = os.path.join(input_folder,
-							f'{nbats}-bats_trajectory_simulation_{ref_order}-order-reflections.wav')
+ 							f'{nbats}-bats_trajectory_simulation_{ref_order}-order-reflections.wav')
     sf.write(final_path, sim_audio, fs)
-
 
 pd.DataFrame(array_geom, columns=['x','y','z']).to_csv(os.path.join(input_folder,'mic_xyz_multibatsim.csv'))
 allbat_xyz.to_csv(os.path.join(input_folder,'multibatsim_xyz_calling.csv'))
@@ -164,7 +205,7 @@ def generate_noisy_micgeom(micxyz, overall_error):
         while not_achieved:
             
             #noise = np.random.normal(0,overall_error,3)
-            noise = np.random.choice(noise_range, 3)
+            noise = choose(noise_range, 3)
             xyz = each.copy()
             xyz+= noise
             if distance.euclidean(xyz, each) <= overall_error:

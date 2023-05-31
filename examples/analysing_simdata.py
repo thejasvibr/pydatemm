@@ -31,7 +31,7 @@ array_geom = pd.read_csv(arraygeom_file).loc[:,'x':'z'].to_numpy()
 vsound = 340.0 # m/s
 #%%
 # load all the results into a dictionary
-result_files = natsorted(glob.glob(output_folder+'/5cm*.csv'))
+result_files = natsorted(glob.glob(output_folder+'/0mm*.csv'))
 # keep only those with the relevant time-window size
 def get_start_stop_times(file_name):
     times = file_name.split('_')[-1].split('.csv')[0]
@@ -57,7 +57,7 @@ all_posns = all_sources.loc[:,['x','y','z','tdoa_res','t_start','t_end']].to_num
 # Now load the video flight trajectories and transform them from the 
 # camera to TotalStation coordinate system
 start_time = 0
-end_time = 0.25
+end_time = sf.info(audiofile).duration
 flight_traj = pd.read_csv('simaudio_input/multibatsim_xyz_calling.csv')
 flight_traj = flight_traj.rename(columns={'batnum':'batid'})
 #%%
@@ -231,7 +231,7 @@ for i,(batid, source_prof) in enumerate(counts_by_batid.items()):
     plt.xticks([])
     plt.legend()
     
-    pks, _ = signal.find_peaks(source_prof, distance=25,  height=50)
+    pks, _ = signal.find_peaks(source_prof, distance=15,  height=4)
     proximity_peaks[batid] = t_batid[pks]
     plt.plot(t_batid[pks], source_prof[pks],'g*')
 
