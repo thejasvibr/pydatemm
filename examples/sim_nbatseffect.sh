@@ -27,7 +27,7 @@ cd /u/tbeleyur/pydatemm/examples/
 mkdir multibat_stresstests
 
 # Run the simulated audio first and generate the ground truth audio, arraygeom (true and noisy xyz) and flightpath files
-for numbats in 2,4,8
+for numbats in 2 4 8
 do
     python  multibatsimulation.py -nbats $numbats -ncalls 5 -room-dim '4,9,3' -input-folder 'multibat_stresstests/nbat${numbats}/' -all-calls-before 0.1
     python batsin_simaudio_tests.py -audiopath multibat_stresstests/nbat${numbats}/${numbats}-bats_trajectory_simulation_1-order-reflections.wav -arraygeompath simaudio_input/mic_xyz_multibatsim.csv -K 3 -maxloopres 1e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name 'nbats-${numbats}' -step-size 1e-3 -num-jobs 5 -dest-folder nbats_${numbats}
