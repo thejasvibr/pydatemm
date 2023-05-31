@@ -31,7 +31,7 @@ array_geom = pd.read_csv(arraygeom_file).loc[:,'x':'z'].to_numpy()
 vsound = 340.0 # m/s
 #%%
 # load all the results into a dictionary
-result_files = natsorted(glob.glob(output_folder+'/origxyz*.csv'))
+result_files = natsorted(glob.glob(output_folder+'/5cm*.csv'))
 # keep only those with the relevant time-window size
 def get_start_stop_times(file_name):
     times = file_name.split('_')[-1].split('.csv')[0]
@@ -84,21 +84,6 @@ upsampled_flighttraj = pd.concat(upsampled_flighttraj).reset_index(drop=True)
 distmat = distance_matrix(upsampled_flighttraj.loc[:,'x':'z'].to_numpy(), all_posns[:,:3])
 nearish_posns = np.where(distmat<0.75) # all points that are at most 1 metres from any mic
 sources_nearish = all_posns[np.unique(nearish_posns[1]),:]
-
-#%%
-# Run a DBSCAN on the nearish sources to get call centres
-from sklearn.cluster import DBSCAN
-clusters = DBSCAN(eps=0.1).fit(sources_nearish[:,:3])
-
-cluster_centres = []
-for lab in np.unique(clusters.labels_):
-    if not lab == -1:
-        inds = np.where(clusters.labels_==lab)
-        cluster_points = sources_nearish[inds, :3].reshape(-1,3)
-        centroid = np.median(cluster_points,axis=0)
-        #print(lab, centroid)
-        cluster_centres.append(centroid)
-cluster_centres = np.array(cluster_centres)
 
 mic_video_xyz = pd.read_csv(arraygeom_file)
 
@@ -176,7 +161,7 @@ for batid, batdf in upsampled_flighttraj.groupby('batid'):
     close_point_inds = np.where(points_to_traj<0.5)
     close_points = sources_nearish[np.unique(close_point_inds[0]),:]
     
-    topx = 5
+    topx = 10
     video_audio_pairs = [[],[]]
     i = 0
     for k,candidate in enumerate(close_points):
@@ -303,7 +288,7 @@ for i,(batid, source_prof) in enumerate(counts_by_batid.items()):
     plt.xticks([])
     plt.legend()
     
-    pks, _ = signal.find_peaks(source_prof, distance=25,  height=50)
+    pks, _ = signal.find_peaks(source_prof, distance=25,  height=5)
     proximity_peaks[batid] = t_batid[pks]
     plt.plot(t_batid[pks], source_prof[pks],'g*')
 
@@ -350,6 +335,9 @@ line = Line2D([0],[0],label='original emission times', color='r')
 handles.extend([line])
 plt.legend(handles=handles)
 
-        
+
+#%%
+# Now let's analyse the results from DBSCAN
+
 
 

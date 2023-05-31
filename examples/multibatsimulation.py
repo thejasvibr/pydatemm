@@ -149,7 +149,7 @@ allbat_xyz.to_csv(os.path.join(input_folder,'multibatsim_xyz_calling.csv'))
 #%%
 # also create a 'noisy' mic xyz file to mimic the effect of having array geom data
 # with noise in it (e.g. from camera reconstruction)
-overall_euclidean_error = [0.05, 0.08, 0.1] # m
+overall_euclidean_error = [5e-3, 0.01, 0.025, 0.05, 0.1] # m
 def generate_noisy_micgeom(micxyz, overall_error):
     noisy_xyz = micxyz.copy()
     for i,each in enumerate(micxyz):
@@ -161,7 +161,7 @@ def generate_noisy_micgeom(micxyz, overall_error):
             if distance.euclidean(xyz, each) <= overall_error:
                 noisy_xyz[i,:] = xyz
                 not_achieved = False
-            
+
     return noisy_xyz
 for error_level in overall_euclidean_error:
     noisy_micarray = generate_noisy_micgeom(array_geom, error_level)
