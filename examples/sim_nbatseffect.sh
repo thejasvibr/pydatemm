@@ -1,12 +1,12 @@
 #!/bin/bash 
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=6
 #SBATCH --time 00:45:00
 #SBATCH --mem 3G
 #SBATCH --array=0-4
-#SBATCH -o simaudio_%A_%a.out
-#SBATCH -e simaudio_%A_%a.err
+#SBATCH -o nbatseffect_%A_%a.out
+#SBATCH -e nbatseffect_%A_%a.err
 #SBATCH --job-name=nbats-effect
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=thejasvi.beleyur@ab.mpg.de
@@ -29,10 +29,10 @@ main_out=multibat_stresstests/
 # Run the simulated audio first and generate the ground truth audio, arraygeom (true and noisy xyz) and flightpath files
 for numbats in 2 4 8
 do
-
+	echo "Now creating sim data and params for $numbats"
 	if mkdir -p "$main_out/nbat${numbats}/"; then
 	  # Do stuff with new directory
-	  echo "Made new directory"
+	  echo "Made new directory $main_out/nbat${numbats}"
 	else
 	  :
 	fi
@@ -43,8 +43,11 @@ do
 done
 
 # now perform the tracking
-for numbats in 2 4 8
-do 
-	python -m pydatemm -paramfile ${main_out}nbats${numbats}outdata/paramset_nbats${numbats}_${SLURM_ARRAY_TASK_ID}.yaml
-done 
+
+numbats=2
+python -m pydatemm -paramfile ${main_out}nbats${numbats}outdata/paramset_nbats${numbats}_${SLURM_ARRAY_TASK_ID}.yaml
+numbats=4
+python -m pydatemm -paramfile ${main_out}nbats${numbats}outdata/paramset_nbats${numbats}_${SLURM_ARRAY_TASK_ID}.yaml
+numbats=8
+python -m pydatemm -paramfile ${main_out}nbats${numbats}outdata/paramset_nbats${numbats}_${SLURM_ARRAY_TASK_ID}.yaml
 
