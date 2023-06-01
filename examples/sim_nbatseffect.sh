@@ -7,7 +7,7 @@
 #SBATCH --array=0-4
 #SBATCH -o nbatseffect_%A_%a.out
 #SBATCH -e nbatseffect_%A_%a.err
-#SBATCH --job-name=nbats-effect
+#SBATCH --job-name=nbatseffect
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=thejasvi.beleyur@ab.mpg.de
 
@@ -39,7 +39,7 @@ do
 	# generate the 
     python  multibatsimulation.py -nbats $numbats -ncalls 5 -all-calls-before 0.1 -room-dim '4,9,3' -seed 78464 -input-folder '${main_out}/nbat${numbats}/' 
 	# prepare parameter sets
-    python batsin_simaudio_tests.py -audiopath ${main_out}/nbat${numbats}/${numbats}-bats_trajectory_simulation_1-order-reflections.wav -arraygeompath ${main_out}/nbat${numbats}/mic_xyz_multibatsim.csv -K 3 -maxloopres 1e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats${numbats}" -step-size 1e-3 -num-jobs 5 -dest-folder ${main_out}nbats${numbats}outdata
+    python batsin_simaudio_tests.py -audiopath ${main_out}nbat${numbats}/${numbats}-bats_trajectory_simulation_1-order-reflections.wav -arraygeompath ${main_out}nbat${numbats}/mic_xyz_multibatsim.csv -K 3 -maxloopres 1e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats${numbats}" -step-size 1e-3 -num-jobs 5 -dest-folder ${main_out}nbats${numbats}outdata
 done
 
 # now perform the tracking
