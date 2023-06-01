@@ -43,7 +43,7 @@ param = args.parse_args()
 np.random.seed(param.seed)
 
 # make the folder for all the input files
-input_folder = param.input_folder+'/'
+input_folder = param.input_folder
 if not os.path.exists(input_folder):
  	os.mkdir(input_folder)
 
