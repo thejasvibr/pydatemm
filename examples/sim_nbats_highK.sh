@@ -66,11 +66,11 @@ python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat16/16-bats_
 # now perform the tracking
 
 
-python -m pydatemm -paramfile "multibat_stresstests/nbat2/nbats2outdata/paramset_nbats2_${SLURM_ARRAY_TASK_ID}.yaml"
+python -m pydatemm -paramfile "multibat_stresstests/nbat2/nbats2outdata/paramset_nbats2-highk_${SLURM_ARRAY_TASK_ID}.yaml"
 
-python -m pydatemm -paramfile "multibat_stresstests/nbat4/nbats4outdata/paramset_nbats4_${SLURM_ARRAY_TASK_ID}.yaml"
+python -m pydatemm -paramfile "multibat_stresstests/nbat4/nbats4outdata/paramset_nbats4-highk_${SLURM_ARRAY_TASK_ID}.yaml"
 
-python -m pydatemm -paramfile "multibat_stresstests/nbat8/nbats8outdata/paramset_nbats8_${SLURM_ARRAY_TASK_ID}.yaml"
+python -m pydatemm -paramfile "multibat_stresstests/nbat8/nbats8outdata/paramset_nbats8-highk_${SLURM_ARRAY_TASK_ID}.yaml"
 
-python -m pydatemm -paramfile "multibat_stresstests/nbat16/nbats16outdata/paramset_nbats16_${SLURM_ARRAY_TASK_ID}.yaml"
+python -m pydatemm -paramfile "multibat_stresstests/nbat16/nbats16outdata/paramset_nbats16-highk_${SLURM_ARRAY_TASK_ID}.yaml"
 
