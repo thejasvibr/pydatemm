@@ -23,15 +23,15 @@ euclidean = distance.euclidean
 import scipy.interpolate as si
 import time
 
-
-output_folder = f'simtests/'
-arraygeom_file = f'simaudio_input/mic_xyz_multibatsim.csv'
-audiofile = f'simaudio_input/3-bats_trajectory_simulation_1-order-reflections.WAV'
+NBAT=4
+output_folder = f'multibat_stresstests/nbat{NBAT}'
+arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
+audiofile = output_folder+f'/{NBAT}-bats_trajectory_simulation_1-order-reflections.WAV'
 array_geom = pd.read_csv(arraygeom_file).loc[:,'x':'z'].to_numpy()
 vsound = 340.0 # m/s
 #%%
 # load all the results into a dictionary
-result_files = natsorted(glob.glob(output_folder+'/0mm*.csv'))
+result_files = natsorted(glob.glob(output_folder+f'/nbats{NBAT}outdata/*.csv'))
 # keep only those with the relevant time-window size
 def get_start_stop_times(file_name):
     times = file_name.split('_')[-1].split('.csv')[0]
@@ -58,7 +58,7 @@ all_posns = all_sources.loc[:,['x','y','z','tdoa_res','t_start','t_end']].to_num
 # camera to TotalStation coordinate system
 start_time = 0
 end_time = sf.info(audiofile).duration
-flight_traj = pd.read_csv('simaudio_input/multibatsim_xyz_calling.csv')
+flight_traj = pd.read_csv(output_folder+'/multibatsim_xyz_calling.csv')
 flight_traj = flight_traj.rename(columns={'batnum':'batid'})
 #%%
 cmap = matplotlib.cm.get_cmap('viridis')
@@ -147,7 +147,7 @@ for batid, batdf in upsampled_flighttraj.groupby('batid'):
             i += 1 
         
 #%%
-fs = sf.info(audiofile).samplerate
+fs, duration = sf.info(audiofile).samplerate,  sf.info(audiofile).duration
 audio, fs = sf.read(audiofile)
 num_bats = len(counts_by_batid.keys())
 
@@ -158,10 +158,10 @@ num_bats = len(counts_by_batid.keys())
 #     tof_mat = distance_matric(time_cli)
     
 
-audio_channels = [0,1,2,3,4,5]
+audio_channels = [0,1,]
 
 fig, axs = plt.subplots(ncols=1, nrows=num_bats+len(audio_channels),
-                        figsize=(5, 10.0),
+                        figsize=(5, 20.0),
                         layout="tight", sharex=True)
 traj_data = upsampled_flighttraj.groupby('batid')
 
@@ -260,8 +260,8 @@ nchannels = len(audio_channels)
 for batid in list(counts_by_batid.keys()):
     plotted_toa_from_peaks(axs[-nchannels:], batid, proximity_peaks[batid], audio_channels, 16e-3)
 
-plt.gca().set_xticks(np.arange(0, 0.25175, .05))
-plt.gca().set_xticks(np.linspace(0, 0.25175, 100), minor=True)
+plt.gca().set_xticks(np.arange(0, duration, .05))
+plt.gca().set_xticks(np.linspace(0, duration, 100), minor=True)
 
 from matplotlib.lines import Line2D
 actual_emission_points = flight_traj[flight_traj['emission_point']].groupby('batid')
@@ -278,9 +278,20 @@ line = Line2D([0],[0],label='original emission times', color='r')
 handles.extend([line])
 plt.legend(handles=handles)
 
-
+plt.savefig(f'{NBAT}_run.png')
 #%%
 # Now let's analyse the results from DBSCAN
-
-
-
+plt.figure()
+a0 = plt.subplot(111, projection='3d')
+by_batid = flight_traj.groupby('batid')
+focal_batid = 2
+# plot the array
+plt.plot(array_geom[:,0],array_geom[:,1],array_geom[:,2],'k')
+x,y,z = [by_batid.get_group(focal_batid).loc[:,ax] for ax in ['x','y','z']]
+plt.plot(x,y,z, '*')
+plt.plot(x[x.index[0]],y[y.index[0]],z[z.index[0]],'r^')
+a0.set_xlim(0,4);a0.set_ylim(0,9);a0.set_zlim(0,3)
+# plot all emission points 
+subdf = by_batid.get_group(focal_batid)
+call_points = subdf[subdf['emission_point']]
+a0.plot(call_points.loc[:,'x'],call_points.loc[:,'y'],call_points.loc[:,'z'],'o')

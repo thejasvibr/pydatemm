@@ -238,7 +238,7 @@ for batid, batdf in upsampled_transf.groupby('batid'):
     close_point_inds = np.where(points_to_traj<0.5)
     close_points = sources_nearish[np.unique(close_point_inds[0]),:]
     
-    topx = 16
+    topx = 3
     video_audio_pairs = [[],[]]
     i = 0
     for k,candidate in enumerate(close_points):
@@ -279,8 +279,11 @@ for batid, batdf in upsampled_transf.groupby('batid'):
             
                     
             i += 1 
-        if i>0:
-            raise ValueError('')
+        # if i>0:
+        #     raise ValueError('')
+#%%
+# What if we fwd-bkwd average out the noisiness in the peaks. 
+
 #%%
 fs = sf.info(audiofile).samplerate
 audio, fs = sf.read(audiofile, start=int(fs*12.4), stop=int(fs*13.4))
@@ -293,7 +296,7 @@ num_bats = len(counts_by_batid.keys())
 #     tof_mat = distance_matric(time_cli)
     
 
-audio_channels = [0,2,3,4,5]
+audio_channels = [0,5,9]
 
 fig, axs = plt.subplots(ncols=1, nrows=num_bats+len(audio_channels),
                         figsize=(5, 10.0),
@@ -377,7 +380,6 @@ for i, ch in enumerate(audio_channels):
 
 
 def plotted_toa_from_peaks(specgram_axes, batid, peak_times, target_channels, window_halfwidth):
-    start = time.time()
     for t_emission in peak_times:
         toa = calculate_toa_channels(t_emission, batid, 
                                      array_geom[target_channels,:]).flatten()
