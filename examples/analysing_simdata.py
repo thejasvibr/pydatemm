@@ -23,8 +23,8 @@ euclidean = distance.euclidean
 import scipy.interpolate as si
 import time
 
-NBAT=16
-output_data_pattern = ''
+NBAT=4
+output_data_pattern = 'high'
 output_folder = f'multibat_stresstests/nbat{NBAT}'
 arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
 audiofile = output_folder+f'/{NBAT}-bats_trajectory_simulation_1-order-reflections.WAV'
