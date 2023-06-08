@@ -130,6 +130,7 @@ def generate_candidate_sources(sim_audio, **kwargs):
                 pass
 
     cfls_from_tdes = gramanip.make_consistent_fls_cpp(top_K_tdes, **kwargs)
+    print(f'Num CFLS found: {len(cfls_from_tdes}')
     if len(cfls_from_tdes)>0:
         ccg_matrix = cpy.gbl.make_ccg_matrix(cfls_from_tdes)
 
