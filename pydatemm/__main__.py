@@ -20,7 +20,6 @@ import pandas as pd
 from pydatemm import generate_candidate_sources
 import scipy.signal as signal 
 import soundfile as sf
-from scipy.spatial import distance_matrix
 import traceback
 import yaml 
 from sklearn.cluster import DBSCAN
@@ -163,7 +162,6 @@ def main():
                         centre = get_3d_median_location(unique_posns_filt[rows,:])
                         all_centres.append(np.append(centre, each))
                     df = pd.DataFrame(all_centres)
-                    dbscan_timepoint = dt.datetime.now()
                 else:
                     df = pd.DataFrame(unique_posns_filt)
                     df['label'] = np.nan
@@ -181,12 +179,10 @@ def main():
                 df['paramfile'] = args.paramfile
                 print(f'No sources found in {start_t, stop_t}...')
             df.to_csv(csv_fname)
-            stop = dt.datetime.now()
         except Exception:
             print(f'CANT PROCESS AUDIO FOR {start_t, stop_t}')
             print(traceback.format_exc())
-            # or
-            pass
+            
 
 if __name__ == "__main__":
     main()
