@@ -42,24 +42,24 @@ done
 # 2 BATS
 python  multibatsimulation.py -nbats 2 -ncalls 5 -all-calls-before 0.1 -room-dim '4,9,3' -seed 78464 -input-folder 'multibat_stresstests/nbat2/' 
 # prepare parameter sets
-python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat2/2-bats_trajectory_simulation_1-order-reflections.wav" -arraygeompath "multibat_stresstests/nbat2/mic_xyz_multibatsim.csv" -K 7 -maxloopres 1e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats2-highk" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat2/nbats2outdata"
+python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat2/2-bats_trajectory_simulation_1-order-reflections.wav" -arraygeompath "multibat_stresstests/nbat2/mic_xyz_multibatsim.csv" -K 7 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats2-highk" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat2/nbats2outdata"
 
 
 # 4 BATS
 python  multibatsimulation.py -nbats 4 -ncalls 5 -all-calls-before 0.1 -room-dim '4,9,3' -seed 78464 -input-folder 'multibat_stresstests/nbat4/' 
 # prepare parameter sets
-python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat4/4-bats_trajectory_simulation_1-order-reflections.wav" -arraygeompath "multibat_stresstests/nbat4/mic_xyz_multibatsim.csv" -K 7 -maxloopres 1e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats4-highk" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat4/nbats4outdata"
+python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat4/4-bats_trajectory_simulation_1-order-reflections.wav" -arraygeompath "multibat_stresstests/nbat4/mic_xyz_multibatsim.csv" -K 7 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats4-highk" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat4/nbats4outdata"
 
 # 8 BATS
 python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-before 0.1 -room-dim '4,9,3' -seed 78464 -input-folder 'multibat_stresstests/nbat8/' 
 # prepare parameter sets
-python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat8/8-bats_trajectory_simulation_1-order-reflections.wav" -arraygeompath "multibat_stresstests/nbat8/mic_xyz_multibatsim.csv" -K 7 -maxloopres 1e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats8-highk" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat8/nbats8outdata"
+python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat8/8-bats_trajectory_simulation_1-order-reflections.wav" -arraygeompath "multibat_stresstests/nbat8/mic_xyz_multibatsim.csv" -K 7 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats8-highk" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat8/nbats8outdata"
 
 # 16 bats
 
 python  multibatsimulation.py -nbats 16 -ncalls 5 -all-calls-before 0.2 -room-dim '4,9,3' -seed 78464 -input-folder 'multibat_stresstests/nbat16/' 
 # prepare parameter sets
-python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat16/16-bats_trajectory_simulation_1-order-reflections.wav" -arraygeompath "multibat_stresstests/nbat16/mic_xyz_multibatsim.csv" -K 7 -maxloopres 1e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats16-highk" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat16/nbats16outdata"
+python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat16/16-bats_trajectory_simulation_1-order-reflections.wav" -arraygeompath "multibat_stresstests/nbat16/mic_xyz_multibatsim.csv" -K 7 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats16-highk" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat16/nbats16outdata"
 
 
 

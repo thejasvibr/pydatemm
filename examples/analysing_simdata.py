@@ -23,7 +23,8 @@ euclidean = distance.euclidean
 import scipy.interpolate as si
 import time
 
-NBAT=4
+NBAT=16
+output_data_pattern = ''
 output_folder = f'multibat_stresstests/nbat{NBAT}'
 arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
 audiofile = output_folder+f'/{NBAT}-bats_trajectory_simulation_1-order-reflections.WAV'
@@ -31,7 +32,7 @@ array_geom = pd.read_csv(arraygeom_file).loc[:,'x':'z'].to_numpy()
 vsound = 340.0 # m/s
 #%%
 # load all the results into a dictionary
-result_files = natsorted(glob.glob(output_folder+f'/nbats{NBAT}outdata/*.csv'))
+result_files = natsorted(glob.glob(output_folder+f'/nbats{NBAT}outdata/*{output_data_pattern}*.csv'))
 # keep only those with the relevant time-window size
 def get_start_stop_times(file_name):
     times = file_name.split('_')[-1].split('.csv')[0]
@@ -278,7 +279,7 @@ line = Line2D([0],[0],label='original emission times', color='r')
 handles.extend([line])
 plt.legend(handles=handles)
 
-plt.savefig(f'{NBAT}_run.png')
+plt.savefig(f'{NBAT}_{output_data_pattern}_run.png')
 #%%
 # Now let's analyse the results from DBSCAN
 plt.figure()
