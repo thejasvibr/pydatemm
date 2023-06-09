@@ -24,7 +24,7 @@ import scipy.interpolate as si
 import time
 
 NBAT=4
-output_data_pattern = 'high'
+output_data_pattern = ''
 output_folder = f'multibat_stresstests/nbat{NBAT}'
 arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
 audiofile = output_folder+f'/{NBAT}-bats_trajectory_simulation_1-order-reflections.WAV'
@@ -125,7 +125,7 @@ for batid, batdf in upsampled_flighttraj.groupby('batid'):
                                         subset_df.loc[:,'x':'z'].to_numpy()).flatten()
         # dist_to_clust = distance_matrix(xyz.reshape(-1,3),
         #                                 relevant_traj.loc[:,'x':'z'].to_numpy()).flatten()
-        inds_close = np.where(dist_to_clust<0.3)[0]
+        inds_close = np.where(dist_to_clust<0.5)[0]
         
         if len(inds_close)>0:
             # if batid==2:
