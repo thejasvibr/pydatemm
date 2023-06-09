@@ -7,24 +7,22 @@ Estimating call emission time and source from simulated data
 
 """
 import glob
-from joblib import Parallel, delayed
 import matplotlib
 from natsort import natsorted
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 import numpy as np 
-import open3d as o3d
 import pandas as pd
-import pyvista as pv
 import soundfile as sf
 from scipy.spatial import distance_matrix, distance
 import scipy.signal as signal 
 euclidean = distance.euclidean
 import scipy.interpolate as si
-import time
+import tqdm
+from source_traj_aligner import generate_proximity_profile
 
 NBAT=4
-output_data_pattern = ''
+output_data_pattern = '823'
 output_folder = f'multibat_stresstests/nbat{NBAT}'
 arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
 audiofile = output_folder+f'/{NBAT}-bats_trajectory_simulation_1-order-reflections.WAV'
@@ -90,63 +88,18 @@ mic_video_xyz = pd.read_csv(arraygeom_file)
 
 
 #%%
-
-
+coarse_threshold = 0.5
+fine_threshold = 0.3
+topx = 5
 
 counts_by_batid = {}
+for batid, batdf in tqdm.tqdm(upsampled_flighttraj.groupby('batid')):
+    prox_profile = generate_proximity_profile(batid, batdf, 
+                                              sources_nearish, coarse_threshold,
+                                              fine_threshold ,
+                                              array_geom, vsound, topx)
+    counts_by_batid[batid]= prox_profile
 
-for batid, batdf in upsampled_flighttraj.groupby('batid'):
-    t_em = np.zeros(batdf.shape[0])
-    counts_by_batid[batid] = np.zeros(t_em.size)
-    print('bow')
-    points_to_traj = distance_matrix(sources_nearish[:,:3],
-                                     batdf.loc[:,'x':'z'].to_numpy())
-    print('miaow')
-    close_point_inds = np.where(points_to_traj<0.5)
-    close_points = sources_nearish[np.unique(close_point_inds[0]),:]
-    
-    topx = 5
-    video_audio_pairs = [[],[]]
-    i = 0
-    for k,candidate in enumerate(close_points):
-        xyz, timewindow = candidate[:3], candidate[-2:]
-        potential_tof = distance_matrix(xyz.reshape(-1,3),
-                                        array_geom)/vsound
-        minmax_tof = np.percentile(potential_tof, [0,100])
-        # get the widest window possible for the video trajs
-        wide_timewindow = [np.min(timewindow[0]-potential_tof), 
-                           np.max(timewindow[1]-potential_tof)]
-        
-        rows_inwindow = batdf['t'].between(wide_timewindow[0],
-                                           wide_timewindow[1], inclusive=True)
-        subset_df = batdf.loc[rows_inwindow,:]
-        
-        dist_to_clust = distance_matrix(xyz.reshape(-1,3),
-                                        subset_df.loc[:,'x':'z'].to_numpy()).flatten()
-        # dist_to_clust = distance_matrix(xyz.reshape(-1,3),
-        #                                 relevant_traj.loc[:,'x':'z'].to_numpy()).flatten()
-        inds_close = np.where(dist_to_clust<0.5)[0]
-        
-        if len(inds_close)>0:
-            # if batid==2:
-            #    raise ValueError('miaow')
-            relevant_inds = subset_df.index[np.argsort(dist_to_clust)][:topx]
-            corrected_inds = relevant_inds - batdf.index[0]
-            counts_by_batid[batid][corrected_inds[0]] += 1 
-            #raise ValueError
-            # closest_ind = np.argmin(dist_to_clust) # choose the closest
-            # counts_by_batid[batid][closest_ind] +=1 
-            #choose the top 5 points that are closest
-            
-            # if batid == 1:
-            #     print(relevant_inds)
-            #top_x_inds = np.argsort(dist_to_clust).flatten()[:topx]
-            counts_by_batid[batid][corrected_inds] += 1   
-            # raise ValueError('')
-            
-                    
-            i += 1 
-        
 #%%
 fs, duration = sf.info(audiofile).samplerate,  sf.info(audiofile).duration
 audio, fs = sf.read(audiofile)
@@ -200,7 +153,6 @@ def calculate_toa_channels(t_source, sourceid, arraygeom):
     return toa
 
 def draw_expected_toa(event, target_channels, window_halfwidth):
-    start = time.time()
     t_emission, ax_id = get_clicked_point_location(event)
     if t_emission is not None:
         batid = ax_id + 1 
@@ -219,8 +171,6 @@ def draw_expected_toa(event, target_channels, window_halfwidth):
             
         fig.canvas.draw()
         #fig.canvas.draw_idle()
-
-
 
 proximity_peaks = {}
 
@@ -243,7 +193,6 @@ for i, ch in enumerate(audio_channels):
 
 
 def plotted_toa_from_peaks(specgram_axes, batid, peak_times, target_channels, window_halfwidth):
-    start = time.time()
     for t_emission in peak_times:
         toa = calculate_toa_channels(t_emission, batid, 
                                      array_geom[target_channels,:]).flatten()
@@ -285,7 +234,7 @@ plt.savefig(f'{NBAT}_{output_data_pattern}_run.png')
 plt.figure()
 a0 = plt.subplot(111, projection='3d')
 by_batid = flight_traj.groupby('batid')
-focal_batid = 2
+focal_batid = 3
 # plot the array
 plt.plot(array_geom[:,0],array_geom[:,1],array_geom[:,2],'k')
 x,y,z = [by_batid.get_group(focal_batid).loc[:,ax] for ax in ['x','y','z']]
