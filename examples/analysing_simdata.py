@@ -86,11 +86,10 @@ sources_nearish = all_posns[np.unique(nearish_posns[1]),:]
 
 mic_video_xyz = pd.read_csv(arraygeom_file)
 
-
 #%%
 coarse_threshold = 0.5
 fine_threshold = 0.3
-topx = 10
+topx = 5
 
 counts_by_batid = {}
 for batid, batdf in tqdm.tqdm(upsampled_flighttraj.groupby('batid')):

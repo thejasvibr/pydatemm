@@ -26,6 +26,13 @@ choose = np.random.choice
 def parse_room_dims(roomdims):
     split = [float(each) for each in roomdims.split(',')]
     return split 
+def parse_raytracing_bool(bool_in):
+    if bool_in == 'True':
+        return True
+    elif bool_in == 'False':
+        return False
+    else:
+        raise ValueError(f'Cant parse {bool_in} for ray-tracing. Must be True or False')
 
 args = argparse.ArgumentParser()
 args.add_argument('-nbats', type=int)
@@ -35,6 +42,9 @@ args.add_argument('-ipi', type=float, default=0.05)
 args.add_argument('-room-dim', type=parse_room_dims,)
 args.add_argument('-seed', type=int, default=78464)
 args.add_argument('-input-folder', type=str)
+args.add_argument('-ray-tracing', type=parse_raytracing_bool, default=False)
+args.add_argument('-samplerate', type=int, default=192000)
+
 
 
 
@@ -124,10 +134,10 @@ print(allbat_xyz[allbat_xyz['emission_point']])
 #%%
 
 
-fs = 192000
+fs = param.samplerate
 ref_order = 1
 reflection_max_order = ref_order
-ray_tracing = False
+ray_tracing = param.ray_tracing
 
 rt60_tgt = 0.2  # seconds
 e_absorption, max_order = pra.inverse_sabine(rt60_tgt, room_dims)
