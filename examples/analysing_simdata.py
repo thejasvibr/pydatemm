@@ -21,7 +21,7 @@ import scipy.interpolate as si
 import tqdm
 from source_traj_aligner import generate_proximity_profile
 
-NBAT=4
+NBAT=8
 output_data_pattern = '823'
 output_folder = f'multibat_stresstests/nbat{NBAT}'
 arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
@@ -90,7 +90,7 @@ mic_video_xyz = pd.read_csv(arraygeom_file)
 #%%
 coarse_threshold = 0.5
 fine_threshold = 0.3
-topx = 5
+topx = 10
 
 counts_by_batid = {}
 for batid, batdf in tqdm.tqdm(upsampled_flighttraj.groupby('batid')):
@@ -105,130 +105,35 @@ fs, duration = sf.info(audiofile).samplerate,  sf.info(audiofile).duration
 audio, fs = sf.read(audiofile)
 num_bats = len(counts_by_batid.keys())
 
-
 #%%
-# def calculate_toa_across_mics(time_click, array_geom):
-#     closest_traj_point = 
-#     tof_mat = distance_matric(time_cli)
-    
-
-audio_channels = [0,1,]
-
-fig, axs = plt.subplots(ncols=1, nrows=num_bats+len(audio_channels),
-                        figsize=(5, 20.0),
-                        layout="tight", sharex=True)
-traj_data = upsampled_flighttraj.groupby('batid')
-
-# here I'll also establish an interactive workflow to get the bat calls 
-
-def get_clicked_point_location(event):
-    if event.button is MouseButton.LEFT:
-        event_axes = [ax.in_axes(event) for ax in axs ]
-        if sum(event_axes) == 0:
-            return None, None
-        else:
-            axes_id = int(np.where(event_axes)[0])
-            
-            tclick, _ =  event.xdata, event.ydata
-            curr_plot = axs[axes_id]
-            num_lines = len(curr_plot.lines)
-            plt.sca(curr_plot)
-            if num_lines >2:
-                for i in range(2,num_lines)[::-1]:
-                    curr_plot.lines[i].remove()
-            
-            plt.plot(event.xdata, event.ydata,'r*')
-#            plt.vlines(event.xdata-0.008, 0, 50, colors=colors[axes_id])
-            return tclick, int(axes_id)
-    else:
-        return None, None
-
-def calculate_toa_channels(t_source, sourceid, arraygeom):
-    flight_traj = traj_data.get_group(sourceid).reset_index(drop=True)
-    # get closest point in time 
-    nearest_ind = abs(flight_traj['t']-t_source).argmin()
-    emission_point = flight_traj.loc[nearest_ind, 'x':'z'].to_numpy().reshape(-1,3)
-    tof = distance_matrix(emission_point, arraygeom)/343.0 
-    toa = t_source + tof
-    return toa
-
-def draw_expected_toa(event, target_channels, window_halfwidth):
-    t_emission, ax_id = get_clicked_point_location(event)
-    if t_emission is not None:
-        batid = ax_id + 1 
-        toa = calculate_toa_channels(t_emission, batid, 
-                                     array_geom[target_channels,:]).flatten()
-        toa_2 = calculate_toa_channels(t_emission-window_halfwidth, batid, 
-                                     array_geom[target_channels,:]).flatten()
-
-
-        # get last few axes - that have specgrams
-        specgram_axes = axs[-len(target_channels):]
-        for channel_toa,channel_toa2, axid in zip(toa, toa_2, specgram_axes):
-            plt.sca(axid)
-            plt.vlines(channel_toa, 20000,96000, linestyle='dotted', color=colors[ax_id])
-            #plt.vlines(channel_toa2, 20000,96000, linestyle='dotted', color=colors[ax_id])
-            
-        fig.canvas.draw()
-        #fig.canvas.draw_idle()
+from source_traj_aligner import plot_diagnostic
 
 proximity_peaks = {}
-
 for i,(batid, source_prof) in enumerate(counts_by_batid.items()):
     t_batid = upsampled_flighttraj.groupby('batid').get_group(batid)['t'].to_numpy()
-    
-    plt.sca(axs[i])
-    plt.plot(t_batid, source_prof, label='bat id ' + str(batid), color=colors[int(batid)-1])
-    plt.xticks([])
-    plt.legend()
-    
     pks, _ = signal.find_peaks(source_prof, distance=15,  height=4)
     proximity_peaks[batid] = t_batid[pks]
-    plt.plot(t_batid[pks], source_prof[pks],'g*')
+proximity_data = (counts_by_batid, proximity_peaks,)
 
+#%%
+from scipy.signal import find_peaks_cwt
 
-for i, ch in enumerate(audio_channels):
-    plt.sca(axs[num_bats+i])
-    plt.specgram(audio[:,ch], Fs=fs, xextent=[0, sf.info(audiofile).duration], cmap='cividis')
+cwt_peaks = {}
+for i,(batid, source_prof) in enumerate(counts_by_batid.items()):
+    t_batid = upsampled_flighttraj.groupby('batid').get_group(batid)['t'].to_numpy()
+    pks = find_peaks_cwt(source_prof, widths=np.arange(2,7),
+                                      max_distances=np.tile(2,5))
+    cwt_peaks[batid] = t_batid[pks ]
 
+proximity_data1 = (counts_by_batid, cwt_peaks,)
 
-def plotted_toa_from_peaks(specgram_axes, batid, peak_times, target_channels, window_halfwidth):
-    for t_emission in peak_times:
-        toa = calculate_toa_channels(t_emission, batid, 
-                                     array_geom[target_channels,:]).flatten()
-        toa_2 = calculate_toa_channels(t_emission-window_halfwidth, batid, 
-                                     array_geom[target_channels,:]).flatten()
-    
+#%%
+fig, axs = plot_diagnostic((audio, fs, duration), proximity_data, array_geom, upsampled_flighttraj,
+                 vis_channels=[0,-1], sim_traj=flight_traj)
 
-        for channel_toa,channel_toa2, axid in zip(toa, toa_2, specgram_axes):
-            plt.sca(axid)
-            plt.vlines(channel_toa, 20000,96000, linestyle='dotted', color=colors[batid-1])
-            #plt.vlines(channel_toa2, 20000,96000, linestyle='dashed', color=colors[batid-1])
-    fig.canvas.draw()
-
-nchannels = len(audio_channels)
-for batid in list(counts_by_batid.keys()):
-    plotted_toa_from_peaks(axs[-nchannels:], batid, proximity_peaks[batid], audio_channels, 16e-3)
-
-plt.gca().set_xticks(np.arange(0, duration, .05))
-plt.gca().set_xticks(np.linspace(0, duration, 100), minor=True)
-
-from matplotlib.lines import Line2D
-actual_emission_points = flight_traj[flight_traj['emission_point']].groupby('batid')
-for batid, subdf in actual_emission_points:
-    plt.sca(axs[batid-1])
-    for i, row in subdf.iterrows():
-        _,x,y,z,t,*uu = row
-        plt.vlines(t, 0, np.max(counts_by_batid[batid]), color='r')
-
-# access legend objects automatically created from data
-plt.sca(axs[0])
-handles, labels = axs[0].get_legend_handles_labels()
-line = Line2D([0],[0],label='original emission times', color='r')
-handles.extend([line])
-plt.legend(handles=handles)
-
-plt.savefig(f'{NBAT}_{output_data_pattern}_run.png')
+fig1, axs1 = plot_diagnostic((audio, fs, duration), proximity_data1, array_geom, upsampled_flighttraj,
+                 vis_channels=[0,1], sim_traj=flight_traj)
+axs1[0].set_title('With CWT peak finding')
 #%%
 # Now let's analyse the results from DBSCAN
 plt.figure()
