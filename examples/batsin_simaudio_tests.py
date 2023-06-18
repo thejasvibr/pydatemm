@@ -34,6 +34,7 @@ args.add_argument('-window-size', type=float)
 args.add_argument('-run-name', type=str)
 args.add_argument('-step-size', type=float, default=1e-3)
 args.add_argument('-num-jobs', type=int, default=10)
+args.add_argument('-channels', type=str, default=None)
 common_parameters = args.parse_args()
 
 for arg in vars(common_parameters):
