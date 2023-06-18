@@ -48,18 +48,18 @@ done
 # 4 BATS
 python  multibatsimulation.py -nbats 4 -ncalls 5 -all-calls-before 0.1 -room-dim '4,9,3' -seed 82319 -input-folder 'multibat_stresstests/nbat4/' -ray-tracing True
 # prepare parameter sets
-python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat4/4-bats_trajectory_simulation_raytracing-1.wav" -arraygeompath "multibat_stresstests/nbat4/mic_xyz_multibatsim.csv" -K 3 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats4-limchannels82319" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat4/nbats4outdata" -channels '0,1,3,5'
+python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat4/4-bats_trajectory_simulation_raytracing-1.wav" -arraygeompath "multibat_stresstests/nbat4/mic_xyz_multibatsim.csv" -K 3 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats4-limchannels-v2-82319" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat4/nbats4outdata" -channels '0,1,3,5,7'
 
 # 8 BATS
 python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-before 0.1 -room-dim '4,9,3' -seed 82319 -input-folder 'multibat_stresstests/nbat8/' -ray-tracing True
 # prepare parameter sets
-python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat8/8-bats_trajectory_simulation_raytracing-1.wav" -arraygeompath "multibat_stresstests/nbat8/mic_xyz_multibatsim.csv" -K 3 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats8-limchannels82319" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat8/nbats8outdata" -channels '0,1,3,5'
+python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat8/8-bats_trajectory_simulation_raytracing-1.wav" -arraygeompath "multibat_stresstests/nbat8/mic_xyz_multibatsim.csv" -K 3 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats8-limchannels-v2-82319" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat8/nbats8outdata" -channels '0,1,3,5,7'
 
 # 16 bats
 
 python  multibatsimulation.py -nbats 16 -ncalls 5 -all-calls-before 0.2 -room-dim '4,9,3' -seed 82319 -input-folder 'multibat_stresstests/nbat16/' -ray-tracing True
 # prepare parameter sets
-python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat16/16-bats_trajectory_simulation_raytracing-1.wav" -arraygeompath "multibat_stresstests/nbat16/mic_xyz_multibatsim.csv" -K 3 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats16-limchannels82319" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat16/nbats16outdata" -channels '0,1,3,5'
+python batsin_simaudio_tests.py -audiopath "multibat_stresstests/nbat16/16-bats_trajectory_simulation_raytracing-1.wav" -arraygeompath "multibat_stresstests/nbat16/mic_xyz_multibatsim.csv" -K 3 -maxloopres 5e-4 -thresh-tdoaresidual 1e-8 -remove-lastchannel 'False' -min-peak-dist 0.25e-3 -window-size 0.01 -run-name "nbats16-limchannels-v2-82319" -step-size 1e-3 -num-jobs 5 -dest-folder "multibat_stresstests/nbat16/nbats16outdata" -channels '0,1,3,5,7'
 
 
 
@@ -68,13 +68,13 @@ echo "Now pydatemm begins..."
 
 echo $(date)
 
-python -m pydatemm -paramfile "multibat_stresstests/nbat4/nbats4outdata/paramset_nbats4-limchannels82319_${SLURM_ARRAY_TASK_ID}.yaml"
+python -m pydatemm -paramfile "multibat_stresstests/nbat4/nbats4outdata/paramset_nbats4-limchannels-v2-82319_${SLURM_ARRAY_TASK_ID}.yaml"
 echo "4 BAT tracking done"
 
 echo $(date)
-python -m pydatemm -paramfile "multibat_stresstests/nbat8/nbats8outdata/paramset_nbats8-limchannels82319_${SLURM_ARRAY_TASK_ID}.yaml"
+python -m pydatemm -paramfile "multibat_stresstests/nbat8/nbats8outdata/paramset_nbats8-limchannels-v2-82319_${SLURM_ARRAY_TASK_ID}.yaml"
 echo "8 BAT tracking done"
 echo $(date)
-python -m pydatemm -paramfile "multibat_stresstests/nbat16/nbats16outdata/paramset_nbats16-limchannels82319_${SLURM_ARRAY_TASK_ID}.yaml"
+python -m pydatemm -paramfile "multibat_stresstests/nbat16/nbats16outdata/paramset_nbats16-limchannels-v2-82319_${SLURM_ARRAY_TASK_ID}.yaml"
 echo "16 BAT tracking done"
 echo $(date)
