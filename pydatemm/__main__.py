@@ -73,7 +73,7 @@ def get_3d_median_location(xyz):
 def main():
     #%%
     # Setting up tracking
-    array_geom = pd.read_csv(params['arraygeompath']).loc[:,'x':'z'].to_numpy()
+    raw_array_geom = pd.read_csv(params['arraygeompath']).loc[:,'x':'z'].to_numpy()
     vsound = params.get('vsound', 343.0) # m/s
     
     #%%
@@ -93,10 +93,8 @@ def main():
             elif params.get('remove_lastchannel')=='False':
                 mic_audio = audio.copy()
             
-            nchannels = mic_audio.shape[1]
-            kwargs = {'nchannels':nchannels,
-                      'fs':fs,
-                      'array_geom':array_geom,
+            
+            kwargs = {'fs':fs,
                       'pctile_thresh': 95,
                       'use_gcc':True,
                       'gcc_variant':'phat', 
@@ -111,8 +109,13 @@ def main():
             if params.get('channels') is not None:
             	channels = [int(each) for each in params['channels'].split(',')]
             	mic_audio = mic_audio[:,channels]
-            	array_geom = array_geom[channels,:]
+            	array_geom = raw_array_geom[channels,:]
+            else:
+            	array_geom = raw_array_geom.copy()
             
+            kwargs['nchannels'] = mic_audio.shape[1]
+            kwargs['array_geom'] = array_geom
+
             hp_order =  params.get('highpass_order')
             if hp_order is not None:
                 order, cutoff = [float(each) for each in hp_order.split(',')]
