@@ -74,7 +74,7 @@ def get_source_proximity_counts(close_points,fine_threshold, input_df, arraygeom
                            np.max(timewindow[1]-potential_tof)]
         
         rows_inwindow = input_df['t'].between(wide_timewindow[0],
-                                           wide_timewindow[1], inclusive=True)
+                                           wide_timewindow[1], inclusive='both')
         subset_df = input_df.loc[rows_inwindow,:]
         
         dist_to_clust = distance_matrix(xyz.reshape(-1,3),
@@ -170,6 +170,7 @@ def plot_diagnostic(audio_data_pack, proximity_data_pack, arraygeom, flighttraj,
         plt.sca(axs[i])
         plt.plot(t_batid, source_prof, label='bat id ' + str(batid),
                                                  color=colorset[int(batid)-1])
+        plt.xlim(-0.001,audio.shape[0]/fs)
         plt.xticks([])
         plt.legend()
         # on the way also plot the detected peaks too. 
@@ -210,6 +211,18 @@ def plotted_toa_from_peaks(fig, specgram_axes, flighttraj, batid, peak_times,
     fig.canvas.draw()
 
 def calculate_toa_channels(t_source, flighttraj, sourceid, arraygeom):
+    '''
+    Parameters
+    ----------
+    t_source : float
+        Time point of acoustic source emission
+    flighttraj: pd.DataFrame
+        With at least batid, x,y,z columns
+    sourceid : int
+        The numeric batid 
+    arraygeom : (N,3) np.array
+        xyz positions of array
+    '''
     flight_traj = flighttraj.groupby('batid').get_group(sourceid).reset_index(drop=True)
     # get closest point in time 
     nearest_ind = abs(flight_traj['t']-t_source).argmin()

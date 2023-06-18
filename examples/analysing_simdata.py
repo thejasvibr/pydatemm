@@ -22,7 +22,7 @@ import tqdm
 from source_traj_aligner import generate_proximity_profile
 
 NBAT=8
-output_data_pattern = '823'
+output_data_pattern = 'raytra'
 output_folder = f'multibat_stresstests/nbat{NBAT}'
 arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
 audiofile = output_folder+f'/{NBAT}-bats_trajectory_simulation_1-order-reflections.WAV'
@@ -130,9 +130,9 @@ proximity_data1 = (counts_by_batid, cwt_peaks,)
 fig, axs = plot_diagnostic((audio, fs, duration), proximity_data, array_geom, upsampled_flighttraj,
                  vis_channels=[0,-1], sim_traj=flight_traj)
 
-fig1, axs1 = plot_diagnostic((audio, fs, duration), proximity_data1, array_geom, upsampled_flighttraj,
-                 vis_channels=[0,1], sim_traj=flight_traj)
-axs1[0].set_title('With CWT peak finding')
+# fig1, axs1 = plot_diagnostic((audio, fs, duration), proximity_data1, array_geom, upsampled_flighttraj,
+#                  vis_channels=[0,1], sim_traj=flight_traj)
+# axs1[0].set_title('With CWT peak finding')
 #%%
 # Now let's analyse the results from DBSCAN
 plt.figure()
