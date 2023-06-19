@@ -10,7 +10,6 @@ import glob
 import matplotlib
 from natsort import natsorted
 import matplotlib.pyplot as plt
-from matplotlib.backend_bases import MouseButton
 import numpy as np 
 import pandas as pd
 import soundfile as sf
@@ -22,7 +21,7 @@ import tqdm
 from source_traj_aligner import generate_proximity_profile
 
 NBAT=8
-output_data_pattern = 'limch'
+output_data_pattern = '*limch*v2'
 output_folder = f'multibat_stresstests/nbat{NBAT}'
 arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
 audiofile = output_folder+f'/{NBAT}-bats_trajectory_simulation_1-order-reflections.WAV'
@@ -87,9 +86,9 @@ sources_nearish = all_posns[np.unique(nearish_posns[1]),:]
 mic_video_xyz = pd.read_csv(arraygeom_file)
 
 #%%
-coarse_threshold = 0.5
-fine_threshold = 0.3
-topx = 5
+coarse_threshold = 0.7
+fine_threshold = 0.5
+topx = 20
 
 counts_by_batid = {}
 for batid, batdf in tqdm.tqdm(upsampled_flighttraj.groupby('batid')):
