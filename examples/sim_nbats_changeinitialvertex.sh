@@ -2,8 +2,8 @@
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time 01:00:00
-#SBATCH --mem 10G
+#SBATCH --time 00:30:00
+#SBATCH --mem 8G
 #SBATCH --array=0-4
 #SBATCH -o limchannels_%A_%a.out
 #SBATCH -e limchannels_%A_%a.err
@@ -19,7 +19,8 @@
 # the intiial vertex to generate the Fundamental Loops is tested - and
 # shown to be effective. Here I will do the same - except only run a few
 # iterations to see if the effect it has is noticeable for our type of data. 
-
+# The initial vertex is altered indirectly here by changing the channel order, 
+# while keeping all of the channels in the array. 
 
 module load anaconda/3/2020.02
 export LIBIOMP5_PATH=$ANACONDA_HOME/lib/libiomp5.so
