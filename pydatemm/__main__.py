@@ -40,6 +40,9 @@ help_text = """Run generate_candidate_sources for a given time snippet of an aud
         * maxloopres : float. Maximum loop residual tolerated. 
         * channels : str. comma-separated zero-indexed channel numbers which are to be used for this 
             particular analysis run e.g. 0,1,4,5,6 
+        * initial_vertex : int, optional. The 'root' vertex used to generate the spanning trees. Here
+          the 0-based index doesnt refer to the channel number but the index of the actually used 
+          channel list. 
         * vsound : float>0. Speed of sound in m/s. Defaults to 343 m/s
         * num_cores : int. Number of cores to use per run to perform the candidate source
             localisations calculations after TDOA graphs are generated. Defaults to 2.
@@ -48,7 +51,6 @@ help_text = """Run generate_candidate_sources for a given time snippet of an aud
             with the given Butterworth filter order and at the given cutoff frequency
             in Hz.
             e.g. highpass: 2,10000 means a 2nd order filter with cutoff at 10 kHz.
-
             """
 
 parser = argparse.ArgumentParser(description=help_text,)
@@ -105,6 +107,7 @@ def main():
             
             kwargs['K'] = params['K']
             kwargs['num_cores'] = params.get('num_cores', 2)
+            kwargs['initial_vertex'] = params.get('initial_vertex',0)
             #%% parse channels to use
             if params.get('channels') is not None:
             	channels = [int(each) for each in params['channels'].split(',')]

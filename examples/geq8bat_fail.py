@@ -21,6 +21,29 @@ Reduce the number of channels to reduce the overall TOA spread of the same
 sound across channels. Didn't really work as the localisation failed rather 
 badly!
 
+It actually seems like more channels helps in recovering the sources better.
+
+Change the 'MAIN NODE' while making CFLs
+----------------------------------------
+See page 101 of Kreissig's thesis. 
+The 'root' node for making FLs is by default set to 0. Kreissig reports
+that my iterating through the root node to make FLs the source detection rate
+increases.
+The root node may possibly lead to some triples being formed or not??
+
+
+Reduce \math{\epsilon}
+----------------------
+Kreissig (Phd Thesis) is using a range of 0.3-0.5 sampling interval! And here
+I am sitting and using very generous values of 10-50 sampling interval!! 
+
+
+Interpolation of cross-correlations to reduce TDOA temporal errors
+------------------------------------------------------------------
+Kreissig interpolates the cross-correlation to a much higher sampling rate and
+and then performs peak detection on the interpolated CC. 
+
+
 
 TODO
 ~~~~
@@ -45,7 +68,7 @@ paramfile = 'multibat_stresstests/nbat8/nbats8outdata/paramset_nbats8-raytracing
 with open(paramfile, 'r') as file:
     kwargs = yaml.safe_load(file)
 arraygeom = pd.read_csv(kwargs['arraygeompath']).loc[:,'x':'z'].to_numpy()
-arraygeom = arraygeom[[0,1,3,5,7],:]
+#arraygeom = arraygeom[,:]
 #%% original call points and traj
 origdata = pd.read_csv('multibat_stresstests/nbat8/multibatsim_xyz_calling.csv')
 callpoints = origdata[origdata['emission_point']==True].sort_values('t')

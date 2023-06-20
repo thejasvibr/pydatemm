@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 from itertools import chain
 from pydatemm.localisation_mpr2003 import mellen_pachter_raquet_2003
 from pydatemm.tdoa_quality import residual_tdoa_error_nongraph
-#import pydatemm.localiser as lo
+import pydatemm.localiser as lo
 import pydatemm.timediffestim as timediff
 import  pydatemm.graph_manip as gramanip
 

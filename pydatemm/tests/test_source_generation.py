@@ -31,6 +31,7 @@ class TestSourceGeneration(unittest.TestCase):
     
     def test_normal_audio_noerror(self):
         output = generate_candidate_sources(self.random_audio, **self.kwargs)
+        
 
 
 if __name__ == "__main__":

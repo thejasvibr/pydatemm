@@ -21,7 +21,7 @@ import tqdm
 from source_traj_aligner import generate_proximity_profile
 
 NBAT=8
-output_data_pattern = '*limch*v2'
+output_data_pattern = 'highkn'
 output_folder = f'multibat_stresstests/nbat{NBAT}'
 arraygeom_file = output_folder+'/mic_xyz_multibatsim.csv'
 audiofile = output_folder+f'/{NBAT}-bats_trajectory_simulation_1-order-reflections.WAV'

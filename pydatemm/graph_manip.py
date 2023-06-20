@@ -16,25 +16,36 @@ except:
     pass
 
 
-def make_fundamental_loops(nchannels):
+def make_fundamental_loops(**kwargs):
     '''
     Parameters
     ----------
     nchannels : int
         Number of channels, and thus number of nodes in the TDE graph.
+
     Returns
     -------
     fundamental_loops : list
         List with tuples containing integer node numbers.
+
+    
+    References
+    ----------
+    * Yang, B. & Kreissig, M., An efficient algorithm for the synthesis of fully connected
+      graphs, ICASSP 2012
+    * Kreissig, M., 2015, Effiziente Synthese konsistenter Graphen und ihre Anwendung
+      in der Lokalisierung durch akustischer Quellen, Uni Stuttgart Phd. Thesis
     '''
-    G = ig.Graph.Full(nchannels)
-    G.vs['name'] = range(nchannels)
+    G = ig.Graph.Full(kwargs['nchannels'])
+    G.vs['name'] = range(kwargs['nchannels'])
     minspan_G = G.spanning_tree()
     main_node = 0
     co_tree = minspan_G.complementer().simplify()
+
     fundamental_loops = []
     for edge in co_tree.es:
-        fl_nodes = tuple((main_node, edge.source, edge.target))
+        source_v, target_v = co_tree.vs['name'][edge.source],  co_tree.vs['name'][edge.target]
+        fl_nodes = tuple((main_node, source_v, target_v))
         fundamental_loops.append(fl_nodes)
     return fundamental_loops
 
@@ -45,7 +56,7 @@ def make_triple_pairs(triple):
     ji_pairs = list(map(lambda X: X[::-1], pairs))
     return ji_pairs
 
-def make_edges_for_fundamental_loops(nchannels):
+def make_edges_for_fundamental_loops(**kwargs):
     '''
     Parameters
     ----------
@@ -57,14 +68,16 @@ def make_edges_for_fundamental_loops(nchannels):
     triple_definition : dict
         Keys are fundamental loops as tuples. Values are lists with
         edges as tuples
+    
+    See Also
+    --------
+    make_fundamental_loops
     '''
-    funda_loops = make_fundamental_loops(nchannels)
+    funda_loops = make_fundamental_loops(**kwargs)
     triple_definition = {}
     for fun_loop in funda_loops:
         edges = make_triple_pairs(fun_loop)
         triple_definition[fun_loop] = []
-        # if the edge (ab) is present but the 'other' way round (ba) - then 
-        # reverse polarity. 
         for edge in edges:
             triple_definition[fun_loop].append(edge)
     return triple_definition
@@ -77,7 +90,7 @@ def make_consistent_fls(multich_tdes, **kwargs):
         Keys are 
     '''
     max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
-    all_edges_fls = make_edges_for_fundamental_loops(kwargs['nchannels'])
+    all_edges_fls = make_edges_for_fundamental_loops(**kwargs)
     all_cfls = []
 
     for fundaloop, edges in all_edges_fls.items():
@@ -121,15 +134,23 @@ def make_consistent_fls_cpp(multich_tdes, **kwargs):
         Defaults to 1e-6 s
     nchannels : int>0
         Number of channels in the original audio. 
+    initial_vertex : int, optional 
+        Defaults to 0. The 'root' veretex from which the spanning 
+        tree radiates out of. 
     
     Returns 
     -------
     all_cfls : list 
         List with Eigen::MatrixXd matrices. Each matrix is one cFL
         graph. 
+    
+    See Also
+    --------
+    make_edges_for_fundamental_loops
+
     '''
     max_loop_residual = kwargs.get('max_loop_residual', 1e-6)
-    all_edges_fls = make_edges_for_fundamental_loops(kwargs['nchannels'])
+    all_edges_fls = make_edges_for_fundamental_loops(**kwargs)
     all_cfls = []
     k = 0
     for fundaloop, edges in all_edges_fls.items():
