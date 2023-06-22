@@ -28,9 +28,9 @@ subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-bef
 
 #%% Make a simple set of parameters where the first channels is changed. 
 paramset = {}
-paramset['audiopath'] = 'initialvertex_tests\\nbat8\\8-bats_trajectory_simulation_raytracing-1.wav'
-paramset['arraygeompath'] =  'initialvertex_tests\\nbat8\\mic_xyz_multibatsim.csv'
-paramset['dest_folder'] = 'initialvertex_tests\\nbat8\\nbats8outdata'
+paramset['audiopath'] = os.path.join(inputfolder,'8-bats_trajectory_simulation_raytracing-1.wav')
+paramset['arraygeompath'] =  os.path.join(inputfolder,'mic_xyz_multibatsim.csv')
+paramset['dest_folder'] = os.path.join(inputfolder,'nbats8outdata')
 paramset['maxloopres'] = 0.0005
 paramset['min_peak_dist'] = 0.00025
 paramset['num_jobs']: 1
@@ -54,10 +54,10 @@ for each in range(8):
     channel_list.append(ordered_channel)
 #%%
 for run_name, firstchannel, channelset in zip(run_list, range(8), channel_list):
-    ff = open(run_name, 'w+')
     paramset['channels'] = str(channelset)[1:-1]
     paramset['run_name'] = f'K6firstch_{firstchannel}'
-    yaml.dump(paramset, ff)
+    with open(run_name, 'w') as ff:
+        yaml.dump(paramset, ff)
 
 # #%%
 # for ii in run_list:
