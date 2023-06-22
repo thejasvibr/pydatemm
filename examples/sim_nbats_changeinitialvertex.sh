@@ -1,11 +1,11 @@
 #!/bin/bash 
 #SBATCH --ntasks=1
-#SBATCH --nodes=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time 01:00:00
+#SBATCH --time 01:20:00
 #SBATCH --mem 8G
-#SBATCH -o initialvertex.out
-#SBATCH -e initialvertex.err
+#SBATCH --array=1-7
+#SBATCH -o initvertex_%A_%a.out
+#SBATCH -e initvertex_%A_%a.err
 #SBATCH --job-name=initialvertex
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=thejasvi.beleyur@ab.mpg.de
@@ -50,9 +50,7 @@ done
 python initial_vertex_tests.py
 
 k=6	
-for ind in $(seq 0 7)
-do 
-	echo "Now running channel combi ${ind}"
-	python -m pydatemm -paramfile "initialvertex_tests\\nbat8\\nbats8outdata\\paramset_K${k}-startch_${ind}.yaml"
-	echo "Done running channel combi ${ind}"
-done
+
+echo "Now running channel combi ${SLURM_ARRAY_TASK_ID}"
+python -m pydatemm -paramfile "initialvertex_tests\\nbat8\\nbats8outdata\\paramset_K${k}-startch_${SLURM_ARRAY_TASK_ID}.yaml"
+echo "Done running channel combi ${SLURM_ARRAY_TASK_ID}"
