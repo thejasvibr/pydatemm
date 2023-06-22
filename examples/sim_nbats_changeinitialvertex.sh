@@ -50,7 +50,7 @@ done
 python initial_vertex_tests.py
 
 k=6	
-for ind in 0,1,2,3,4,5,6,7
+for ind in $(seq 0 7)
 do 
 	echo "Now running channel combi ${ind}"
 	python -m pydatemm -paramfile "initialvertex_tests\\nbat8\\nbats8outdata\\paramset_K${k}-startch_${ind}.yaml"
