@@ -1,9 +1,9 @@
 #!/bin/bash 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time 01:20:00
-#SBATCH --mem 8G
-#SBATCH --array=1-7
+#SBATCH --time 03:00:00
+#SBATCH --mem 20G
+#SBATCH --array=0-7
 #SBATCH -o initvertex_%A_%a.out
 #SBATCH -e initvertex_%A_%a.err
 #SBATCH --job-name=initialvertex
@@ -49,8 +49,8 @@ done
 
 python initial_vertex_tests.py
 
-k=6	
+k=8
 
 echo "Now running channel combi ${SLURM_ARRAY_TASK_ID}"
-python -m pydatemm -paramfile "initialvertex_tests\\nbat8\\nbats8outdata\\paramset_K${k}-startch_${SLURM_ARRAY_TASK_ID}.yaml"
+python -m pydatemm -paramfile "initialvertex_tests/nbat8/nbats8outdata/paramset_K${k}-startch_${SLURM_ARRAY_TASK_ID}.yaml"
 echo "Done running channel combi ${SLURM_ARRAY_TASK_ID}"
