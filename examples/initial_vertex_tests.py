@@ -58,11 +58,11 @@ for run_name, firstchannel, channelset in zip(run_list, range(8), channel_list):
     paramset['run_name'] = f'K6firstch_{firstchannel}'
     yaml.dump(paramset, ff)
 
-#%%
-for ii in run_list:
-    print(f'Running {ii}')
-    #os.system(f'python -m pydatemm -paramfile {ii}')
-    output = subprocess.run(f'python -m pydatemm -paramfile {ii}')
-    print(output)
+# #%%
+# for ii in run_list:
+#     print(f'Running {ii}')
+#     #os.system(f'python -m pydatemm -paramfile {ii}')
+#     output = subprocess.run(f'python -m pydatemm -paramfile {ii}')
+#     print(output)
 
 
