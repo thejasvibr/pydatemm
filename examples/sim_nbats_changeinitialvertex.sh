@@ -2,10 +2,10 @@
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time 00:01:00
+#SBATCH --time 01:00:00
 #SBATCH --mem 8G
-#SBATCH -o initialvertex_%A_%a.out
-#SBATCH -e initialvertex_%A_%a.err
+#SBATCH -o initialvertex.out
+#SBATCH -e initialvertex.err
 #SBATCH --job-name=initialvertex
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=thejasvi.beleyur@ab.mpg.de
@@ -49,7 +49,7 @@ done
 
 python initial_vertex_tests.py
 
-k=6
+k=6	
 for ind in 0,1,2,3,4,5,6,7
 do 
 	echo "Now running channel combi ${ind}"
