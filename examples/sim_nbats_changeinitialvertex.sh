@@ -51,6 +51,6 @@ python initial_vertex_tests.py
 
 k=8
 
-echo "Now running channel combi ${SLURM_ARRAY_TASK_ID}"
+echo "Now running channel combi ${SLURM_ARRAY_TASK_ID} for K=${k}"
 python -m pydatemm -paramfile "initialvertex_tests/nbat8/nbats8outdata/paramset_K${k}-startch_${SLURM_ARRAY_TASK_ID}.yaml"
 echo "Done running channel combi ${SLURM_ARRAY_TASK_ID}"
