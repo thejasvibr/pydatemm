@@ -22,7 +22,8 @@ try:
 except:
     pass
 
-subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-before 0.1 -room-dim {roomdim} -seed 82319 -input-folder {inputfolder} -ray-tracing True")
+subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-before 0.1 -room-dim {roomdim} -seed 82319 -input-folder {inputfolder} -ray-tracing True",
+               shell=True)
 
 
 #%% Make a simple set of parameters where the first channels is changed. 
