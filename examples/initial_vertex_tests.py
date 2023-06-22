@@ -27,6 +27,7 @@ subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-bef
 
 
 #%% Make a simple set of parameters where the first channels is changed. 
+K = 6
 paramset = {}
 paramset['audiopath'] = os.path.join(inputfolder,'8-bats_trajectory_simulation_raytracing-1.wav')
 paramset['arraygeompath'] =  os.path.join(inputfolder,'mic_xyz_multibatsim.csv')
@@ -35,7 +36,7 @@ paramset['maxloopres'] = 0.0005
 paramset['min_peak_dist'] = 0.00025
 paramset['num_jobs']: 1
 paramset['remove_lastchannel'] = 'False'
-paramset['K'] = 6
+paramset['K'] = K
 times = np.arange(0.15,0.2,1e-3)
 times_str = str(list(times))[1:-1]
 paramset['start_time'] = times_str
@@ -45,7 +46,7 @@ paramset['window_size'] = 0.01
 
 commonparamfile_name = os.path.join(paramset['dest_folder'])
 
-run_list = [os.path.join(commonparamfile_name,f'paramset_start_ch{each}.yaml') for each in range(8)]
+run_list = [os.path.join(commonparamfile_name,f'paramset_K{K}-startch_{each}.yaml') for each in range(8)]
 channel_list = []
 for each in range(8):
     allchannels = range(8)
