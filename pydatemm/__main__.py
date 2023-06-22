@@ -90,10 +90,13 @@ def main():
             stop_t = start_t + window_size
             start_ind, stop_ind = int(start_t*fs), int(stop_t*fs)
             audio, fs = sf.read(params['audiopath'], start=start_ind, stop=stop_ind+1)
-            if params.get('remove_lastchannel') is None:
+            if params.get('remove_lastchannel') == 'True':
             	mic_audio = audio[:,:-1]
-            elif params.get('remove_lastchannel')=='False':
+            elif params.get('remove_lastchannel') =='False':
                 mic_audio = audio.copy()
+            else:
+                raise ValueError(f'{params.get("remove_lastchannel")} is invalid input for \
+                                 remove_lastchannel!')
             
             
             kwargs = {'fs':fs,

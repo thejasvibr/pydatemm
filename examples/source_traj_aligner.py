@@ -191,7 +191,11 @@ def plot_diagnostic(audio_data_pack, proximity_data_pack, arraygeom, flighttraj,
             plt.sca(axs[batid-1])
             for i, row in subdf.iterrows():
                 _,x,y,z,t,*uu = row
-                plt.vlines(t, 0, np.max(proximity_profiles[batid]), color='r')
+                if np.max(proximity_profiles[batid])>0:
+                    plt.vlines(t, 0, np.max(proximity_profiles[batid]), color='r')
+                else:
+                    plt.vlines(t, 0, 1, color='r')
+                    
     
     # plot the spectrogram of the visualised audio channels and the expected
     # TOAs of the sources
