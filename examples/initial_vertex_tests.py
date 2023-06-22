@@ -27,7 +27,7 @@ subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-bef
 
 
 #%% Make a simple set of parameters where the first channels is changed. 
-K = 8
+K = 7
 paramset = {}
 paramset['audiopath'] = os.path.join(inputfolder,'8-bats_trajectory_simulation_raytracing-1.wav')
 paramset['arraygeompath'] =  os.path.join(inputfolder,'mic_xyz_multibatsim.csv')
