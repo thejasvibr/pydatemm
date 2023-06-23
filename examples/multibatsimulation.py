@@ -44,7 +44,7 @@ args.add_argument('-seed', type=int, default=78464)
 args.add_argument('-input-folder', type=str)
 args.add_argument('-ray-tracing', type=parse_raytracing_bool, default=False)
 args.add_argument('-samplerate', type=int, default=192000)
-
+args.add_argument('-ref-order', type=int, default=1)
 
 
 
@@ -135,7 +135,7 @@ print(allbat_xyz[allbat_xyz['emission_point']])
 
 
 fs = param.samplerate
-ref_order = 1
+ref_order = param.ref_order
 reflection_max_order = ref_order
 ray_tracing = param.ray_tracing
 
