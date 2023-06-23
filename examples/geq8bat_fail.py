@@ -31,6 +31,11 @@ that my iterating through the root node to make FLs the source detection rate
 increases.
 The root node may possibly lead to some triples being formed or not??
 
+Increase K
+----------
+Increasing K from 3-6 didn't really ahve an effect, while keeping epsilon rather
+generous (and with crude TDOA). K=8 ran out of 20 GB memory. 
+
 
 Reduce \math{\epsilon}
 ----------------------
@@ -115,12 +120,14 @@ for i, batid in enumerate(withoverlap.groupby('batid').groups.keys()):
     subdf['mean_toa'] = (subdf.loc[:,'min_toa']+subdf.loc[:,'max_toa'])/2
     plt.vlines(subdf['min_toa'],0,1, label='batid '+str(batid))
     plt.vlines(subdf['max_toa'],0,1)
+    
     for idx,row in subdf.iterrows():
         each = row['mean_toa']
         overlaps = row['overlaps']
         if each > 0:
             y_points = np.linspace(0.1,0.9,overlaps)
             plt.plot(np.tile(each, overlaps),y_points,'r*')
+        plt.text(row['min_toa']-0.01,0.5,'Tem \n'+str(row['t']), rotation=90)
 
     plt.legend()
 
