@@ -161,7 +161,7 @@ array_geom = np.array(([3, 8.9, 1.5],
 # add some noise to the array - this is so that none of the mics are 
 # co-planar.
 array_geom += choose(np.linspace(-0.01,0.01,20), array_geom.size).reshape(array_geom.shape)
-
+print(array_geom)
 #%%
 # Go crazy and make each call emission the same type of call.
 call_points = allbat_xyz[allbat_xyz['emission_point']]

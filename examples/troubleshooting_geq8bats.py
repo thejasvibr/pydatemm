@@ -43,14 +43,14 @@ sim_folder = os.path.join('initialvertex_tests',
 audiofile = os.path.join(sim_folder,
                          '8-bats_trajectory_simulation_raytracing-1.wav')
 
-audiofile = os.path.join('multibatno_reverb','nbat8','8-bats_trajectory_simulation_0-order-reflections.wav')
+#audiofile = os.path.join('multibatno_reverb','nbat8','8-bats_trajectory_simulation_0-order-reflections.wav')
 fs = sf.info(audiofile).samplerate
 nchannels = sf.info(audiofile).channels
 kwargs = {}
 kwargs['fs'] = fs 
-kwargs['min_peak_diff'] = 0.0001
-kwargs['min_height'] = 0.03
-kwargs['K'] = 5
+kwargs['min_peak_diff'] = 10e-6
+kwargs['min_height'] = 0.01
+kwargs['K'] = 20
 #%%
 micxyz = pd.read_csv(os.path.join(sim_folder,'mic_xyz_multibatsim.csv')).loc[:,'x':'z'].to_numpy()
 
@@ -87,7 +87,7 @@ call_data['toa_max'] = toa_max
 #%% Now load the audio based on the min-max TOA data
 # so we know for SURE that the calls are in there. 
 all_tmin = call_data['toa_min'].min()
-all_tmax = call_data['toa_max'].max()
+all_tmax = call_data['toa_max'].max()+0.005
 
 audio, _ = sf.read(audiofile, start=int(fs*all_tmin), stop=int(fs*all_tmax))
 
@@ -99,20 +99,18 @@ multich_cc = timediff.generate_multich_crosscorr(audio, **kwargs )
 # Implement zero-ing of all beyond max-delay to focus attention 
 # on the plausible range
 
+mic2mic = distance_matrix(micxyz,micxyz)
 for  chpair, cc in multich_cc.items():
-    max_delay = distance_matrix(micxyz[chpair,:],micxyz[chpair,:]).max()/343
+    max_delay = mic2mic[chpair[0],chpair[1]]/343
     max_delay_samples = int(max_delay*fs)
     halfway_point = int(cc.shape[0]*0.5)
     left_edge = np.max([halfway_point-max_delay_samples,0])
     right_edge = np.min([halfway_point+max_delay_samples, cc.shape[0]])
     cc[:left_edge] *= 0
     cc[right_edge:] *= 0
-    
+
 kwargs['nchannels'] = audio.shape[1]
 cc_peaks = timediff.get_multich_tdoas(multich_cc, **kwargs)
-
-    
-
 
 top_K_tdes = {}
 for ch_pair, tdes in cc_peaks.items():
@@ -126,7 +124,7 @@ for ch_pair, tdes in cc_peaks.items():
 
 #%%
 fig,ax = plt.subplots(nrows=1,ncols=1)
-chpair = (2,1)
+chpair = (4,1)
 
 tleft,tright = -(audio.shape[0])/fs, (audio.shape[0])/fs
 t = np.linspace(tleft, tright, (audio.shape[0]*2)-1)
@@ -138,6 +136,9 @@ ax.plot(timepoints, multich_cc[chpair][samplepoints],'*')
 
 ax.plot(expected_tdoa[chpair], np.tile(0.2, len(expected_tdoa[chpair])),'r*')
 
+# total_resid = np.array(sorted(timepoints)) - np.array(sorted(expected_tdoa[chpair]))
+
+# print(total_resid/(1/fs))
 
 
 
