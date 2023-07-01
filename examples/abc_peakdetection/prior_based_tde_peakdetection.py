@@ -62,10 +62,11 @@ for k in range(1, nbats+1):
 
 def gen_mock_observed_data(seednum=82319):
     fs = 192000
-    mock_audio = np.random.normal(0,1e-6,96000*4).reshape(96000,4)
+    np.random.seed(seednum)
+    mock_audio = np.random.normal(0,1e-6,25000*4).reshape(25000,4)
     sound = np.random.normal(0,1e-4,192)
     for i in range(4):
-        start = int(np.random.choice(np.arange(100,45000),1))
+        start = int(np.random.choice(np.arange(100,12500),1)[0])
         mock_audio[start:start+192,i] +=  sound
     
     ch_combis = list(combinations(range(4),2))
@@ -73,7 +74,7 @@ def gen_mock_observed_data(seednum=82319):
     all_ccs = np.zeros((num_combis, int(mock_audio.shape[0]*2)-1))
     for i, chpair in enumerate(ch_combis):
         all_ccs[i,:] = signal.correlate(mock_audio[:,chpair[0]], mock_audio[:,chpair[1]])
-    return all_ccs
+    return np.sqrt(all_ccs.flatten()**2)
 
 def generate_parambased_cc(rng, categorytype, size=None):
     if categorytype<= 20:
@@ -83,18 +84,22 @@ def generate_parambased_cc(rng, categorytype, size=None):
 
 observed_cc = gen_mock_observed_data(82319)
 
-#%%
-if __name__ == "__main__":
+
+def run_model():
     with pm.Model() as mm:
         category = pm.Categorical(name='category',
-                                     p=np.tile(1/(scenario_num+1), scenario_num+1))
+                                      p=np.tile(1/(scenario_num+1), scenario_num+1))
         simsim = pm.Simulator('simsim', generate_parambased_cc, category,
-                              epsilon=1e5, observed=observed_cc)
+                              epsilon=5e-10, distance='laplace',
+                              sum_stat='sort', observed=observed_cc)
         idata = pm.sample_smc()
         idata.extend(pm.sample_posterior_predictive(idata))
     az.plot_trace(idata, kind="rank_vlines");
     plt.savefig('miaowmiaow.png')
     plt.show()
-
+    return mm, idata
+#%%
+if __name__ == "__main__":
+    run_model()
 
 
