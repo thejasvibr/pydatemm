@@ -22,19 +22,20 @@ import scipy.signal as signal
 import os 
 roomdim = '4,9,3'
 
+os.chdir('..//')
 inputfolder = os.path.join('abc_peakdetection','nbat8')
 try:
     os.makedirs(inputfolder)
 except:
     pass
 
+print(f'CURRENT CWD: {os.getcwd()}')
 # If need be run the simulated audio once again 
-os.chdir('..//')
-# subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-before 0.1 -room-dim {roomdim} -seed 82319 -input-folder {inputfolder} -ray-tracing False -ref-order 0",
-#                shell=True)
+subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-before 0.1 -room-dim {roomdim} -seed 82319 -input-folder {inputfolder} -ray-tracing False -ref-order 0",
+                shell=True)
 
-# subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-before 0.1 -room-dim {roomdim} -seed 82319 -input-folder {inputfolder} -ray-tracing True -ref-order 1",
-#                shell=True)
+subprocess.run(f"python  multibatsimulation.py -nbats 8 -ncalls 5 -all-calls-before 0.1 -room-dim {roomdim} -seed 82319 -input-folder {inputfolder} -ray-tracing True -ref-order 1",
+                shell=True)
 
 os.chdir('abc_peakdetection//')
 
