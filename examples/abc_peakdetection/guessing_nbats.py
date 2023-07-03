@@ -110,6 +110,11 @@ if __name__ == "__main__":
     import arviz as az
     import pymc as pm
     
+    def dummy_func(rng, indata, size=None):
+        mu = indata[-1]
+        sd = indata[-2]
+        return np.normal(mu,sd, 1000)
+    
     with pm.Model() as mm:
         muest = pm.Uniform('muest',-1,1)
         sdest = pm.Uniform('sdest',0.8,1.5)
