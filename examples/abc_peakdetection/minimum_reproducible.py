@@ -48,6 +48,8 @@ for batnum in range(nbats):
 
 def generate_fake_cc(rng, scenario_number, xyz_emissions, size=None):
     '''
+    An incomplete but functional example to show issues with subsetting 
+
     Parameters
     ----------
     rng : 
@@ -63,7 +65,6 @@ def generate_fake_cc(rng, scenario_number, xyz_emissions, size=None):
           type(scenario_number), scenario_number)
     
     # PROBLEM POINT when uncommented
-    
     # calling_bats = allscenarios_asnp[scenario_number,:]
     
     
@@ -77,6 +78,7 @@ if __name__ == "__main__":
         current_scenario = pm.Categorical('current_scenario',
                                               p_categories,
                                               shape=(1,))
+        
         # generate the hypothesised x,y,z for the emitting bats
         x_hyp = pm.Uniform('x_hyp', lower=xyz_ranges[:,0],
                               upper=xyz_ranges[:,1], shape=(nbats,))
@@ -92,5 +94,5 @@ if __name__ == "__main__":
                                                    observed=np.array([3,3]).reshape(-1,2),
                                                    )
     with mo:
-        idata = pm.sample_smc(draws=100)
+        idata = pm.sample_smc(draws=100, chains=2)
         idata.extend(pm.sample_posterior_predictive(idata))
