@@ -13,6 +13,7 @@ from itertools import combinations
 import scipy.signal as signal 
 from scipy.spatial import distance_matrix
 import numpy as np 
+import pymc as pm
 import matplotlib.pyplot as plt 
 
 #%% Create mock bat scenarios
@@ -22,7 +23,7 @@ def generate_scenario_number(nbats):
     Includes a 
     '''
     
-    all_scenarios = {}
+    all_scenarios = []
     scenario_number = 0
     for subset in range(1, nbats+1):
         subscenario_combis = combinations(range(1,nbats+1),subset)
@@ -31,8 +32,9 @@ def generate_scenario_number(nbats):
             binary_scenario = np.zeros(nbats)
             batinds = np.array((each))-1
             binary_scenario[batinds] = 1 
-            all_scenarios[scenario_number] = np.bool_(binary_scenario )
+            all_scenarios.append(binary_scenario )
             scenario_number += 1 
+    all_scenarios = np.array(all_scenarios)
     return all_scenarios
 
 def calculate_toa(source, micarray, vsound=343.0):
@@ -89,8 +91,8 @@ def generate_scenario_crosscor(all_input_data):
     -------
     sim_crosscor:
     '''
-    batscenario = scenariodict[scenarionumber]
-    emitted_sound, fs = scenariodata[-2]
+    # batscenario = scenariodict[scenarionumber]
+    # emitted_sound, fs = scenariodata[-2]
     
     
     
@@ -102,33 +104,11 @@ def generate_scenario_crosscor(all_input_data):
 
 if __name__ == "__main__":
     import os
-    os.environ['PYTHONIOENCODING']='utf-8'
-
-    
-
-    obs = np.random.normal(0,1,1000)
-    import arviz as az
-    import pymc as pm
-    
-    def dummy_func(rng, indata, size=None):
-        mu = indata[-1]
-        sd = indata[-2]
-        return np.normal(mu,sd, 1000)
-    
-    with pm.Model() as mm:
-        muest = pm.Uniform('muest',-1,1)
-        sdest = pm.Uniform('sdest',0.8,1.5)
-        inputvariable = [1,2,sdest,muest]
-        ss = pm.Simulator('ss', dummy_func, inputvariable,
-                          sum_stat="sort", distance='laplace',
-                          observed=obs, epsilon=50)
-        idata = pm.sample_smc(draws=1000)
-        idata.extend(pm.sample_posterior_predictive(idata))
-    az.plot_trace(idata, kind="rank_vlines");
-    az.plot_posterior(idata);
-    
+    from pytensor.tensor.subtensor import inc_subtensor
+    os.environ['PYTHONIOENCODING']='utf-8'    
     #%%
-    nbats = 3
+    import pytensor as pt
+    nbats = 4
     scenarios = generate_scenario_number(nbats)
     num_scenarios = len(scenarios.keys())
     p_categories = np.tile(1/num_scenarios, num_scenarios)
@@ -139,43 +119,78 @@ if __name__ == "__main__":
         xyz_ranges[:,i] *= i+1
     
     allscenarios_asnp = np.array([callingbats for i, callingbats in scenarios.items()])
+    allscenario_pt = pt.shared(allscenarios_asnp, 'allscenario_pt', shape=allscenarios_asnp.shape)
+    
+    fs = 192000
     micxyz = np.random.normal(0,1,30).reshape(-1,3)
-
     
-    def generate_fake_cc(rng, scenario_number, xyz_emissions , size=None):
+    durn = 5e-3 # seconds
+    #emitted_sound = np.random.normal(0,1e-5,5*192)
+    emitted_sound = signal.chirp(np.linspace(0,durn,int(fs*durn)),10000,
+                                             durn, 90000,'linear')
+    emitted_sound *= signal.windows.hann(emitted_sound.size)
+    
+    
+    def generate_fake_cc(rng, scenario_number, xyz_emissions, size=None):
         
+        #calling_bats = allscenario_pt[scenario_number,:]        
+        print(type(xyz_emissions), xyz_emissions.shape,
+              type(scenario_number), scenario_number)
         calling_bats = allscenarios_asnp[scenario_number,:]
-        #print('HELLO!',scenario_number, calling_bats)
-        emission_hypotheses = xyz_emissions[calling_bats.flatten(),:]
-       
-        return np.array(emission_hypotheses.shape).reshape(-1,2)
-        #return np.array([5, 2]).reshape(-1,2)
+        print(calling_bats)
+        #
+        #inds = np.where(calling_bats)
+        #print('HELLO!',scenario_number, type(calling_bats), inds)
+        #inds = calling_bats[0].nonzero()[0]
+        #emission_hypotheses = pt.tensor.zeros((inds.size,3))
+        # emission_hypotheses = inc_subtensor(emission_hypotheses[inds,:],
+        #                                     xyz_emissions[inds,: ])
+        #print(emission_hypotheses.eval())
+        #print(emission_hypotheses.eval(), scenario_number.eval())
+        #print( xyz_emissions, emission_hypotheses.shape)
+        #return np.array(emission_hypotheses.shape).reshape(-1,2)
+        return np.array([5,2]).reshape(-1,2)
 
-    #%%
-    scenario_data = []
-    scenario_data.append([]) # 0 current scenario
-    scenario_data.append([]) # 1 all emission hypotheses
-    
-    
+    # def generate_fake_np_based(rng, scenario_number, xyz_emissions,  size=None):
+    #     '''
+    #     '''
+    #     calling_bats = allscenarios_asnp[scenario_number,:]
+    #     inds = calling_bats.nonzero()[0]
+        
+    #     # now generate the TOAs of the various emission points
+    #     toas = distance_matrix(emission_hypotheses, micxyz)/343.0 # each source has a row. 
+    #     audio_samples = int(fs*toas.max())  + emitted_sound.size
+    #     audio_data = np.zeros((audio_samples, micxyz.shape[0]))
+    #     for row in range(toas.shape[0]):
+    #         for ch_num, channel_toa in enumerate(toas[row,:]):
+    #             toa_sample = int(fs*channel_toa)
+    #             toa_end = toa_sample + emitted_sound.size
+    #             audio_data[toa_sample:toa_end, ch_num] += emitted_sound
+    #     return audio_data
+
+   
     
     with pm.Model() as mo:
         # choose which scenario is being tested
         current_scenario = pm.Categorical('current_scenario',
                                               p_categories,
-                                              shape=1)
+                                              shape=(1,))
         #scenario_data[0] = current_scenario
         # generate the hypothesised x,y,z for the emitting bats
         x_hyp = pm.Uniform('x_hyp', lower=xyz_ranges[:,0],
-                              upper=xyz_ranges[:,1])
+                              upper=xyz_ranges[:,1], shape=(nbats,))
         y_hyp = pm.Uniform('y_hyp', lower=xyz_ranges[:,2],
-                              upper=xyz_ranges[:,3])
+                              upper=xyz_ranges[:,3],shape=(nbats,))
         z_hyp = pm.Uniform('z_hyp', lower=xyz_ranges[:,4],
-                              upper=xyz_ranges[:,5])
+                              upper=xyz_ranges[:,5],shape=(nbats,))
         xyz_stack = pm.math.stack([x_hyp, y_hyp, z_hyp], axis=1)
+        print('xyz_stack:',xyz_stack.shape)
         # #scenario_data[1] = xyz_stack
         # # recreate the simulated audio and cross-correlations
         sim = pm.Simulator('sim', generate_fake_cc, params=(current_scenario, xyz_stack),
-                                                   observed=np.array([4,3]).reshape(-1,2),
+                                                   observed=np.array([3,3]).reshape(-1,2),
                                                    )
-        idata = pm.sample_smc()
+    with mo:
+        idata = pm.sample_smc(draws=100)
         idata.extend(pm.sample_posterior_predictive(idata))
+    #az.plot_trace(idata, kind="rank_vlines");
