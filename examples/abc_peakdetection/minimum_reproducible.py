@@ -30,7 +30,7 @@ def generate_all_possible_scenarios(nbats):
     all_scenarios = np.array(all_scenarios)
     return all_scenarios
 
-nbats = 5
+nbats = 3
 # generate various possible scenarios individual called (1=call, 0=silent)
 allscenarios_asnp = generate_all_possible_scenarios(nbats)
 # set probability of all scenarios to be the same 
@@ -45,34 +45,47 @@ xyz_ranges = np.ones((nbats,6))
 for batnum in range(nbats):
     xyz_ranges[batnum,:] = batnum + np.linspace(0,1,6)
 
-
-def generate_fake_cc(rng, scenario_number, xyz_emissions, size=None):
-    '''
-    An incomplete but functional example to show issues with subsetting 
-
+def do_sound_propagation(call_positions):
+    ''' dummy function to mimic sound propagation. 
     Parameters
     ----------
-    rng : 
-    scenario_number : int? or pytensor?
-        The row number to choose from the binary scenario matrix
-    xyz_emissions : np.array? or pytensor?
-        The set of drawn potential emission points
-    size : 
-        
+    call_positions : (Bbats, 3) np.array
+        Where Bbats >= 1.
+    Returns
+    -------
+    synthetic_audio : (Msamples,Nchannels) np.array
     '''
-    
-    print(type(xyz_emissions), xyz_emissions.shape,
-          type(scenario_number), scenario_number)
-    
-    # PROBLEM POINT when uncommented
-    # calling_bats = allscenarios_asnp[scenario_number,:]
-    
-    
+    # sound propagated
+    synthetic_audio =  np.random.normal(0,1,100).reshape(20,5)
+    return synthetic_audio
 
+def generate_fake_audio(rng, scenario_number, xyz_emissions, size=None):
+    '''
+    generates audio based on potential call positions
     
-    # dummy output just to get the function to run
-    return np.array([5, 2]).reshape(-1,2)
+    Parameters
+    ----------
+    rng :  np.random.Generator
+    scenario_number : int
+    xyz_emissions : (Bbats,3)
+        Bbats is the max number of bats
+    size : int
+    
+    Returns
+    -------
+    emitted_sounds : (Msamples, Nchannels) np.array
+    '''
+    # which bats are calling 
+    current_scenario = allscenarios_asnp[scenario_number,:]
+    # select xyz positions of calling bats only
+    actual_callpositions = xyz_emissions[np.bool_(current_scenario),:]
+    # do audio propagation stuff  here
+    emitted_sounds = do_sound_propagation(actual_callpositions)
+    return emitted_sounds
+
+
 if __name__ == "__main__":
+    observed_audio =  np.random.normal(0,1,100).reshape(20,5)
     with pm.Model() as mo:
         # choose which scenario is being tested
         current_scenario = pm.Categorical('current_scenario',
@@ -87,11 +100,9 @@ if __name__ == "__main__":
         z_hyp = pm.Uniform('z_hyp', lower=xyz_ranges[:,4],
                               upper=xyz_ranges[:,5],shape=(nbats,))
         xyz_stack = pm.math.stack([x_hyp, y_hyp, z_hyp], axis=1)
-        print('xyz_stack:',xyz_stack.shape)
-        # #scenario_data[1] = xyz_stack
-        # # recreate the simulated audio and cross-correlations
-        sim = pm.Simulator('sim', generate_fake_cc, params=(current_scenario, xyz_stack),
-                                                   observed=np.array([3,3]).reshape(-1,2),
+        
+        sim = pm.Simulator('sim', generate_fake_audio, params=(current_scenario, xyz_stack),
+                                                   observed=observed_audio,
                                                    )
     with mo:
         idata = pm.sample_smc(draws=100, chains=2)
