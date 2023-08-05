@@ -119,6 +119,7 @@ def generate_candidate_sources(sim_audio, **kwargs):
     kwargs['nchannels'] = sim_audio.shape[1]
     cc_peaks = timediff.get_multich_tdoas(multich_cc, **kwargs)
     K = kwargs.get('K',5) # number of peaks per channel CC to consider
+    raise NotImplemented('NEED TO PUT IN GET_TOPK_PEAKS FROM TIMEDIFFESTIM HERE')
     top_K_tdes = {}
     for ch_pair, tdes in cc_peaks.items():
         descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)

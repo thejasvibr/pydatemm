@@ -389,6 +389,19 @@ def get_positive_aa_peaks(multich_aa):
                 pos_multich_aa[channel].append(each)
     return pos_multich_aa
 
+def get_topK_peaks(cc_peaks, **kwargs):
+    K = kwargs['K']
+    top_K_tdes = {}
+    for ch_pair, tdes in cc_peaks.items():
+        descending_quality = sorted(tdes, key=lambda X: X[-1], reverse=True)
+        top_K_tdes[ch_pair] = []
+        for i in range(K):
+            try:
+                top_K_tdes[ch_pair].append(descending_quality[i])
+            except:
+                pass
+    return top_K_tdes
+
 if __name__ == '__main__':
     from simdata import simulate_1source_and_1reflector
     audio, _, _, _ = simulate_1source_and_1reflector()
