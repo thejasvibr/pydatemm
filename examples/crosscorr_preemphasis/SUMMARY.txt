@@ -1,0 +1,16 @@
+Work and results summary
+========================
+short forms: TDE: time-delay/time-difference estimate
+
+2023-08-06:
+Here I tested the effect of pre-emphasised cross-correlations. Knowing the 
+flight trajectory of the bats allows me to eliminate all irrelevant TDES.
+The cross-correlation is thus 'pre-emphasised' from the beginning - and helps
+avoid false peak detections that are not at all possible. 
+
+The pre-emphasis is done by getting an idea of the min-max TDEs expected from 
+each bat flying over a window of time for each unique channel pair. The min-max
+TDE regions for each bat are then kept in the cross-correlation, and all 
+regions outside of the plausible TDE regions are set to 0.
+
+2023-08-07 

@@ -17,7 +17,7 @@ import datetime as dt
 import numpy as np 
 import os
 import pandas as pd
-from pydatemm import generate_candidate_sources
+from pydatemm.source_generation import generate_candidate_sources
 import scipy.signal as signal 
 import soundfile as sf
 import traceback
@@ -53,17 +53,6 @@ help_text = """Run generate_candidate_sources for a given time snippet of an aud
             e.g. highpass: 2,10000 means a 2nd order filter with cutoff at 10 kHz.
             """
 
-parser = argparse.ArgumentParser(description=help_text,)
-parser.add_argument('-paramfile', type=str, help="Path to parameter YAML file")
-
-args = parser.parse_args()
-with open(args.paramfile, 'r') as file:
-    params = yaml.safe_load(file)
-
-if not os.path.exists(params['dest_folder']):
-    os.mkdir(params['dest_folder'])
-
-now = dt.datetime.now()
 #%%
 # Utility functions
 def conv_to_numpy(pydatemm_out):
@@ -194,4 +183,16 @@ def main():
             
 
 if __name__ == "__main__":
+        
+    parser = argparse.ArgumentParser(description=help_text,)
+    parser.add_argument('-paramfile', type=str, help="Path to parameter YAML file")
+    
+    args = parser.parse_args()
+    with open(args.paramfile, 'r') as file:
+        params = yaml.safe_load(file)
+    
+    if not os.path.exists(params['dest_folder']):
+        os.mkdir(params['dest_folder'])
+    
+    now = dt.datetime.now()
     main()

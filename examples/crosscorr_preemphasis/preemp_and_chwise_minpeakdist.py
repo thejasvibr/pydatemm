@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Testing the effect of cross-correlation pre-emphasis on peak-detection
-======================================================================
+Testing the effect of pre-emphasis and channel-based min-peak-distances
+=======================================================================
+This module is largely copied from pre-emphasis-pt2.py
 
 Step 1: Create the pre-emphasis regions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -12,7 +13,9 @@ for a channel pair from all bats in the data to pre-emphasise the cross-correlat
 
 Step 2: Effect of incoporating fine-scale TDE peak-to-peak distances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Here will also attempt at setting the correct minimum peak distance using 
+the TDE predictions. From each point of emission, we get the expected TDE peaks,
+from which we also get the 
 
 
 """
@@ -40,9 +43,6 @@ parser.add_argument('-tstop', dest='tstop', type=lambda X: float(X))
 parser.add_argument('-runname', dest='runname', type=str, default=None)
 parser.add_argument('-minpeakdist', dest='minpeakdist', type=float, default=50e-6)
 args = parser.parse_args()
-
-
-
 #%%
 # Load raw data and upsample flight data. 
 datafolder = '../multibat_stresstests/nbat8/'
