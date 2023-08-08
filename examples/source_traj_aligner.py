@@ -47,12 +47,15 @@ def get_source_proximity_counts(close_points,fine_threshold, input_df, arraygeom
     ----------
     close_points : (M,6) np.array
         Set of sources that are <= the coarse threshold for proximity
+        The columns represent x,y,z,tdoa_res,tstart,tstop
     input_df : pd.DataFrame
         Video trajectory data for that particular bat id 
     arraygeom : (N,3) np.array
         xyz data for the microphone array
     vsound : float>0
         The speed of sound in m/s
+    topx : int
+        Number of closest points to consider
     
     Returns
     -------
@@ -93,6 +96,28 @@ def get_source_proximity_counts(close_points,fine_threshold, input_df, arraygeom
 def generate_proximity_profile(*kwargs):
     '''
     Wrapper around get_close_points and get_source_proximity_counts
+    
+    Arguments
+    ---------
+    sources_nearish : pd.DataFrame
+        Video trajectory data for that particular bat id 
+    arraygeom : (N,3) np.array
+        xyz data for the microphone array
+    vsound : float>0
+        The speed of sound in m/s
+    batid : int
+    input_df : pd.DataFrame
+        Trajectory information with columns t, batid, x,y,z
+    nearish_sources : (Npoints,6) np.array
+        Columns hold x,y,z,tdoa residual,tstart,tend
+    coarse_thresh : float>0
+        The coarse threshold over which the nearby sources are chosen
+    vsound : float
+        Speed of sound in m/s.
+    topx : int
+        Number of closest points to consider
+    
+    
     '''
     batid, batdf, sources_nearish, coarse_threshold, fine_threshold, array_geom, vsound, topx = kwargs
     

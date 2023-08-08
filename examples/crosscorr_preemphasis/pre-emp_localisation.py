@@ -18,6 +18,8 @@ Step 2: Effect on localisation
 """
 
 import argparse
+import glob
+import natsort
 import numpy as np 
 import pandas as pd
 import soundfile as sf
@@ -29,7 +31,8 @@ from scipy.spatial import distance_matrix as distmat
 from scipy.interpolate import interp1d
 import sys
 sys.path.append('../')
-from source_traj_aligner import calculate_toa_channels
+from source_traj_aligner import calculate_toa_channels, generate_proximity_profile
+from source_traj_aligner import get_close_points
 from pydatemm.timediffestim import generate_multich_crosscorr, geometrically_valid
 from pydatemm.timediffestim import get_multich_tdoas, get_topK_peaks
 from pre_emph_utils import *
@@ -42,6 +45,7 @@ try:
 except:
     pass
 from pydatemm.__main__ import conv_to_numpy
+import tqdm
 
 # parser = argparse.ArgumentParser()
 # parser.add_argument('-tstart', dest='tstart', type=lambda X: float(X))
@@ -66,7 +70,10 @@ call_points = flighttraj[flighttraj['emission_point']].sort_values('t')
 
 args = dataclass()
 
-for (tsta, tsto) in zip(np.arange(0,200,10e-3), np.arange(10e-3, 210e-3,10e-3)):
+winstarts = np.arange(0,200,5e-3)
+winstops = winstarts + 10e-3
+
+for (tsta, tsto) in zip(winstarts, winstops):
     args.tstart = tsta
     args.tstop = tsto
     args.minpeakdist = 50e-6 # seconds
@@ -135,7 +142,7 @@ for (tsta, tsto) in zip(np.arange(0,200,10e-3), np.arange(10e-3, 210e-3,10e-3)):
     kwargs['min_height'] = 1e-2
     kwargs['min_peak_diff'] = args.minpeakdist
     kwargs['array_geom'] = micxyz
-    kwargs['K'] = 10
+    kwargs['K'] = 20
     
     # with pre-emphasis
     preemph_multichcrosscor = {}
@@ -195,7 +202,9 @@ for (tsta, tsto) in zip(np.arange(0,200,10e-3), np.arange(10e-3, 210e-3,10e-3)):
     
     cfls_from_tdes = gramanip.make_consistent_fls_cpp(preemph_tdes, **kwargs)
     cfls_from_tdes_raw = gramanip.make_consistent_fls_cpp(normal_tdes, **kwargs)
-    for cfl_input in [cfls_from_tdes, cfls_from_tdes_raw]:
+    run_types = ['preemph', 'raw']
+    
+    for cfl_input, run_type  in zip([cfls_from_tdes, cfls_from_tdes_raw], run_types):
         print(f'Num CFLS found: {len(cfl_input)}')
         if len(cfl_input)>0:
             ccg_matrix = cpy.gbl.make_ccg_matrix(cfl_input)
@@ -211,8 +220,63 @@ for (tsta, tsto) in zip(np.arange(0,200,10e-3), np.arange(10e-3, 210e-3,10e-3)):
                 no_999 = np.logical_and(posns[:,0]!=-999, posns[:,1]!=-999)
                 posns_filt = posns[no_999,:]
                 posns_xyz = posns_filt[:,:3]
-                sources_to_groundtruth = distmat(posns_xyz, actual_calls.loc[:,'x':'z'].to_numpy())
-                sources_closeby = np.sum(sources_to_groundtruth<=0.3, axis=0)
-                print(sources_closeby)
+                # save to dataframe 
+                df_sources = pd.DataFrame(data=posns_filt, columns=['x','y','z','tdoares'])
+                df_sources['tstart'] = args.tstart
+                df_sources['tstop'] = args.tstop
+                csv_filename = f'{run_type}_{tstart}-{tstop}s_sources.csv'
+                df_sources.to_csv(csv_filename)
 
-raise ValueError('THIS NEEDS BETTER CHECKING - LOOK AT THE XYZ SOURCES AND DO ALIGNMENT!!!')
+
+#%%
+# And now let's check the accuracy of tracking in 8 bats with and without pre-emphasis.
+
+preemph_csv = natsort.realsorted(glob.glob('pree*.csv'))
+all_sources = pd.concat([pd.read_csv(each) for each in preemph_csv]).reset_index(drop=True)
+preemph_distmat = distmat(all_sources.loc[:,'x':'z'], upsampled_trajectories.loc[:,'x':'z'])
+preemph_sources_nearish = all_sources[preemph_distmat[:,0]<=2].loc[:,['x','y','z','tdoares','tstart','tstop']]
+preemph_sources_nearish = preemph_sources_nearish.to_numpy()
+
+
+raw_csv = natsort.realsorted(glob.glob('raw*.csv'))
+all_sources = pd.concat([pd.read_csv(each) for each in raw_csv]).reset_index(drop=True)
+raw_distmat = distmat(all_sources.loc[:,'x':'z'], upsampled_trajectories.loc[:,'x':'z'])
+raw_sources_nearish = all_sources[raw_distmat[:,0]<=2].loc[:,['x','y','z','tdoares','tstart','tstop']]
+raw_sources_nearish = raw_sources_nearish.to_numpy()
+
+
+
+
+coarse_threshold = 1
+fine_threshold = 0.3
+array_geom = micxyz.copy()
+topx = 10
+
+proxprofiles_bybatid = {}
+
+for batid  in tqdm.tqdm(upsampled_trajectories['batid'].unique()):
+   
+    batdf = upsampled_trajectories.groupby('batid').get_group(batid)
+    proxprofiles_bybatid[batid] = generate_proximity_profile(batid, batdf, preemph_sources_nearish, coarse_threshold,
+                                              fine_threshold, array_geom, vsound, topx )
+
+
+rawproxprofiles_bybatid = {}
+
+for batid  in tqdm.tqdm(upsampled_trajectories['batid'].unique()):
+   
+    batdf = upsampled_trajectories.groupby('batid').get_group(batid)
+    rawproxprofiles_bybatid[batid] = generate_proximity_profile(batid, batdf, raw_sources_nearish, coarse_threshold,
+                                              fine_threshold, array_geom, vsound, topx )
+
+#%%    
+plt.figure()
+for batid, profile in proxprofiles_bybatid.items():
+    plt.plot(profile)
+plt.vlines(call_points['t']*1e3,0,5,'k')
+
+#%%
+plt.figure()
+for batid, profile in rawproxprofiles_bybatid.items():
+    plt.plot(profile)
+plt.vlines(call_points['t']*1e3,0,5,'k')
