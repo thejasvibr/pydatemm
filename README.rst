@@ -1,29 +1,29 @@
 ========
 pydatemm
 ========
-
-`Warning: package and docs still under construction!!!`
-
-
-.. image:: https://img.shields.io/pypi/v/pydatemm.svg
-        :target: https://pypi.python.org/pypi/pydatemm
-
-.. image:: https://img.shields.io/travis/thejasvibr/pydatemm.svg
-        :target: https://travis-ci.com/thejasvibr/pydatemm
-
-.. image:: https://readthedocs.org/projects/pydatemm/badge/?version=latest
-        :target: https://pydatemm.readthedocs.io/en/latest/?version=latest
-        :alt: Documentation Status
+A package to localise sources in overlapping multi-channel audio data. 
 
 
-A package to perform acoustic localisation in audio with overlapping sounds. 
+`Update (2024 January)
+Development on this package has been paused as I realised phase-difference based algorithms may do better
+with the kinds of overlapping, reverberant audio that I am dealing with.`
 
+The name `pydatemm` refers to the DATEMM (Scheuing & Yang 2008) algorithm that was the original implementation. 
+The current version of this package implements the Compatibility-Conflict-Graph (CCG) (Kreißig & Yang 2013) algorithm.
+The CCG and linear algebra localisation scripts are optimised for speed and written in C++ (python-C++ communication
+through the :code:`cppyy` package.
 
+Overview
+--------
+The Compatibility-Conflict-Graph algorithm by Kreißig & Yang is the successor of the DATEMM algorithm (Scheuing & Yang 2008), 
+which builds zero-sum time-difference-of-arrival (TDOA) triplets, and 'fuses' compatible triplets together to make a bigger TDOA
+graph. 
 
-* Free software: MIT license
-* Documentation: https://pydatemm.readthedocs.io.
-
-
+In CCG, zero-sum triplets are first built systematically by investigating the presence of zero-sum 'fundamental loops'. Then, based
+on the values and node identities, all zero-sum loops are compared with each other and a large N_loop x N_loop binary matrix is filled
+to indicate compatibility or a conflict. A compatibility indicates two triplets can be fused together, while a conflict indicates they can't. 
+The CCG algorithm finds the largest subsets of unique compatible fundamental-loops, that thus result in >=4 channel TDOA graphs that can
+then be used to localise sources. 
 
 References
 ----------
@@ -31,10 +31,10 @@ References
 * Kreißig, M., & Yang, B. (2013, May). Fast and reliable TDOA assignment in multi-source reverberant environments. In 2013 IEEE International Conference on Acoustics, Speech and Signal Processing (pp. 355-359). IEEE.
 
 
-Features
---------
-
-* TODO
+License
+-------
+* Free software: MIT license
+* Documentation: https://pydatemm.readthedocs.io.
 
 Credits
 -------
