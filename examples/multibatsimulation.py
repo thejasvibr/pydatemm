@@ -34,22 +34,47 @@ def parse_raytracing_bool(bool_in):
     else:
         raise ValueError(f'Cant parse {bool_in} for ray-tracing. Must be True or False')
 
+def parse_arraygeom_file(arraygeom_filepath):
+    if arraygeom_filepath =='':
+    
+        array_geom = np.array(([3, 8.9, 1.5],
+                              [2.5, 8.9, 1],
+                              [2, 8.9, 1.5],
+                              [1.5, 8.9,1],
+                              [1.0, 8.9, 1.5],
+                              [0.01, 8, 2.0],
+                              [0.01, 8, 1.5],
+                              [0.01, 7, 2.0],
+                              )
+                              )
+        # add some noise to the array - this is so that none of the mics are 
+        # co-planar.
+        array_geom += choose(np.linspace(-0.01,0.01,20), array_geom.size).reshape(array_geom.shape)
+
+    else:
+        df = pd.read_csv(arraygeom_filepath)
+        array_geom = df.loc[:,'x':'z'].to_numpy()
+    return array_geom
+    
+
+
 args = argparse.ArgumentParser()
-args.add_argument('-nbats', type=int)
-args.add_argument('-ncalls', type=int)
-args.add_argument('-all-calls-before', type=float, default=0.1)
+args.add_argument('-nbats', type=int, default=2)
+args.add_argument('-ncalls', type=int, default=10)
+args.add_argument('-all-calls-before', type=float, default=1.0)
 args.add_argument('-ipi', type=float, default=0.05)
-args.add_argument('-room-dim', type=parse_room_dims,)
+args.add_argument('-room-dim', type=parse_room_dims, default=[5,5,5])
 args.add_argument('-seed', type=int, default=78464)
 args.add_argument('-input-folder', type=str)
 args.add_argument('-ray-tracing', type=parse_raytracing_bool, default=False)
 args.add_argument('-samplerate', type=int, default=192000)
 args.add_argument('-ref-order', type=int, default=1)
+args.add_argument('-arraygeomfile', type=parse_arraygeom_file, default=parse_arraygeom_file(''))
 
 
 
 param = args.parse_args()
-
+#%%
 np.random.seed(param.seed)
 
 # make the folder for all the input files
@@ -58,10 +83,11 @@ if not os.path.exists(input_folder):
  	os.mkdir(input_folder)
 
 
+array_geom = param.arraygeomfile
 nbats = param.nbats
 ncalls = param.ncalls
 room_dims = param.room_dim
-
+print('array_geom ...', array_geom)
 
 timestep = 2e-3
 potential_call_times = np.arange(0,param.all_calls_before, timestep)
@@ -148,20 +174,6 @@ room = pra.ShoeBox(
     ray_tracing=ray_tracing,
     air_absorption=True)
 
-array_geom = np.array(([3, 8.9, 1.5],
-                      [2.5, 8.9, 1],
-                      [2, 8.9, 1.5],
-                      [1.5, 8.9,1],
-                      [1.0, 8.9, 1.5],
-                      [0.01, 8, 2.0],
-                      [0.01, 8, 1.5],
-                      [0.01, 7, 2.0],
-                      )
-                      )
-# add some noise to the array - this is so that none of the mics are 
-# co-planar.
-array_geom += choose(np.linspace(-0.01,0.01,20), array_geom.size).reshape(array_geom.shape)
-print(array_geom)
 #%%
 # Go crazy and make each call emission the same type of call.
 call_points = allbat_xyz[allbat_xyz['emission_point']]
@@ -173,7 +185,9 @@ t_call = np.linspace(0,call_durn, int(fs*call_durn))
 call_type = str(choose(['logarithmic','linear','hyperbolic'], 1)[0])
 batcall = signal.chirp(t_call, maxf, t_call[-1], minf,call_type)
 batcall *= signal.hamming(batcall.size)
+batcall *= 0.99
 batcall *= 1/nbats
+
 
 for rownum, row in call_points.iterrows():
     x,y,z,t,_,_ = row
