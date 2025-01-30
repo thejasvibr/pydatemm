@@ -9,8 +9,6 @@ A package to localise sources in overlapping multi-channel audio data.
 .. image:: singlebat_traj_ccg_output.PNG
    :width: 600
    
-Update 2025 January: *This package is not very user-installable yet, and documentation may be patchy. This is a proof-of-principle implementation that didn't go too far when I realised the DATEMM/CCG class methods are rather slow when you need to start tracking multiple sources ( >=3 sources) with multiple microphones (>=12 mics). The code **does work** though, and the main issue is that there are a lot of false positives (and some false negatives too) - which makes cleaning the data hard unless you have another sensor modality to support the output (e.g. camera based trajectories to constrain audio source locations).*
-
 The name `pydatemm` refers to the DATEMM (Scheuing & Yang 2008) algorithm that was the original implementation. 
 The current version of this package implements the Compatibility-Conflict-Graph (CCG) (Kreißig & Yang 2013) algorithm.
 The CCG and linear algebra localisation scripts are optimised for speed and written in C++ (python-C++ communication
@@ -39,6 +37,11 @@ For examples scripts that use the ```generate_candidate_sources``` see the ```ex
 
 For examples of bash scripts (ending with ```.sh```) that were used to run the code on computing clusters with the Slurm job-manager check out:
 	* ```1529543496_origxyz.sh``` 
+
+
+
+Update 2025 January: *This package is not very user-installable yet, and documentation may be patchy. This is a proof-of-principle implementation that didn't go too far when I realised the DATEMM/CCG class methods are rather slow when you need to start tracking multiple sources ( >=3 sources) with multiple microphones (>=12 mics). The code does work though, and the main issue is that there are a lot of false positives (and some false negatives too) - which makes cleaning the data hard unless you have another sensor modality to support the output (e.g. camera based trajectories to constrain audio source locations).*
+
 
 
 References
