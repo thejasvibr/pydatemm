@@ -1,7 +1,8 @@
 ========
 pydatemm
 ========
-.. image:: images/singlebat_traj_ccg_output.png
+
+.. image:: singlebat_traj_ccg_output.png
    :width: 600
    
 Update 2025 January: *This package is not very user-installable yet, and documentation may be patchy. This is a proof-of-principle implementation that didn't go too far when I realised the DATEMM/CCG class methods are rather slow when you need to start tracking multiple sources ( >=3 sources) with multiple microphones (>=12 mics). The code *does* work though, and the main issue is that there are a lot of false positives (and some false negatives too) - which makes cleaning the data hard unless you have another sensor modality to go along (e.g. camera based trajectories).*
