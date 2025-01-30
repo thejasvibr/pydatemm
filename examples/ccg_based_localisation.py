@@ -112,6 +112,20 @@ within_rangediff_tolerance = np.array(within_rangediff_tolerance, dtype=np.bool_
 #%%
 # Segment and get all valid regions that are at least X ms long. 
 
+ch1, ch2 = 1,0
+plt.figure()
+a = plt.subplot(211)
+plt.imshow(gcc_map[ch1,ch2,:,:], aspect='auto',cmap="Set2",
+           extent=[t_chunks[0], t_chunks[-1], rangediff_max, rangediff_min], interpolation='none')
+
+plt.plot(sender_times, rangediffs[(ch1,ch2)])
+plt.subplot(212, sharex=a, sharey=a)
+plt.imshow(within_rangediff_tolerance[ch1,ch2,:,:], aspect='auto',cmap="Set2",
+           extent=[t_chunks[0], t_chunks[-1], rangediff_max, rangediff_min], interpolation='none')
+
+plt.plot(sender_times, rangediffs[(ch1,ch2)])
+
+
 #%% Now 
 
 

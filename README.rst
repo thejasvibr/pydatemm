@@ -1,12 +1,14 @@
 ========
 pydatemm
 ========
+.. image:: images/singlebat_traj_ccg_output.png
+   :width: 600
+   
+Update 2025 January: *This package is not very user-installable yet, and documentation may be patchy. This is a proof-of-principle implementation that didn't go too far when I realised the DATEMM/CCG class methods are rather slow when you need to start tracking multiple sources ( >=3 sources) with multiple microphones (>=12 mics). The code *does* work though, and the main issue is that there are a lot of false positives (and some false negatives too) - which makes cleaning the data hard unless you have another sensor modality to go along (e.g. camera based trajectories).*
+
+
+
 A package to localise sources in overlapping multi-channel audio data. 
-
-
-`Update (2024 January)
-Development on this package has been paused as I realised phase-difference based algorithms may do better
-with the kinds of overlapping, reverberant audio that I am dealing with.`
 
 The name `pydatemm` refers to the DATEMM (Scheuing & Yang 2008) algorithm that was the original implementation. 
 The current version of this package implements the Compatibility-Conflict-Graph (CCG) (Kreißig & Yang 2013) algorithm.
@@ -22,8 +24,25 @@ graph.
 In CCG, zero-sum triplets are first built systematically by investigating the presence of zero-sum 'fundamental loops'. Then, based
 on the values and node identities, all zero-sum loops are compared with each other and a large N_loop x N_loop binary matrix is filled
 to indicate compatibility or a conflict. A compatibility indicates two triplets can be fused together, while a conflict indicates they can't. 
-The CCG algorithm finds the largest subsets of unique compatible fundamental-loops, that thus result in >=4 channel TDOA graphs that can
-then be used to localise sources. 
+The CCG algorithm finds the largest subsets of unique compatible fundamental-loops, that thus result in >=4 channel TDOA graphs that can then be used to localise sources. 
+
+
+Installation & usage
+--------------------
+This package is rather under-documented from a user-perspective, and active development was stopped ~2023. 
+ 
+The heart of the package is the ```generate_candidate_sources``` function in the ```source_generation``` module. 
+
+For examples scripts that use the ```generate_candidate_sources``` see the ```examples/``` folder, and in specific:
+	* ```ushichka_2018-08-17_speakerplayback.py```
+
+For examples of bash scripts (ending with ```.sh```) that were used to run the code on computing clusters with the Slurm job-manager check out:
+	* ```1529543496_origxyz.sh``` 
+
+
+
+
+
 
 References
 ----------
